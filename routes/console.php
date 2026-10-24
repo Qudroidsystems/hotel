@@ -34,6 +34,12 @@ Artisan::command('it:prune', function (\App\Services\It\MonitorService $monitors
     $this->info($monitors->prune() . ' old check result(s) removed.');
 })->purpose('Remove IT check history older than the retention period');
 
+// Online bookings waiting for a deposit are released when their hold runs out.
+Artisan::command('bookings:expire-holds', function (\App\Services\Booking\OnlineBookingService $booking) {
+    $this->info($booking->expireHolds() . ' unpaid online booking(s) released.');
+})->purpose('Cancel online bookings whose deposit was not paid in time');
+
+Schedule::command('bookings:expire-holds')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('it:prune')->dailyAt('03:30');

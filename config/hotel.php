@@ -111,6 +111,34 @@ return [
     ],
 
     /*
+    | Online booking & guest portal (spec §4, §5, §12.2). deposit_percent of the
+    | stay is asked for online (0 = pay at the hotel). Bookings waiting for a
+    | deposit are released after hold_hours. Guests can cancel online up to
+    | cancel_hours before the check-in time.
+    */
+    'booking' => [
+        'enabled'         => (bool) env('HOTEL_BOOKING_ENABLED', true),
+        'welcome'         => null,      // one line under the hotel name on the booking page
+        'deposit_percent' => (float) env('HOTEL_BOOKING_DEPOSIT_PERCENT', 30),
+        'hold_hours'      => (int) env('HOTEL_BOOKING_HOLD_HOURS', 24),
+        'cancel_hours'    => (int) env('HOTEL_BOOKING_CANCEL_HOURS', 48),
+        'max_nights'      => 30,
+        'max_rooms'       => 4,
+        'advance_days'    => 365,
+        'check_in_time'   => '14:00',
+        'check_out_time'  => '12:00',
+        'contact_phone'   => env('HOTEL_PHONE'),
+        'contact_email'   => env('HOTEL_EMAIL', env('MAIL_FROM_ADDRESS')),
+        'address'         => env('HOTEL_ADDRESS'),
+        'policies'        => [
+            'Check-in from 2:00 PM, check-out by 12:00 noon.',
+            'A valid photo ID is required at check-in.',
+            'Smoking is not allowed in rooms.',
+        ],
+        'guest_requests'  => true,
+    ],
+
+    /*
     | Operating expenses (spec §9, §14). Expenses above approval_limit need
     | approval by someone other than the person who recorded them (0 = all).
     | Departments are the cost centres expenses are charged to.

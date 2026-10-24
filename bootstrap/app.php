@@ -19,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
+        // Paystack posts payment notifications without a CSRF token; they are checked by signature instead.
+        $middleware->validateCsrfTokens(except: ['paystack/webhook']);
+
         // Signed-in users go to the dashboard instead of the login page.
         $middleware->redirectUsersTo('/dashboard');
     })

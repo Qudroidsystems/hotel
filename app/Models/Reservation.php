@@ -31,6 +31,7 @@ class Reservation extends Model
         'checked_in_at'   => 'datetime',
         'checked_out_at'  => 'datetime',
         'cancelled_at'    => 'datetime',
+        'hold_expires_at' => 'datetime',
     ];
 
     // Store stay dates as plain Y-m-d so date comparisons behave the same on MySQL and SQLite.
@@ -59,6 +60,16 @@ class Reservation extends Model
     public function folio(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Folio::class);
+    }
+
+    public function onlinePayments(): HasMany
+    {
+        return $this->hasMany(\App\Models\Booking\OnlinePayment::class);
+    }
+
+    public function guestRequests(): HasMany
+    {
+        return $this->hasMany(\App\Models\Booking\GuestRequest::class);
     }
 
     public function events(): HasMany
@@ -185,6 +196,16 @@ class Reservation extends Model
     }
 
     /** Random, unguessable token for the guest's QR code (spec §5: no personal data in the QR). */
+    /** The guest's private link to their booking (not the same as the check-in QR token). */
+    public static function newGuestToken(): string
+    {
+        do {
+            $token = \Illuminate\Support\Str::random(48);
+        } while (static::where('guest_token', $token)->exists());
+
+        return $token;
+    }
+
     public static function newQrToken(): string
     {
         do {

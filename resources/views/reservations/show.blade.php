@@ -258,6 +258,32 @@
                         <div class="mt-2"><a href="{{ route('reservations.print', $r) }}" target="_blank" rel="noopener" class="action-btn btn-open"><i class="ri-printer-line"></i> Print / share</a></div></div>
                 </div>
             </x-cb.card>
+
+            {{-- The guest's own booking page (pay, cancel, requests) --}}
+            <x-cb.card title="Guest's booking page" icon="ri-global-line">
+                @if ($r->status->value === 'pending' && $r->hold_expires_at)
+                    <div class="small text-warning mb-2"><i class="ri-time-line"></i> Online hold — released {{ $r->hold_expires_at->diffForHumans() }} ({{ $r->hold_expires_at->format('D j M, g:i A') }}) unless the deposit is paid or you confirm it.</div>
+                @endif
+                @if ($r->guest_token)
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="guestLink" value="{{ route('stay.show', $r->guest_token) }}" readonly aria-label="Guest booking link">
+                        <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard?.writeText(document.getElementById('guestLink').value); this.textContent='Copied';">Copy</button>
+                    </div>
+                    <div class="small text-muted mt-1">Send this to the guest (WhatsApp, SMS or email). Anyone with the link can see, pay and cancel the booking.</div>
+                @else
+                    <form method="POST" action="{{ route('reservations.guest-link', $r) }}" data-once>@csrf
+                        <button class="action-btn btn-open"><i class="ri-link"></i> Create a link for the guest</button></form>
+                    <div class="small text-muted mt-1">Lets the guest pay online, see their QR code and send requests during the stay.</div>
+                @endif
+                @php $ops = $r->onlinePayments()->latest()->limit(5)->get(); @endphp
+                @if ($ops->isNotEmpty())
+                    <div class="small fw-bold text-muted mt-3 mb-1">Online payments</div>
+                    @foreach ($ops as $op)
+                        <div class="d-flex justify-content-between small border-bottom py-1"><span>{{ $op->created_at->format('j M, g:i A') }} · {{ ucfirst($op->purpose) }}<span class="text-muted"> {{ $op->reference }}</span></span>
+                            <span>@money($op->amount) <span class="status-pill {{ ['success' => 'st-success', 'failed' => 'st-danger', 'abandoned' => 'st-muted'][$op->status] ?? 'st-warning' }}">{{ $op->status === 'initialized' ? 'Started' : ucfirst($op->status) }}</span></span></div>
+                    @endforeach
+                @endif
+            </x-cb.card>
         </div>
     </div>
 

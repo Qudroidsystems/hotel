@@ -67,6 +67,7 @@ class PermissionMeta
         'Manage attendance'         => ['Manage', 'Correct clock-ins (with a reason), change the rota and record leave.'],
         'Manage staff & shifts'     => ['Manage', 'Set up shifts, departments, kiosks and staff badges (including replacing a lost badge).'],
         'Run attendance kiosk'      => ['Use',    'Open the clock-in kiosk on a device at the staff entrance.'],
+        'Handle guest requests'     => ['Manage', 'See and answer requests guests send from their booking page (towels, repairs, room service…).'],
         'Record expenses'           => ['Create', 'Record running costs (diesel, repairs, supplies…) with receipts. Small ones are approved automatically.'],
         'View expenses'             => ['View',   'See every expense, budgets and spending by department — not only your own.'],
         'Approve expenses'          => ['Approve','Approve or reject expenses above the approval limit (never your own), and void expenses.'],

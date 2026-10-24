@@ -58,6 +58,16 @@ class StaffAppService
                 ]));
         }
 
+        if ($user->can('Handle guest requests')) {
+            // Requests that need a person (housekeeping ones arrive as cleaning tasks instead).
+            \App\Models\Booking\GuestRequest::active()->whereNull('housekeeping_task_id')->whereNull('maintenance_order_id')
+                ->with(['room:id,number', 'reservation.guest:id,first_name,last_name,is_vip'])->get()
+                ->each(fn ($g) => $items->push((object) [
+                    'kind' => 'guest', 'model' => $g, 'urgent' => $g->created_at->lt(now()->subMinutes(20)) || (bool) $g->reservation?->guest?->is_vip,
+                    'at' => $g->created_at, 'rank' => $g->status === 'open' ? 0 : 2,
+                ]));
+        }
+
         if ($user->can('Manage IT tickets')) {
             ItTicket::active()->with('requester:id,name')
                 ->where(fn ($q) => $q->where('assigned_to', $user->id)->orWhereNull('assigned_to'))

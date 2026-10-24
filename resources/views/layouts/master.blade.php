@@ -721,6 +721,15 @@
                             </div>
                         </li>
                     @endcanany
+                    @can('Handle guest requests')
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="{{ route('guest-requests.index') }}">
+                                <i class="ph-bell-ringing"></i> <span>Guest Requests</span>
+                                @php $openGuestRequests = \App\Models\Booking\GuestRequest::where('status', 'open')->count(); @endphp
+                                @if ($openGuestRequests)<span class="badge bg-danger ms-auto">{{ $openGuestRequests }}</span>@endif
+                            </a>
+                        </li>
+                    @endcan
                     {{-- Staff App: the phone version for everyone --}}
                     <li class="nav-item">
                         <a class="nav-link menu-link" href="{{ route('staff.home') }}">
@@ -1410,6 +1419,10 @@
         @can('Manage expense categories')
         {title:'Expense Categories & Budgets',          url:'{{ route("expenses.categories.index") }}',                  icon:'mdi-folder-cog-outline',      category:'Finance',             keywords:['budget','expense category']},
         @endcan
+        @can('Handle guest requests')
+        {title:'Guest Requests',                        url:'{{ route("guest-requests.index") }}',                       icon:'mdi-bell-ring-outline',       category:'Front Desk',          keywords:['guest','request','towels','room service','complaint']},
+        @endcan
+        {title:'Public Booking Page',                   url:'{{ route("book.index") }}',                                 icon:'mdi-web',                     category:'Front Desk',          keywords:['book online','website','booking engine','public']},
         {title:'Staff App (phone)',                     url:'{{ route("staff.home") }}',                                 icon:'mdi-cellphone',               category:'Staff',               keywords:['mobile','phone','app','my work','tasks','approvals','install']},
         {title:'Raise an IT Ticket',                    url:'{{ route("it.tickets.index") }}#new',                       icon:'mdi-lifebuoy',                category:'IT',                  keywords:['it','support','help','computer','wifi','printer','internet','ticket','broken']},
         {title:'My IT Requests',                        url:'{{ route("it.tickets.index") }}',                           icon:'mdi-ticket-outline',          category:'IT',                  keywords:['it','ticket','service desk','support']},

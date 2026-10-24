@@ -38,6 +38,9 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\Settings\BankAccountController;
 use App\Http\Controllers\Settings\HotelSettingsController;
 use App\Http\Controllers\Staff\StaffAppController;
+use App\Http\Controllers\Booking\BookingController;
+use App\Http\Controllers\Booking\GuestPortalController;
+use App\Http\Controllers\Booking\GuestRequestController;
 use App\Http\Controllers\Finance\ExpenseCategoryController;
 use App\Http\Controllers\Finance\ExpenseController;
 use App\Http\Controllers\It\AlertController as ItAlertController;
@@ -82,6 +85,23 @@ Route::get('/refresh-csrf', function () {
 | Authenticated routes
 |--------------------------------------------------------------------------
 */
+
+// ── Public: online booking and the guest's own booking page (spec §4, §5) ──
+Route::middleware('throttle:booking-pages')->group(function () {
+    Route::get('/book', [BookingController::class, 'index'])->name('book.index');
+    Route::get('/book/search', [BookingController::class, 'search'])->name('book.search');
+    Route::get('/book/details', [BookingController::class, 'details'])->name('book.details');
+    Route::post('/book', [BookingController::class, 'store'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('book.store');
+    Route::get('/book/pay/{token}', [BookingController::class, 'pay'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('book.pay');
+    Route::get('/book/paystack/callback', [BookingController::class, 'callback'])->name('book.paystack.callback');
+
+    Route::get('/stay', [GuestPortalController::class, 'find'])->name('stay.find');
+    Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
+    Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
+    Route::post('/stay/{token}/cancel', [GuestPortalController::class, 'cancel'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.cancel');
+    Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
+});
+Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middleware('throttle:paystack-webhook')->name('book.paystack.webhook');
 
 // Staff App manifest: fetched by the browser without cookies, so it must be public.
 Route::get('/staff/manifest.webmanifest', [StaffAppController::class, 'manifest'])->name('staff.manifest');
@@ -201,6 +221,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{reservation}/no-show', 'noShow')->name('no-show');
         Route::post('/{reservation}/dates', 'changeDates')->name('dates');
         Route::post('/{reservation}/discount', 'discount')->name('discount');
+        Route::post('/{reservation}/guest-link', 'guestLink')->name('guest-link');
     });
     // Guest QR codes point here (opaque token, no personal data).
     Route::get('/r/{token}', [ReservationController::class, 'qr'])->where('token', '[A-Za-z0-9]{40,64}')->middleware('throttle:60,1')->name('reservations.qr');
@@ -371,6 +392,11 @@ Route::middleware('auth')->group(function () {
 
     // Audit trail
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit.index');
+
+    // Guest requests sent from the guest portal (spec §12.2)
+    Route::get('/guest-requests', [GuestRequestController::class, 'index'])->name('guest-requests.index');
+    Route::post('/guest-requests/{guestRequest}', [GuestRequestController::class, 'update'])->name('guest-requests.update');
+    Route::post('/guest-requests/{guestRequest}/maintenance', [GuestRequestController::class, 'toMaintenance'])->name('guest-requests.maintenance');
 
     // Staff App: phone-first, installable (spec §16)
     Route::prefix('staff')->name('staff.')->controller(StaffAppController::class)->group(function () {

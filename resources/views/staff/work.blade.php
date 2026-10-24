@@ -7,7 +7,7 @@
     $me = auth()->user();
     $hkManager = $me->can('Manage housekeeping');
     $needInspect = config('hotel.housekeeping.require_inspection', true);
-    $groups = ['housekeeping' => 'Rooms to clean', 'maintenance' => 'Repairs', 'ticket' => 'IT tickets'];
+    $groups = ['guest' => 'Guest requests', 'housekeeping' => 'Rooms to clean', 'maintenance' => 'Repairs', 'ticket' => 'IT tickets'];
 @endphp
 
 @if ($work->isEmpty())
@@ -22,7 +22,27 @@
     @foreach ($items as $it)
         @php $m = $it->model; @endphp
 
-        @if ($kind === 'housekeeping')
+        @if ($kind === 'guest')
+            <div class="sa-item {{ $it->urgent ? 'urgent' : '' }}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div><div class="big">{{ $m->room?->number ?? '—' }}</div><div class="t" style="font-size:15px"><i class="{{ $m->type_icon }} text-muted"></i> {{ $m->type_label }}</div>
+                        <div class="m">{{ $m->reservation?->guest?->full_name }}{{ $m->reservation?->guest?->is_vip ? ' · VIP' : '' }} · {{ $m->created_at->diffForHumans() }}</div></div>
+                    <span class="status-pill {{ $m->status_pill }}">{{ $m->status_label }}</span>
+                </div>
+                @if ($m->details)<div class="small mt-2">“{{ $m->details }}”</div>@endif
+                <form method="POST" action="{{ route('guest-requests.update', $m) }}" class="mt-2" data-once>@csrf
+                    <input name="staff_note" class="form-control mb-2" maxlength="500" placeholder="Message to the guest (optional)">
+                    <div class="sa-btns mt-0">
+                        @if ($m->status === 'open')<button name="status" value="in_progress" class="sa-btn">On it</button>@endif
+                        <button name="status" value="done" class="sa-btn go"><i class="ri-check-line"></i> Done</button>
+                    </div>
+                </form>
+                @if ($m->route === 'maintenance' && auth()->user()->canAny(['Report maintenance issues', 'Manage maintenance']))
+                    <form method="POST" action="{{ route('guest-requests.maintenance', $m) }}" class="mt-2" data-once>@csrf<button class="sa-btn w-100"><i class="ri-tools-line"></i> Send to maintenance</button></form>
+                @endif
+            </div>
+
+        @elseif ($kind === 'housekeeping')
             <div class="sa-item {{ $it->urgent ? 'urgent' : '' }}">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div><div class="big">{{ $m->room?->number }}</div><div class="m">{{ $m->type_label }}{{ $m->room?->floor ? ' · ' . $m->room->floor->name : '' }}{{ $m->urgent ? ' · URGENT' : '' }}</div></div>

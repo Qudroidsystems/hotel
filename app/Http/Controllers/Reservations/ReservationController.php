@@ -374,6 +374,16 @@ class ReservationController extends Controller
     }
 
     /** Target of the QR code. Logs every scan; flags bookings the QR is no longer valid for. */
+    /** Give a phone or walk-in booking a private link the guest can use (pay, QR, requests). */
+    public function guestLink(Reservation $reservation, \App\Services\Booking\OnlineBookingService $booking)
+    {
+        abort_unless(auth()->user()->canAny(['View reservations', 'Update reservations']), 403);
+        $booking->ensureToken($reservation);
+        $reservation->log('guest_link', 'Guest booking page link created.');
+
+        return back()->with('success', 'Link created — copy it and send it to the guest.');
+    }
+
     public function qr(Request $request, string $token)
     {
         $reservation = Reservation::where('qr_token', $token)->first();

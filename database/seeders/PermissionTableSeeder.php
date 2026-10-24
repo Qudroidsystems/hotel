@@ -117,6 +117,9 @@ class PermissionTableSeeder extends Seeder
         'Audit & Security' => [
             'View audit log',
         ],
+        'Guest Services' => [
+            'Handle guest requests',
+        ],
         'Expenses' => [
             'Record expenses',
             'View expenses',
