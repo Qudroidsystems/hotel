@@ -37,6 +37,14 @@ use App\Http\Controllers\Reservations\ReservationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\Settings\BankAccountController;
 use App\Http\Controllers\Settings\HotelSettingsController;
+use App\Http\Controllers\Finance\ExpenseCategoryController;
+use App\Http\Controllers\Finance\ExpenseController;
+use App\Http\Controllers\It\AlertController as ItAlertController;
+use App\Http\Controllers\It\AssetController as ItAssetController;
+use App\Http\Controllers\It\ControlRoomController;
+use App\Http\Controllers\It\MaintenanceController as ItMaintenanceController;
+use App\Http\Controllers\It\MonitorController as ItMonitorController;
+use App\Http\Controllers\It\TicketController as ItTicketController;
 use App\Http\Controllers\Rooms\BuildingController;
 use App\Http\Controllers\Rooms\RoomController;
 use App\Http\Controllers\Rooms\RoomTypeController;
@@ -359,6 +367,61 @@ Route::middleware('auth')->group(function () {
 
     // Audit trail
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit.index');
+
+    // Operating expenses (spec §9, §14)
+    Route::prefix('expenses')->name('expenses.')->group(function () {
+        Route::get('/', [ExpenseController::class, 'index'])->name('index');
+        Route::post('/', [ExpenseController::class, 'store'])->middleware('throttle:30,1')->name('store');
+        Route::get('/categories', [ExpenseCategoryController::class, 'index'])->name('categories.index');
+        Route::post('/categories', [ExpenseCategoryController::class, 'store'])->name('categories.store');
+        Route::put('/categories/{category}', [ExpenseCategoryController::class, 'update'])->name('categories.update');
+        Route::get('/{expense}', [ExpenseController::class, 'show'])->name('show');
+        Route::put('/{expense}', [ExpenseController::class, 'update'])->name('update');
+        Route::post('/{expense}/approve', [ExpenseController::class, 'approve'])->name('approve');
+        Route::post('/{expense}/reject', [ExpenseController::class, 'reject'])->name('reject');
+        Route::post('/{expense}/pay', [ExpenseController::class, 'pay'])->name('pay');
+        Route::post('/{expense}/void', [ExpenseController::class, 'void'])->name('void');
+        Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])->name('attach');
+        Route::get('/{expense}/files/{index}', [ExpenseController::class, 'file'])->whereNumber('index')->name('file');
+    });
+
+    // IT control room & service desk (spec §11)
+    Route::prefix('it')->name('it.')->group(function () {
+        Route::get('/', [ControlRoomController::class, 'index'])->name('index');
+        Route::post('/check-now', [ControlRoomController::class, 'runChecks'])->middleware('throttle:6,1')->name('check-now');
+        Route::get('/report', [ControlRoomController::class, 'report'])->name('report');
+
+        Route::get('/monitors', [ItMonitorController::class, 'index'])->name('monitors.index');
+        Route::post('/monitors', [ItMonitorController::class, 'store'])->name('monitors.store');
+        Route::get('/monitors/{monitor}', [ItMonitorController::class, 'show'])->name('monitors.show');
+        Route::put('/monitors/{monitor}', [ItMonitorController::class, 'update'])->name('monitors.update');
+        Route::delete('/monitors/{monitor}', [ItMonitorController::class, 'destroy'])->name('monitors.destroy');
+        Route::post('/monitors/{monitor}/check', [ItMonitorController::class, 'check'])->middleware('throttle:20,1')->name('monitors.check');
+        Route::post('/monitors/{monitor}/toggle', [ItMonitorController::class, 'toggle'])->name('monitors.toggle');
+
+        Route::get('/equipment', [ItAssetController::class, 'index'])->name('assets.index');
+        Route::post('/equipment', [ItAssetController::class, 'store'])->name('assets.store');
+        Route::put('/equipment/{asset}', [ItAssetController::class, 'update'])->name('assets.update');
+        Route::delete('/equipment/{asset}', [ItAssetController::class, 'destroy'])->name('assets.destroy');
+
+        Route::get('/alerts', [ItAlertController::class, 'index'])->name('alerts.index');
+        Route::post('/alerts/{alert}/acknowledge', [ItAlertController::class, 'acknowledge'])->name('alerts.acknowledge');
+        Route::post('/alerts/{alert}/resolve', [ItAlertController::class, 'resolve'])->name('alerts.resolve');
+        Route::post('/alerts/{alert}/ticket', [ItAlertController::class, 'ticket'])->name('alerts.ticket');
+
+        Route::get('/maintenance', [ItMaintenanceController::class, 'index'])->name('maintenance.index');
+        Route::post('/maintenance', [ItMaintenanceController::class, 'store'])->name('maintenance.store');
+        Route::put('/maintenance/{window}', [ItMaintenanceController::class, 'update'])->name('maintenance.update');
+        Route::post('/maintenance/{window}/cancel', [ItMaintenanceController::class, 'cancel'])->name('maintenance.cancel');
+
+        // Any signed-in staff member can raise and follow tickets.
+        Route::get('/tickets', [ItTicketController::class, 'index'])->name('tickets.index');
+        Route::post('/tickets', [ItTicketController::class, 'store'])->middleware('throttle:20,1')->name('tickets.store');
+        Route::get('/tickets/{ticket}', [ItTicketController::class, 'show'])->name('tickets.show');
+        Route::post('/tickets/{ticket}/updates', [ItTicketController::class, 'update'])->name('tickets.update');
+        Route::post('/tickets/{ticket}/assign', [ItTicketController::class, 'assign'])->name('tickets.assign');
+        Route::post('/tickets/{ticket}/triage', [ItTicketController::class, 'triage'])->name('tickets.triage');
+    });
 
     // Hotel settings
     Route::prefix('settings')->name('settings.')->group(function () {

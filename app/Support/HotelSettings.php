@@ -85,6 +85,14 @@ class HotelSettings
                     'procurement.invoice_tolerance'  => ['type' => 'money', 'label' => 'Supplier invoice tolerance', 'help' => 'How far an invoice may differ from the value of goods received before it is flagged.'],
                 ],
             ],
+            'expenses' => [
+                'title' => 'Expenses', 'icon' => 'ri-wallet-3-line',
+                'intro' => 'Approval rule and departments (cost centres) for running costs.',
+                'fields' => [
+                    'expenses.approval_limit' => ['type' => 'money', 'label' => 'Expense approval limit', 'help' => 'Expenses above this need approval by someone other than the person who recorded them. 0 means every expense needs approval.'],
+                    'expenses.departments'    => ['type' => 'list', 'label' => 'Departments', 'help' => 'One per line. Expenses are charged to one of these, so running costs can be compared by department.', 'max_items' => 30],
+                ],
+            ],
             'inventory' => [
                 'title' => 'Stock Analysis', 'icon' => 'ri-archive-line',
                 'intro' => 'Used by the stock health and reorder reports.',
@@ -92,6 +100,22 @@ class HotelSettings
                     'inventory.usage_days'       => ['type' => 'int', 'label' => 'Average usage over the last (days)', 'min' => 7, 'max' => 365, 'help' => 'Daily usage is averaged over this many days.'],
                     'inventory.cover_days'       => ['type' => 'int', 'label' => 'Days of stock to keep', 'min' => 1, 'max' => 180, 'help' => 'Suggested orders aim to cover this many days of usage plus the reorder level.'],
                     'inventory.slow_moving_days' => ['type' => 'int', 'label' => 'Slow-moving after (days without use)', 'min' => 7, 'max' => 730],
+                ],
+            ],
+            'it' => [
+                'title' => 'IT Service Desk', 'icon' => 'ri-customer-service-2-line',
+                'intro' => 'Response and fix targets for IT tickets, and who is emailed about outages. Tickets that miss a target are escalated automatically.',
+                'fields' => [
+                    'it.response_minutes.critical' => ['type' => 'int', 'label' => 'Critical — respond within (minutes)', 'min' => 1, 'max' => 10080],
+                    'it.resolve_hours.critical'    => ['type' => 'int', 'label' => 'Critical — fix within (hours)', 'min' => 1, 'max' => 2160],
+                    'it.response_minutes.high'     => ['type' => 'int', 'label' => 'High — respond within (minutes)', 'min' => 1, 'max' => 10080],
+                    'it.resolve_hours.high'        => ['type' => 'int', 'label' => 'High — fix within (hours)', 'min' => 1, 'max' => 2160],
+                    'it.response_minutes.normal'   => ['type' => 'int', 'label' => 'Normal — respond within (minutes)', 'min' => 1, 'max' => 10080],
+                    'it.resolve_hours.normal'      => ['type' => 'int', 'label' => 'Normal — fix within (hours)', 'min' => 1, 'max' => 2160],
+                    'it.response_minutes.low'      => ['type' => 'int', 'label' => 'Low — respond within (minutes)', 'min' => 1, 'max' => 10080],
+                    'it.resolve_hours.low'         => ['type' => 'int', 'label' => 'Low — fix within (hours)', 'min' => 1, 'max' => 2160],
+                    'it.alert_emails'              => ['type' => 'email_list', 'label' => 'Email outages and escalations to', 'help' => 'One email address per line. Critical and high alerts, and overdue tickets, are emailed here. Leave empty to only show them in the control room.', 'max_items' => 10],
+                    'it.check_retention_days'      => ['type' => 'int', 'label' => 'Keep monitoring history for (days)', 'min' => 7, 'max' => 730],
                 ],
             ],
             'security' => [
@@ -139,6 +163,13 @@ class HotelSettings
                 'percent'  => ['required', 'numeric', 'min:0', 'max:' . ($f['max'] ?? 100)],
                 'int'      => ['required', 'integer', 'min:' . ($f['min'] ?? 0), 'max:' . ($f['max'] ?? 100000)],
                 'list', 'int_list' => ['nullable', 'string', 'max:5000'],
+                'email_list' => ['nullable', 'string', 'max:2000', function ($attribute, $value, $fail) {
+                    foreach (preg_split('/[\s,;]+/', (string) $value, -1, PREG_SPLIT_NO_EMPTY) as $email) {
+                        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            $fail('"' . $email . '" is not a valid email address.');
+                        }
+                    }
+                }],
                 'image'    => ['nullable', 'file', 'mimes:' . ($f['mimes'] ?? 'png,jpg,jpeg,webp'), 'max:1024'],
                 default    => $f['rules'] ?? ['nullable', 'string', 'max:255'],
             };
@@ -156,6 +187,7 @@ class HotelSettings
             'int'      => (int) $value,
             'currency' => strtoupper(trim((string) $value)),
             'list'     => collect(preg_split('/\r\n|\r|\n/', (string) $value))->map(fn ($l) => trim($l))->filter()->unique()->take($field['max_items'] ?? 50)->values()->all(),
+            'email_list' => collect(preg_split('/[\s,;]+/', (string) $value, -1, PREG_SPLIT_NO_EMPTY))->map(fn ($e) => strtolower(trim($e)))->filter(fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL))->unique()->take($field['max_items'] ?? 10)->values()->all(),
             'int_list' => collect(preg_split('/[\s,]+/', (string) $value))->map(fn ($l) => (int) preg_replace('/\D/', '', $l))->filter(fn ($n) => $n > 0)->unique()->sortDesc()->take($field['max_items'] ?? 20)->values()->all(),
             default    => is_string($value) ? trim($value) : $value,
         };
@@ -236,7 +268,7 @@ class HotelSettings
             'bool'     => $value ? 'Yes' : 'No',
             'money'    => config('hotel.currency_symbol') . number_format((float) $value, 2),
             'percent'  => rtrim(rtrim(number_format((float) $value, 2), '0'), '.') . '%',
-            'list', 'int_list' => implode(', ', (array) $value),
+            'list', 'int_list', 'email_list' => implode(', ', (array) $value),
             default    => (string) $value,
         };
     }

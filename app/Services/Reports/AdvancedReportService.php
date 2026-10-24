@@ -6,6 +6,8 @@ use App\Enums\ChargeType;
 use App\Enums\PaymentKind;
 use App\Enums\StockMovementType as T;
 use App\Models\CashShift;
+use App\Models\Finance\Expense;
+use App\Models\Finance\ExpenseCategory;
 use App\Models\Folio;
 use App\Models\FolioCharge;
 use App\Models\Payment;
@@ -96,10 +98,29 @@ class AdvancedReportService
         $gross = $netRevenue - $cogs;
         $afterStock = $gross - array_sum($losses);
 
+        // Operating expenses (approved or paid, by the date the cost belongs to; VAT excluded).
+        $expenses = Expense::counted()->with('category:id,name,group')
+            ->whereBetween('expense_date', [$from->toDateString(), $to->toDateString()])
+            ->get(['id', 'category_id', 'department', 'amount', 'tax_amount', 'status']);
+        $opex = $expenses->groupBy(fn ($e) => $e->category?->group ?? 'other')
+            ->map(fn ($g, $group) => (object) [
+                'label'      => ExpenseCategory::GROUPS[$group] ?? ucfirst($group),
+                'amount'     => (float) $g->sum(fn ($e) => $e->net_amount),
+                'categories' => $g->groupBy('category_id')->map(fn ($c) => (object) ['name' => $c->first()->category?->name, 'amount' => (float) $c->sum(fn ($e) => $e->net_amount), 'count' => $c->count()])
+                    ->sortByDesc('amount')->values(),
+            ])
+            ->sortBy(fn ($g, $k) => array_search($k, array_keys(ExpenseCategory::GROUPS)))->values();
+        $opexTotal = (float) $opex->sum('amount');
+        $netProfit = $afterStock - $opexTotal;
+        $byDepartment = $expenses->groupBy(fn ($e) => $e->department ?: 'Not given')->map(fn ($g) => (float) $g->sum(fn ($e) => $e->net_amount))->sortDesc();
+        $unpaid = (float) $expenses->where('status', 'approved')->sum('amount');
+
         return [
             'lines'    => $lines->values(),
             'outlets'  => $outlets,
             'losses'   => $losses,
+            'opex'     => $opex,
+            'opex_departments' => $byDepartment,
             'totals'   => [
                 'gross_revenue' => (float) $lines->sum('gross'),
                 'tax'           => (float) $lines->sum('tax'),
@@ -110,6 +131,11 @@ class AdvancedReportService
                 'fb_cost_pct'   => $posNet > 0 ? $cogs / $posNet * 100 : null,
                 'stock_losses'  => array_sum($losses),
                 'after_stock'   => $afterStock,
+                'opex'          => $opexTotal,
+                'net_profit'    => $netProfit,
+                'np_pct'        => $netRevenue > 0 ? $netProfit / $netRevenue * 100 : null,
+                'opex_unpaid'   => $unpaid,
+                'pending_opex'  => (float) Expense::where('status', 'pending')->whereBetween('expense_date', [$from->toDateString(), $to->toDateString()])->sum('amount'),
                 'purchases'     => (float) StockReceipt::whereBetween('received_on', [$from->toDateString(), $to->toDateString()])->sum('total'),
                 'supplier_paid' => (float) SupplierPayment::whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])->sum('amount'),
             ],
@@ -173,12 +199,14 @@ class AdvancedReportService
         $pos = PosOrder::whereIn('status', [PosOrder::PAID, PosOrder::CHARGED])->whereBetween('ordered_at', [$first, $last])->get(['id', 'status', 'total', 'tax_breakdown', 'ordered_at']);
         $payments = Payment::valid()->whereBetween('received_at', [$first, $last])->get(['kind', 'amount', 'received_at']);
         $cost = StockMovement::whereIn('type', [T::Sale->value, T::SaleVoid->value])->whereBetween('occurred_at', [$first, $last])->get(['value', 'occurred_at']);
+        $spend = Expense::counted()->whereBetween('expense_date', [$first->toDateString(), $last->toDateString()])->get(['amount', 'tax_amount', 'expense_date']);
 
         $key = fn ($d) => $d->format('Y-m');
         $chargesBy = $charges->groupBy(fn ($c) => $key($c->service_date));
         $posBy = $pos->groupBy(fn ($o) => $key($o->ordered_at));
         $payBy = $payments->groupBy(fn ($p) => $key($p->received_at));
         $costBy = $cost->groupBy(fn ($m) => $key($m->occurred_at));
+        $spendBy = $spend->groupBy(fn ($e) => $key($e->expense_date));
 
         $rows = collect();
         for ($m = $first->copy(); $m->lte($last); $m->addMonthNoOverflow()) {
@@ -196,6 +224,7 @@ class AdvancedReportService
             $revenue = $room + $posRev + $otherRev;
             $tax = $this->taxOf($c) + $this->taxOf($o);
             $cogs = -(float) ($costBy[$k] ?? collect())->sum('value');
+            $opex = (float) ($spendBy[$k] ?? collect())->sum(fn ($e) => $e->net_amount);
 
             $rows->push([
                 'month'     => $m->copy(),
@@ -210,6 +239,8 @@ class AdvancedReportService
                 'tax'       => $tax,
                 'cogs'      => $cogs,
                 'gross'     => $revenue - $tax - $cogs,
+                'opex'      => $opex,
+                'net'       => $revenue - $tax - $cogs - $opex,
                 'collected' => (float) ($payBy[$k] ?? collect())->sum(fn ($p) => $p->signed_amount) + (float) $o->where('status', PosOrder::PAID)->sum('total'),
             ]);
         }
@@ -228,6 +259,8 @@ class AdvancedReportService
                 'other'     => (float) $rows->sum('other'),
                 'cogs'      => (float) $rows->sum('cogs'),
                 'gross'     => (float) $rows->sum('gross'),
+                'opex'      => (float) $rows->sum('opex'),
+                'net'       => (float) $rows->sum('net'),
                 'collected' => (float) $rows->sum('collected'),
                 'sold'      => (int) $rows->sum('sold'),
             ],

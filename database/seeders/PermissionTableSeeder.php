@@ -117,6 +117,18 @@ class PermissionTableSeeder extends Seeder
         'Audit & Security' => [
             'View audit log',
         ],
+        'Expenses' => [
+            'Record expenses',
+            'View expenses',
+            'Approve expenses',
+            'Pay expenses',
+            'Manage expense categories',
+        ],
+        'IT Control Room' => [
+            'View IT control room',
+            'Manage IT monitoring',
+            'Manage IT tickets',
+        ],
         'Hotel Settings' => [
             'Manage hotel settings',
         ],

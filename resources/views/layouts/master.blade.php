@@ -564,6 +564,23 @@
                             </div>
                         </li>
                     @endcanany
+                    @canany(['Record expenses', 'View expenses', 'Approve expenses', 'Pay expenses', 'Manage expense categories'])
+                        <li class="nav-item">
+                            <a class="nav-link menu-link collapsed" href="#sidebarExpenses" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarExpenses">
+                                <i class="ph-wallet"></i> <span>Expenses</span>
+                            </a>
+                            <div class="collapse menu-dropdown" id="sidebarExpenses">
+                                <ul class="nav nav-sm flex-column">
+                                    @canany(['Record expenses', 'View expenses', 'Approve expenses', 'Pay expenses'])
+                                        <li class="nav-item"><a href="{{ route('expenses.index') }}" class="nav-link">@canany(['View expenses', 'Approve expenses', 'Pay expenses']) All Expenses @else My Expenses @endcanany</a></li>
+                                    @endcanany
+                                    @can('Record expenses')<li class="nav-item"><a href="{{ route('expenses.index') }}#new" class="nav-link">Record an Expense</a></li>@endcan
+                                    @canany(['Approve expenses', 'Pay expenses'])<li class="nav-item"><a href="{{ route('expenses.index', ['status' => 'open']) }}" class="nav-link">To Approve / Pay</a></li>@endcanany
+                                    @can('Manage expense categories')<li class="nav-item"><a href="{{ route('expenses.categories.index') }}" class="nav-link">Categories &amp; Budgets</a></li>@endcan
+                                </ul>
+                            </div>
+                        </li>
+                    @endcanany
                     @canany(['Use POS', 'View POS reports', 'Manage POS menu'])
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarPos" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarPos">
@@ -704,6 +721,29 @@
                             </div>
                         </li>
                     @endcanany
+                    {{-- IT control room & service desk: everyone can raise IT tickets --}}
+                    <li class="nav-item">
+                        <a class="nav-link menu-link collapsed" href="#sidebarIt" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarIt">
+                            <i class="ph-desktop-tower"></i> <span>IT Support</span>
+                        </a>
+                        <div class="collapse menu-dropdown" id="sidebarIt">
+                            <ul class="nav nav-sm flex-column">
+                                @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
+                                    <li class="nav-item"><a href="{{ route('it.index') }}" class="nav-link">Control Room</a></li>
+                                    <li class="nav-item"><a href="{{ route('it.alerts.index') }}" class="nav-link">Alerts</a></li>
+                                @endcanany
+                                <li class="nav-item"><a href="{{ route('it.tickets.index') }}" class="nav-link">@canany(['View IT control room', 'Manage IT tickets']) Service Desk @else My IT Requests @endcanany</a></li>
+                                @canany(['View IT control room', 'Manage IT monitoring'])
+                                    <li class="nav-item"><a href="{{ route('it.monitors.index') }}" class="nav-link">Monitors</a></li>
+                                    <li class="nav-item"><a href="{{ route('it.assets.index') }}" class="nav-link">Equipment</a></li>
+                                    <li class="nav-item"><a href="{{ route('it.maintenance.index') }}" class="nav-link">Planned Maintenance</a></li>
+                                @endcanany
+                                @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
+                                    <li class="nav-item"><a href="{{ route('it.report') }}" class="nav-link">Monthly Service Report</a></li>
+                                @endcanany
+                            </ul>
+                        </div>
+                    </li>
                     @can('Manage hotel settings')
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarSettings" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
@@ -1355,6 +1395,27 @@
         {title:'Clock-in Kiosk',                        url:'{{ route("attendance.kiosk") }}',                               icon:'mdi-qrcode-scan',             category:'Attendance',          keywords:['kiosk','clock in','scan','badge','qr']},
         @endcan
         {title:'My Attendance',                         url:'{{ route("attendance.my") }}',                                  icon:'mdi-account-check',           category:'My Account',          keywords:['my attendance','clock in','late','badge']},
+        @canany(['Record expenses', 'View expenses', 'Approve expenses', 'Pay expenses'])
+        {title:'Expenses',                              url:'{{ route("expenses.index") }}',                             icon:'mdi-wallet-outline',          category:'Finance',             keywords:['expense','cost','diesel','spend','petty cash','budget','running cost']},
+        @endcanany
+        @can('Record expenses')
+        {title:'Record an Expense',                     url:'{{ route("expenses.index") }}#new',                         icon:'mdi-cash-minus',              category:'Finance',             keywords:['expense','receipt','diesel','repair','pay','petty cash']},
+        @endcan
+        @can('Manage expense categories')
+        {title:'Expense Categories & Budgets',          url:'{{ route("expenses.categories.index") }}',                  icon:'mdi-folder-cog-outline',      category:'Finance',             keywords:['budget','expense category']},
+        @endcan
+        {title:'Raise an IT Ticket',                    url:'{{ route("it.tickets.index") }}#new',                       icon:'mdi-lifebuoy',                category:'IT',                  keywords:['it','support','help','computer','wifi','printer','internet','ticket','broken']},
+        {title:'My IT Requests',                        url:'{{ route("it.tickets.index") }}',                           icon:'mdi-ticket-outline',          category:'IT',                  keywords:['it','ticket','service desk','support']},
+        @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
+        {title:'IT Control Room',                       url:'{{ route("it.index") }}',                                   icon:'mdi-monitor-dashboard',       category:'IT',                  keywords:['network','uptime','monitoring','server','router','wifi','backup','noc','control room']},
+        {title:'IT Alerts',                             url:'{{ route("it.alerts.index") }}',                            icon:'mdi-alert-octagon-outline',   category:'IT',                  keywords:['alert','outage','down','incident']},
+        {title:'IT Service Report',                     url:'{{ route("it.report") }}',                                  icon:'mdi-file-chart-outline',      category:'IT',                  keywords:['sla','uptime','monthly','service report']},
+        @endcanany
+        @canany(['View IT control room', 'Manage IT monitoring'])
+        {title:'IT Monitors',                           url:'{{ route("it.monitors.index") }}',                          icon:'mdi-heart-pulse',             category:'IT',                  keywords:['monitor','ping','check','ssl','backup','disk']},
+        {title:'IT Equipment',                          url:'{{ route("it.assets.index") }}',                            icon:'mdi-router-wireless',         category:'IT',                  keywords:['asset','router','switch','access point','device','inventory','warranty']},
+        {title:'Planned IT Maintenance',                url:'{{ route("it.maintenance.index") }}',                       icon:'mdi-wrench-clock',            category:'IT',                  keywords:['maintenance','downtime','window']},
+        @endcanany
         @can('Manage hotel settings')
         {title:'Hotel Settings',                        url:'{{ route("settings.hotel.index") }}',                           icon:'mdi-cog-outline',             category:'Settings',            keywords:['settings','hotel name','logo','tax','vat','approval limit','tolerance','price jump','branding','currency']},
         {title:'Bank Accounts',                         url:'{{ route("settings.bank-accounts.index") }}',                   icon:'mdi-bank',                    category:'Billing',             keywords:['bank','account','transfer','invoice','settings']},

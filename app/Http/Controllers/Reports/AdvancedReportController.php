@@ -20,7 +20,7 @@ class AdvancedReportController extends Controller
 {
     public const REPORTS = [
         // key => [title, icon, area, description]
-        'profit'     => ['Gross profit', 'ri-funds-line', 'finance', 'Revenue after tax, cost of stock sold and stock losses'],
+        'profit'     => ['Profit & loss', 'ri-funds-line', 'finance', 'Revenue, cost of sales, running costs and net operating profit'],
         'trend'      => ['12-month trend', 'ri-line-chart-line', 'finance', 'Month by month occupancy, ADR, RevPAR, revenue and money in'],
         'tax'        => ['Tax report', 'ri-percent-line', 'finance', 'VAT, service charge and other taxes charged'],
         'ageing'     => ['Debtors & creditors', 'ri-time-line', 'finance', 'Who owes the hotel and whom it owes, by age'],
@@ -115,9 +115,13 @@ class AdvancedReportController extends Controller
                     ->concat(collect($d['outlets'])->map(fn ($o) => ['  Outlet: ' . $o['label'], $r2($o['gross']), $r2($o['tax']), $r2($o['net']), $r2($o['cost']), $r2($o['margin']), $r2($o['pct'])]))
                     ->concat([['Stock used in-house', '', '', '', $r2($d['losses']['issue']), '', ''], ['Waste & breakage', '', '', '', $r2($d['losses']['waste']), '', ''],
                         ['Stocktake differences', '', '', '', $r2($d['losses']['count']), '', ''], ['Adjustments', '', '', '', $r2($d['losses']['adjustment']), '', ''],
-                        ['Gross profit after stock losses', '', '', '', '', $r2($d['totals']['after_stock']), '']])],
-            'trend' => [['Month', 'Rooms sold', 'Occupancy %', 'ADR', 'RevPAR', 'Room revenue', 'Bar & restaurant', 'Other', 'Total revenue', 'Tax', 'Cost of sales', 'Gross profit', 'Collected'],
-                $d['rows']->map(fn ($m) => [$m['month']->format('Y-m'), $m['sold'], $m['occupancy'], $r2($m['adr']), $r2($m['revpar']), $r2($m['room']), $r2($m['pos']), $r2($m['other']), $r2($m['revenue']), $r2($m['tax']), $r2($m['cogs']), $r2($m['gross']), $r2($m['collected'])])],
+                        ['Gross profit after stock losses', '', '', '', '', $r2($d['totals']['after_stock']), '']])
+                    ->concat(collect($d['opex'])->flatMap(fn ($g) => collect([['Running costs: ' . $g->label, '', '', '', $r2($g->amount), '', '']])
+                        ->concat($g->categories->map(fn ($c) => ['  ' . $c->name, '', '', '', $r2($c->amount), '', '']))))
+                    ->concat([['Total running costs', '', '', '', $r2($d['totals']['opex']), '', ''],
+                        ['NET OPERATING PROFIT', '', '', '', '', $r2($d['totals']['net_profit']), $r2($d['totals']['np_pct'])]])],
+            'trend' => [['Month', 'Rooms sold', 'Occupancy %', 'ADR', 'RevPAR', 'Room revenue', 'Bar & restaurant', 'Other', 'Total revenue', 'Tax', 'Cost of sales', 'Gross profit', 'Running costs', 'Net operating profit', 'Collected'],
+                $d['rows']->map(fn ($m) => [$m['month']->format('Y-m'), $m['sold'], $m['occupancy'], $r2($m['adr']), $r2($m['revpar']), $r2($m['room']), $r2($m['pos']), $r2($m['other']), $r2($m['revenue']), $r2($m['tax']), $r2($m['cogs']), $r2($m['gross']), $r2($m['opex']), $r2($m['net']), $r2($m['collected'])])],
             'tax' => [['Tax', 'Rate %', 'On guest bills', 'On bar & restaurant', 'Total tax', 'Sales it applied to'],
                 $d['by_tax']->map(fn ($t) => [$t['name'], $t['rate'], $r2($t['bills']), $r2($t['pos']), $r2($t['amount']), $r2($t['base'])])],
             'ageing' => $request->query('part') === 'suppliers'

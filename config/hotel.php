@@ -110,6 +110,30 @@ return [
         'slow_moving_days' => (int) env('HOTEL_STOCK_SLOW_DAYS', 60),
     ],
 
+    /*
+    | Operating expenses (spec §9, §14). Expenses above approval_limit need
+    | approval by someone other than the person who recorded them (0 = all).
+    | Departments are the cost centres expenses are charged to.
+    */
+    'expenses' => [
+        'approval_limit' => (float) env('HOTEL_EXPENSE_APPROVAL_LIMIT', 50000),
+        'departments'    => ['Rooms / Front Office', 'Housekeeping', 'Food & Beverage', 'Kitchen', 'Maintenance & Engineering', 'Security', 'Sales & Marketing', 'Administration', 'IT'],
+    ],
+
+    /*
+    | IT control room (spec §11). Service-desk targets by ticket priority:
+    | first response within response_minutes, fixed within resolve_hours.
+    | Tickets that miss them are escalated. New critical/high monitoring
+    | alerts and escalations are emailed to alert_emails (comma-separated in
+    | .env). Check history older than check_retention_days is removed nightly.
+    */
+    'it' => [
+        'response_minutes' => ['critical' => 15, 'high' => 60, 'normal' => 240, 'low' => 1440],
+        'resolve_hours'    => ['critical' => 4, 'high' => 8, 'normal' => 24, 'low' => 72],
+        'alert_emails'     => array_values(array_filter(array_map('trim', explode(',', (string) env('HOTEL_IT_ALERT_EMAILS', ''))))),
+        'check_retention_days' => (int) env('HOTEL_IT_CHECK_RETENTION_DAYS', 90),
+    ],
+
     'audit' => [
         'flag_amount'   => (float) env('HOTEL_AUDIT_FLAG_AMOUNT', 50000),
         'flag_failures' => (int) env('HOTEL_AUDIT_FLAG_FAILURES', 5),

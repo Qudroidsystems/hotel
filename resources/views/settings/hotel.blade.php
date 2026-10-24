@@ -86,6 +86,7 @@
                                     @break
                                 @case('list')
                                 @case('int_list')
+                                @case('email_list')
                                     <textarea class="form-control @error($name) is-invalid @enderror" name="{{ $name }}" id="{{ $id }}" rows="{{ $f['type'] === 'list' && count((array) $value) > 8 ? 10 : 5 }}">{{ old($name, $listValue($value)) }}</textarea>
                                     @break
                                 @case('image')

@@ -20,6 +20,23 @@ Artisan::command('security:prune-visitors', function (\App\Services\Security\Sec
     $this->info($security->pruneVisitors() . ' old visitor record(s) anonymised.');
 })->purpose('Clear personal details from visitor records older than the retention period');
 
+// IT control room (spec §11): run the monitors that are due, escalate overdue
+// tickets, and trim old check history.
+Artisan::command('it:monitor {--all : Check every monitor now, not only the ones due}', function (\App\Services\It\MonitorService $monitors) {
+    $this->info($monitors->runDue((bool) $this->option('all')) . ' monitor(s) checked.');
+})->purpose('Run the IT control room checks that are due');
+
+Artisan::command('it:escalate', function (\App\Services\It\ServiceDesk $desk) {
+    $this->info($desk->escalateOverdue() . ' overdue IT ticket(s) escalated.');
+})->purpose('Escalate IT tickets that missed their response or fix target');
+
+Artisan::command('it:prune', function (\App\Services\It\MonitorService $monitors) {
+    $this->info($monitors->prune() . ' old check result(s) removed.');
+})->purpose('Remove IT check history older than the retention period');
+
+Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
+Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('it:prune')->dailyAt('03:30');
 Schedule::command('rooms:prepare-arrivals')->dailyAt('00:05');
 Schedule::command('folios:night-audit')->dailyAt('02:00');
 Schedule::command('security:prune-visitors')->dailyAt('03:00');

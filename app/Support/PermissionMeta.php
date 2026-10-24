@@ -67,6 +67,14 @@ class PermissionMeta
         'Manage attendance'         => ['Manage', 'Correct clock-ins (with a reason), change the rota and record leave.'],
         'Manage staff & shifts'     => ['Manage', 'Set up shifts, departments, kiosks and staff badges (including replacing a lost badge).'],
         'Run attendance kiosk'      => ['Use',    'Open the clock-in kiosk on a device at the staff entrance.'],
+        'Record expenses'           => ['Create', 'Record running costs (diesel, repairs, supplies…) with receipts. Small ones are approved automatically.'],
+        'View expenses'             => ['View',   'See every expense, budgets and spending by department — not only your own.'],
+        'Approve expenses'          => ['Approve','Approve or reject expenses above the approval limit (never your own), and void expenses.'],
+        'Pay expenses'              => ['Pay',    'Mark approved expenses as paid — by transfer, card, cheque or cash from your till.'],
+        'Manage expense categories' => ['Manage', 'Set up expense categories and their monthly budgets.'],
+        'View IT control room'      => ['View',   'See the IT control room: network, systems and backup status, alerts and the service desk queue.'],
+        'Manage IT monitoring'      => ['Manage', 'Set up what is monitored, the equipment register and planned maintenance; acknowledge and close alerts.'],
+        'Manage IT tickets'         => ['Manage', 'Work on every IT support ticket: assign, update, resolve and close. (Any staff member can raise a ticket.)'],
         'Manage hotel settings'     => ['Manage', 'Change hotel settings: name and logo, taxes, approval limits, cash and audit rules, and the bank accounts shown on invoices.'],
     ];
 
