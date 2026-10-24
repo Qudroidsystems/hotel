@@ -100,7 +100,7 @@ class MaintenanceController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        $where = $request->input('back') === 'housekeeping' ? back() : redirect()->route('maintenance.show', $order);
+        $where = in_array($request->input('back'), ['housekeeping', 'staff'], true) ? back() : redirect()->route('maintenance.show', $order);
 
         return $where->with('success', "{$order->number} reported" . ($order->blocks_room && $order->room?->status->value === 'maintenance' ? " — room {$order->room->number} taken off sale until it's fixed." : '.'));
     }

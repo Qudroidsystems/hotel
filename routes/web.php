@@ -37,6 +37,7 @@ use App\Http\Controllers\Reservations\ReservationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\Settings\BankAccountController;
 use App\Http\Controllers\Settings\HotelSettingsController;
+use App\Http\Controllers\Staff\StaffAppController;
 use App\Http\Controllers\Finance\ExpenseCategoryController;
 use App\Http\Controllers\Finance\ExpenseController;
 use App\Http\Controllers\It\AlertController as ItAlertController;
@@ -81,6 +82,9 @@ Route::get('/refresh-csrf', function () {
 | Authenticated routes
 |--------------------------------------------------------------------------
 */
+
+// Staff App manifest: fetched by the browser without cookies, so it must be public.
+Route::get('/staff/manifest.webmanifest', [StaffAppController::class, 'manifest'])->name('staff.manifest');
 
 Route::middleware('auth')->group(function () {
 
@@ -367,6 +371,17 @@ Route::middleware('auth')->group(function () {
 
     // Audit trail
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit.index');
+
+    // Staff App: phone-first, installable (spec §16)
+    Route::prefix('staff')->name('staff.')->controller(StaffAppController::class)->group(function () {
+        Route::get('/', 'home')->name('home');
+        Route::get('/work', 'work')->name('work');
+        Route::get('/approvals', 'approvals')->name('approvals');
+        Route::get('/report', 'report')->name('report');
+        Route::get('/front-desk', 'frontDesk')->name('front-desk');
+        Route::get('/stock', 'stock')->name('stock');
+        Route::get('/more', 'more')->name('more');
+    });
 
     // Operating expenses (spec §9, §14)
     Route::prefix('expenses')->name('expenses.')->group(function () {

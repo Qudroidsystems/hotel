@@ -721,6 +721,12 @@
                             </div>
                         </li>
                     @endcanany
+                    {{-- Staff App: the phone version for everyone --}}
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="{{ route('staff.home') }}">
+                            <i class="ph-device-mobile"></i> <span>Staff App (phone)</span>
+                        </a>
+                    </li>
                     {{-- IT control room & service desk: everyone can raise IT tickets --}}
                     <li class="nav-item">
                         <a class="nav-link menu-link collapsed" href="#sidebarIt" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarIt">
@@ -1404,6 +1410,7 @@
         @can('Manage expense categories')
         {title:'Expense Categories & Budgets',          url:'{{ route("expenses.categories.index") }}',                  icon:'mdi-folder-cog-outline',      category:'Finance',             keywords:['budget','expense category']},
         @endcan
+        {title:'Staff App (phone)',                     url:'{{ route("staff.home") }}',                                 icon:'mdi-cellphone',               category:'Staff',               keywords:['mobile','phone','app','my work','tasks','approvals','install']},
         {title:'Raise an IT Ticket',                    url:'{{ route("it.tickets.index") }}#new',                       icon:'mdi-lifebuoy',                category:'IT',                  keywords:['it','support','help','computer','wifi','printer','internet','ticket','broken']},
         {title:'My IT Requests',                        url:'{{ route("it.tickets.index") }}',                           icon:'mdi-ticket-outline',          category:'IT',                  keywords:['it','ticket','service desk','support']},
         @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
