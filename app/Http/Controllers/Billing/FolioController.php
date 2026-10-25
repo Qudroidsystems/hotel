@@ -101,7 +101,7 @@ class FolioController extends Controller
     {
         $data = $request->validate([
             'kind'      => ['required', Rule::enum(PaymentKind::class)],
-            'method'    => ['required', Rule::enum(PaymentMethod::class)],
+            'method'    => ['required', Rule::in(array_map(fn ($m) => $m->value, PaymentMethod::takeable()))],
             'amount'    => 'required|numeric|min:0.01|max:99999999',
             'reference' => [Rule::requiredIf(fn () => PaymentMethod::tryFrom((string) $request->input('method'))?->needsReference() ?? false), 'nullable', 'string', 'max:100'],
             'notes'     => 'nullable|string|max:255',

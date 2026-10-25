@@ -17,6 +17,7 @@ class Reservation extends Model
         'reference', 'qr_token', 'guest_id', 'status', 'source', 'check_in_date', 'check_out_date',
         'adults', 'children', 'expected_arrival_time', 'room_total', 'discount_amount', 'discount_reason',
         'total_amount', 'special_requests', 'notes', 'cancel_reason', 'created_by',
+        'rate_plan_id', 'rate_plan_name', 'promo_code', 'company_id',
     ];
 
     protected $casts = [
@@ -46,6 +47,16 @@ class Reservation extends Model
     }
 
     // ── Relationships ─────────────────────────────────────────────────
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function ratePlan(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Rates\RatePlan::class);
+    }
 
     public function guest(): BelongsTo
     {

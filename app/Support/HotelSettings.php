@@ -194,6 +194,17 @@ class HotelSettings
                     'security.lost_item_days' => ['type' => 'int', 'label' => 'Unclaimed lost items can be disposed of after (days)', 'min' => 1, 'max' => 3650],
                 ],
             ],
+            'night_audit' => [
+                'title' => 'Night Audit', 'icon' => 'ri-moon-clear-line',
+                'intro' => 'Closing the business day: tonight\'s room charges, no-shows and the daily report. Staff run it from Front Desk → Night Audit; it can also run by itself.',
+                'fields' => [
+                    'night_audit.day_ends_at'    => ['type' => 'text', 'label' => 'The business day ends at', 'rules' => ['required', 'date_format:H:i'], 'help' => 'Before the first night audit, work done before this time counts for the day before.'],
+                    'night_audit.auto_close'     => ['type' => 'bool', 'label' => 'Close the day automatically if nobody has by then'],
+                    'night_audit.auto_close_at'  => ['type' => 'text', 'label' => 'Close automatically at', 'rules' => ['required', 'date_format:H:i'], 'help' => 'The next morning. Staff are reminded an hour before.'],
+                    'night_audit.auto_no_shows'  => ['type' => 'bool', 'label' => 'When closing automatically, mark guests who never arrived as no-shows'],
+                    'night_audit.report_emails'  => ['type' => 'email_list', 'label' => 'Email the daily report to', 'help' => 'One address per line: the owner, the GM, the accountant…', 'max_items' => 10],
+                ],
+            ],
             'sms_accounts' => [
                 'title' => 'SMS & WhatsApp Accounts', 'icon' => 'ri-chat-settings-line',
                 'intro' => 'The Twilio or Termii account guest messages are sent from (choose which one under Guest Messages). Keys are stored encrypted and never shown again; leave a key empty to keep the one saved.',

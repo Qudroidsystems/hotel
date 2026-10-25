@@ -108,6 +108,8 @@ class ReservationController extends Controller
             'in'        => $request->query('in', today()->toDateString()),
             'out'       => $request->query('out', today()->addDay()->toDateString()),
             'idTypes'   => Guest::ID_TYPES,
+            'plans'     => \App\Models\Rates\RatePlan::active()->where('front_desk', true)->with('company')->ordered()->get(),
+            'companies' => \Illuminate\Support\Facades\Schema::hasTable('companies') ? \App\Models\Company::active()->orderBy('name')->get() : collect(),
         ]);
     }
 
@@ -115,9 +117,15 @@ class ReservationController extends Controller
     public function availability(Request $request)
     {
         $data = $request->validate([
-            'in'  => 'required|date|after_or_equal:today',
-            'out' => 'required|date|after:in',
+            'in'      => 'required|date|after_or_equal:today',
+            'out'     => 'required|date|after:in',
+            'plan'    => 'nullable|integer',
+            'company' => 'nullable|integer',
         ]);
+        $rates = app(\App\Services\Rates\RateService::class);
+        $plan = ! empty($data['plan']) ? \App\Models\Rates\RatePlan::find($data['plan']) : null;
+        $in = Carbon::parse($data['in'])->startOfDay();
+        $out = Carbon::parse($data['out'])->startOfDay();
 
         $nights = count(Reservation::nightsBetween($data['in'], $data['out']));
         if ($nights > 90) {
@@ -131,7 +139,12 @@ class ReservationController extends Controller
 
         return response()->json([
             'nights' => $nights,
-            'types'  => $this->availability->summary($data['in'], $data['out'])->map(fn ($row) => [
+            'plan'   => $plan ? ['id' => $plan->id, 'name' => $plan->name, 'summary' => $plan->summary, 'inclusions' => $plan->inclusions] : null,
+            'types'  => $this->availability->summary($data['in'], $data['out'])->map(function ($row) use ($rates, $plan, $in, $out, $data, $free) {
+                $type = $row['type'];
+                $quote = $plan ? $rates->quote($type, $in, $out, null, $plan) : $row['nights'];
+
+                return [
                 'id'        => $row['type']->id,
                 'name'      => $row['type']->name,
                 'code'      => $row['type']->code,
@@ -141,14 +154,19 @@ class ReservationController extends Controller
                 'max_children' => $row['type']->max_children,
                 'available' => $row['available'],
                 'total'     => $row['total'],
-                'amount'    => $row['amount'],
-                'nights'    => collect($row['nights'])->map(fn ($rate, $date) => ['date' => Carbon::parse($date)->format('D j M'), 'rate' => $rate])->values(),
+                'amount'    => round(array_sum($quote), 2),
+                'nights'    => collect($quote)->map(fn ($rate, $date) => ['date' => Carbon::parse($date)->format('D j M'), 'rate' => $rate])->values(),
+                // Why the chosen rate can't be used for this room type (it can't be added), and online-only rules staff may override.
+                'plan_problem' => $plan ? ($rates->problems($plan, $type, $in, $out, \App\Services\Rates\RateService::FRONT_DESK, null, isset($data['company']) ? (int) $data['company'] : null)[0] ?? null) : null,
+                'warning'   => $rates->restriction($type, $in, $out),
                 'rooms'     => ($free[$row['type']->id] ?? collect())->map(fn ($r) => [
                     'id' => $r->id, 'number' => $r->number, 'floor' => $r->floor->name,
                     'status' => $r->status->label(), 'ready' => in_array($r->status->value, ['available', 'reserved'], true),
                     'rate_override' => $r->rate_override !== null ? (float) $r->rate_override : null,
+                    'amount' => $r->rate_override !== null ? round(array_sum($rates->quote($type, $in, $out, $r, $plan)), 2) : null,
                 ])->values(),
-            ])->values(),
+                ];
+            })->values(),
         ]);
     }
 
@@ -168,6 +186,8 @@ class ReservationController extends Controller
             'rooms.*.adults'        => 'required|integer|min:1|max:20',
             'rooms.*.children'      => 'nullable|integer|min:0|max:20',
             'guest_id'              => 'nullable|integer|exists:guests,id',
+            'rate_plan_id'          => 'nullable|integer|exists:rate_plans,id',
+            'company_id'            => 'nullable|integer|exists:companies,id',
             'guest.first_name'      => 'required_without:guest_id|nullable|string|max:100',
             'guest.last_name'       => 'required_without:guest_id|nullable|string|max:100',
             'guest.phone'           => ['required_without:guest_id', 'nullable', 'string', 'max:30', 'regex:/^\+?[0-9 ()-]{7,20}$/'],
@@ -198,6 +218,10 @@ class ReservationController extends Controller
                 $guest = ! empty($data['guest_id'])
                     ? Guest::findOrFail($data['guest_id'])
                     : Guest::create(collect($data['guest'])->filter(fn ($v) => $v !== null && $v !== '')->all() + ['created_by' => auth()->id()]);
+                // A guest booked for a company becomes one of its people (for their next stay and its statements).
+                if (! empty($data['company_id']) && ! $guest->company_id) {
+                    $guest->forceFill(['company_id' => $data['company_id']])->save();
+                }
 
                 return $this->service->create($guest, $data, $data['rooms']);
             });
@@ -212,7 +236,7 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation)
     {
-        $reservation->load(['guest', 'rooms.room.floor', 'rooms.roomType', 'createdBy', 'checkedInBy', 'checkedOutBy']);
+        $reservation->load(['guest', 'rooms.room.floor', 'rooms.roomType', 'createdBy', 'checkedInBy', 'checkedOutBy', 'ratePlan', 'company']);
         $pagetitle = 'Reservation ' . $reservation->reference;
         $events = $reservation->events()->with('user')->get();
 

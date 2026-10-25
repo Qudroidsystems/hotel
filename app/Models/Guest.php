@@ -12,7 +12,7 @@ class Guest extends Model
     public const ID_TYPES = ['National ID (NIN)', 'International passport', "Driver's licence", "Voter's card", 'Other'];
 
     protected $fillable = [
-        'title', 'first_name', 'last_name', 'email', 'phone', 'gender', 'date_of_birth',
+        'title', 'first_name', 'last_name', 'email', 'phone', 'gender', 'date_of_birth', 'company_id',
         'nationality', 'id_type', 'id_number', 'address', 'company', 'is_vip', 'preferences', 'notes',
         'messages_opt_out', 'marketing_opt_in',
     ];
@@ -33,6 +33,11 @@ class Guest extends Model
     public function folios(): HasMany
     {
         return $this->hasMany(Folio::class);
+    }
+
+    public function companyAccount()
+    {
+        return $this->belongsTo(Company::class, 'company_id');
     }
 
     public function loyaltyEntries(): HasMany

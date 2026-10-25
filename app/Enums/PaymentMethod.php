@@ -10,6 +10,7 @@ enum PaymentMethod: string
     case Online   = 'online';    // payment gateway (later)
     case Cheque   = 'cheque';
     case Other    = 'other';
+    case Company  = 'company';   // the bill moved to a company's account (city ledger)
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum PaymentMethod: string
             self::Online   => 'Online',
             self::Cheque   => 'Cheque',
             self::Other    => 'Other',
+            self::Company  => 'Company account',
         };
     }
 
@@ -32,6 +34,7 @@ enum PaymentMethod: string
             self::Online   => 'ri-global-line',
             self::Cheque   => 'ri-file-paper-2-line',
             self::Other    => 'ri-wallet-3-line',
+            self::Company  => 'ri-building-2-line',
         };
     }
 
@@ -43,6 +46,12 @@ enum PaymentMethod: string
 
     public static function options(): array
     {
-        return collect(self::cases())->mapWithKeys(fn (self $m) => [$m->value => $m->label()])->all();
+        return collect(self::takeable())->mapWithKeys(fn (self $m) => [$m->value => $m->label()])->all();
+    }
+
+    /** Ways money is actually taken at a till or desk (a company account is only used by moving a bill to it). */
+    public static function takeable(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $m) => $m !== self::Company));
     }
 }

@@ -422,6 +422,70 @@ Route::middleware('auth')->group(function () {
         Route::get('/more', 'more')->name('more');
     });
 
+    // Rates & seasons: rate plans, seasons and the rate calendar
+    Route::prefix('rates')->name('rates.')->controller(\App\Http\Controllers\Rates\RateController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/check', 'check')->name('check');
+        Route::get('/plans/new', 'createPlan')->name('plans.create');
+        Route::post('/plans', 'storePlan')->name('plans.store');
+        Route::get('/plans/{plan}/edit', 'editPlan')->name('plans.edit');
+        Route::put('/plans/{plan}', 'updatePlan')->name('plans.update');
+        Route::delete('/plans/{plan}', 'destroyPlan')->name('plans.destroy');
+        Route::post('/seasons', 'storeSeason')->name('seasons.store');
+        Route::put('/seasons/{season}', 'updateSeason')->name('seasons.update');
+        Route::delete('/seasons/{season}', 'destroySeason')->name('seasons.destroy');
+        Route::post('/calendar', 'updateCalendar')->name('calendar.update');
+    });
+
+    // Company accounts (city ledger)
+    Route::prefix('companies')->name('companies.')->controller(\App\Http\Controllers\Companies\CompanyController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/new', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{company}', 'show')->name('show');
+        Route::get('/{company}/edit', 'edit')->name('edit');
+        Route::put('/{company}', 'update')->name('update');
+        Route::get('/{company}/statement', 'statement')->name('statement');
+        Route::get('/{company}/invoices/{entry}', 'invoice')->name('invoice');
+        Route::post('/{company}/payments', 'payment')->middleware('throttle:30,1')->name('payment');
+        Route::post('/{company}/entries', 'entry')->name('entry');
+        Route::post('/{company}/entries/{entry}/void', 'void')->name('void');
+    });
+    Route::post('/folios/{folio}/to-company', [\App\Http\Controllers\Companies\CompanyController::class, 'transfer'])->middleware('throttle:30,1')->name('folios.to-company');
+
+    // Night audit: close the business day
+    Route::prefix('night-audit')->name('night-audit.')->controller(\App\Http\Controllers\NightAudit\NightAuditController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/run', 'run')->middleware('throttle:6,1')->name('run');
+        Route::get('/{audit}', 'show')->name('show');
+    });
+
+    // Events & halls
+    Route::prefix('events')->name('events.')->group(function () {
+        Route::controller(\App\Http\Controllers\Events\HallController::class)->group(function () {
+            Route::get('/halls', 'index')->name('halls.index');
+            Route::post('/halls', 'store')->name('halls.store');
+            Route::put('/halls/{hall}', 'update')->name('halls.update');
+            Route::post('/packages', 'storePackage')->name('packages.store');
+            Route::put('/packages/{package}', 'updatePackage')->name('packages.update');
+        });
+        Route::controller(\App\Http\Controllers\Events\EventController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/new', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{event}', 'show')->name('show');
+            Route::get('/{event}/edit', 'edit')->name('edit');
+            Route::put('/{event}', 'update')->name('update');
+            Route::post('/{event}/status', 'status')->name('status');
+            Route::post('/{event}/items', 'addItem')->name('items.store');
+            Route::delete('/{event}/items/{item}', 'removeItem')->name('items.destroy');
+            Route::post('/{event}/payments', 'payment')->middleware('throttle:30,1')->name('payments.store');
+            Route::post('/{event}/payments/{payment}/void', 'voidPayment')->name('payments.void');
+            Route::post('/{event}/to-company', 'toCompany')->name('to-company');
+            Route::get('/{event}/sheet', 'sheet')->name('sheet');
+        });
+    });
+
     // Operating expenses (spec §9, §14)
     Route::prefix('expenses')->name('expenses.')->group(function () {
         Route::get('/', [ExpenseController::class, 'index'])->name('index');

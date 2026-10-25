@@ -1,4 +1,5 @@
-{{-- One room type as a row. $type; optional $price (per stay), $note, $action (url), $actionLabel, $disabled. --}}
+{{-- One room type as a row. $type; optional $price (per stay), $note, $action (url), $actionLabel, $disabled;
+     $rates (each: key, name, inclusions, non_refundable, promo, total) with $rateUrl (fn ($key) => url) to list the rates under it. --}}
 @php
     $photo = $type->photos->first();
     $sym = config('hotel.currency_symbol');
@@ -28,6 +29,18 @@
         @if (! empty($note))<div class="note">{{ $note }}</div>@endif
         @if (! empty($action))<a href="{{ $action }}" class="btn {{ ! empty($disabled) ? 'quiet' : '' }}" @if (! empty($disabled)) aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:.5" @endif>{{ $actionLabel ?? 'Choose' }}</a>@endif
     </div>
+    @if (! empty($rates) && count($rates) > 1)
+        <div class="rates">
+            @foreach ($rates as $rate)
+                <div class="rate">
+                    <div><strong>{{ $rate->name }}</strong>@if ($rate->promo) <span class="tag">Promo</span>@endif @if ($rate->non_refundable) <span class="tag warn">Non-refundable</span>@endif
+                        @if ($rate->inclusions)<div class="muted small">{{ $rate->inclusions }}</div>@endif</div>
+                    <div class="amt">{{ $sym }}{{ number_format($rate->total) }}</div>
+                    @if (! empty($rateUrl))<a class="btn quiet small" href="{{ $rateUrl($rate->key) }}">Book</a>@endif
+                </div>
+            @endforeach
+        </div>
+    @endif
 </article>
 @once
 @push('head')
@@ -46,7 +59,15 @@
     .room .buy .price { font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--ink); line-height: 1.1; }
     .room .buy .note { font-size: 13.5px; color: var(--warn); margin: 6px 0 2px; }
     .room .buy .btn { margin-top: 12px; width: 100%; }
+    .room .rates { grid-column: 1 / -1; border-top: 1px dashed var(--line); padding-top: 12px; display: grid; gap: 8px; }
+    .room .rate { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; }
+    .room .rate .amt { font-family: var(--serif); font-weight: 700; font-size: 19px; color: var(--ink); }
+    .room .rate .btn.small { padding: 8px 16px; min-height: 0; }
+    .room .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 99px; background: rgba(15,118,110,.1); color: var(--accent, #0f766e); font-weight: 600; vertical-align: 2px; }
+    .room .tag.warn { background: rgba(183,131,47,.14); color: #8a5f1c; }
     @media (max-width: 860px) {
+        .room .rate { grid-template-columns: 1fr auto; }
+        .room .rate .btn { grid-column: 1 / -1; }
         .room { grid-template-columns: 1fr; gap: 14px; padding: 14px; }
         .room .ph { min-height: 190px; }
         .room .buy { border-left: 0; border-top: 1px dashed var(--line); padding: 14px 0 0; align-items: stretch; text-align: left; }

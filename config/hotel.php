@@ -210,6 +210,18 @@ return [
         'check_retention_days' => (int) env('HOTEL_IT_CHECK_RETENTION_DAYS', 90),
     ],
 
+    /*
+    | Night audit: closing the business day (room charges, no-shows, the daily
+    | report). It runs from Front Desk → Night Audit, or by itself.
+    */
+    'night_audit' => [
+        'day_ends_at'   => '06:00',
+        'auto_close'    => (bool) env('HOTEL_NIGHT_AUDIT_AUTO', false),
+        'auto_close_at' => '05:00',
+        'auto_no_shows' => true,
+        'report_emails' => [],
+    ],
+
     'audit' => [
         'flag_amount'   => (float) env('HOTEL_AUDIT_FLAG_AMOUNT', 50000),
         'flag_failures' => (int) env('HOTEL_AUDIT_FLAG_FAILURES', 5),

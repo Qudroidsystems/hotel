@@ -39,10 +39,11 @@ class BookingController extends Controller
         } catch (BookingException $e) {
             return redirect()->route('book.index', $q)->with('error', $e->getMessage());
         }
-        $results = $this->booking->search($in, $out, $adults, $children, $rooms);
+        $results = $this->booking->search($in, $out, $adults, $children, $rooms, $q['promo']);
         $results->each(fn ($r) => $r->type->loadMissing('photos'));
+        $promoProblem = $this->booking->promoProblem($q['promo'], $results, $in, $out);
 
-        return view('booking.results', compact('results', 'q', 'in', 'out', 'adults', 'children', 'rooms'));
+        return view('booking.results', compact('results', 'q', 'in', 'out', 'adults', 'children', 'rooms', 'promoProblem'));
     }
 
     public function details(Request $request)
@@ -50,17 +51,21 @@ class BookingController extends Controller
         $q = $this->defaults($request);
         try {
             [$in, $out, $adults, $children, $rooms] = $this->booking->criteria($q);
-            $option = $this->booking->search($in, $out, $adults, $children, $rooms)->first(fn ($r) => $r->type->id === (int) $request->query('type'));
+            $option = $this->booking->search($in, $out, $adults, $children, $rooms, $q['promo'])->first(fn ($r) => $r->type->id === (int) $request->query('type'));
             if (! $option || ! $option->bookable) {
-                throw new BookingException('That room is no longer available for these dates. Please choose another.');
+                throw new BookingException($option?->restriction ?: 'That room is no longer available for these dates. Please choose another.');
+            }
+            $rate = $option->rates->firstWhere('key', (string) $request->query('rate', 'standard'));
+            if (! $rate) {
+                throw new BookingException('That rate is not available for these dates. Please choose another.');
             }
         } catch (BookingException $e) {
             return redirect()->route('book.search', $q)->with('error', $e->getMessage());
         }
         $depositPct = (float) config('hotel.booking.deposit_percent', 30);
-        $deposit = round($option->total * $depositPct / 100, 2);
+        $deposit = round($rate->total * $depositPct / 100, 2);
 
-        return view('booking.details', compact('option', 'q', 'in', 'out', 'adults', 'children', 'rooms', 'deposit', 'depositPct'));
+        return view('booking.details', compact('option', 'rate', 'q', 'in', 'out', 'adults', 'children', 'rooms', 'deposit', 'depositPct'));
     }
 
     public function store(Request $request, PaystackService $paystack)
@@ -84,6 +89,8 @@ class BookingController extends Controller
             'special_requests' => 'nullable|string|max:1000',
             'accept'           => 'accepted',
             'pay'              => 'nullable|in:online,later',
+            'rate_plan_id'     => 'nullable|integer',
+            'promo'            => 'nullable|string|max:30',
         ], ['accept.accepted' => 'Please accept the hotel policies to continue.', 'phone.regex' => 'Enter a valid phone number.']);
 
         try {
@@ -165,6 +172,7 @@ class BookingController extends Controller
             'adults'    => (int) $request->query('adults', $request->input('adults', 2)),
             'children'  => (int) $request->query('children', $request->input('children', 0)),
             'rooms'     => (int) $request->query('rooms', $request->input('rooms', 1)),
+            'promo'     => mb_substr(strtoupper(preg_replace('/[^A-Za-z0-9_-]/', '', (string) $request->query('promo', $request->input('promo', '')))), 0, 30),
         ];
     }
 }

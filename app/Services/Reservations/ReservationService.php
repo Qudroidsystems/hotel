@@ -8,11 +8,13 @@ use App\Enums\RoomStatus;
 use App\Exceptions\BookingException;
 use App\Exceptions\OutstandingBalanceException;
 use App\Models\Guest;
+use App\Models\Rates\RatePlan;
 use App\Models\Reservation;
 use App\Models\ReservationRoom;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Services\Billing\FolioService;
+use App\Services\Rates\RateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -29,7 +31,7 @@ class ReservationService
 
     /**
      * @param  array  $data  check_in_date, check_out_date, adults, children, source, status,
-     *                       expected_arrival_time, special_requests, notes
+     *                       expected_arrival_time, special_requests, notes, rate_plan_id, promo_code, company_id
      * @param  array  $lines [['room_type_id' => 1, 'room_id' => null|5, 'adults' => 2, 'children' => 0], …]
      */
     public function create(Guest $guest, array $data, array $lines): Reservation
@@ -47,7 +49,14 @@ class ReservationService
             throw new BookingException('Add at least one room.');
         }
 
-        return DB::transaction(function () use ($guest, $data, $lines, $in, $out) {
+        // The rate plan's own rules apply wherever the booking is made.
+        $plan = ! empty($data['rate_plan_id']) ? RatePlan::find($data['rate_plan_id']) : null;
+        if (! empty($data['rate_plan_id']) && ! $plan) {
+            throw new BookingException('That rate is no longer offered.');
+        }
+        $channel = ($data['source'] ?? null) === BookingSource::Website->value ? RateService::ONLINE : RateService::FRONT_DESK;
+
+        return DB::transaction(function () use ($guest, $data, $lines, $in, $out, $plan, $channel) {
             // Serialise bookings for the same room types so two clerks can't sell the last room twice.
             $typeIds = collect($lines)->pluck('room_type_id')->unique()->all();
             $types = RoomType::whereIn('id', $typeIds)->lockForUpdate()->get()->keyBy('id');
@@ -67,6 +76,12 @@ class ReservationService
 
             $this->assertRoomsFree($lines, $in, $out);
 
+            if ($plan) {
+                foreach ($types->only(collect($lines)->pluck('room_type_id')->unique()->all()) as $type) {
+                    app(RateService::class)->check($plan, $type, $in, $out, $channel, $data['promo_code'] ?? null, $data['company_id'] ?? null);
+                }
+            }
+
             $status = ReservationStatus::from($data['status'] ?? ReservationStatus::Confirmed->value);
 
             $reservation = Reservation::create([
@@ -82,6 +97,10 @@ class ReservationService
                 'expected_arrival_time' => $data['expected_arrival_time'] ?? null,
                 'special_requests'      => $data['special_requests'] ?? null,
                 'notes'                 => $data['notes'] ?? null,
+                'rate_plan_id'          => $plan?->id,
+                'rate_plan_name'        => $plan?->name,
+                'promo_code'            => $plan?->promo_code ? strtoupper($plan->promo_code) : null,
+                'company_id'            => $data['company_id'] ?? null,
                 'created_by'            => auth()->id(),
             ]);
             if ($status === ReservationStatus::Confirmed) {
@@ -91,7 +110,7 @@ class ReservationService
             foreach ($lines as $line) {
                 $type = $types[$line['room_type_id']];
                 $room = ! empty($line['room_id']) ? Room::find($line['room_id']) : null;
-                $rates = $this->availability->quote($type, $in, $out, $room);
+                $rates = $this->availability->quote($type, $in, $out, $room, $plan);
 
                 $reservation->rooms()->create([
                     'room_type_id' => $type->id,
@@ -105,8 +124,9 @@ class ReservationService
 
             $reservation->recalculateTotals();
             $reservation->log('created', sprintf(
-                '%s booking for %d night(s), %d room(s). Source: %s.',
-                $status->label(), $reservation->nights, count($lines), $reservation->source->label()
+                '%s booking for %d night(s), %d room(s). Source: %s.%s',
+                $status->label(), $reservation->nights, count($lines), $reservation->source->label(),
+                $plan ? " Rate: {$plan->name}." : ''
             ));
 
             $this->folios->forReservation($reservation);
@@ -359,7 +379,7 @@ class ReservationService
             }
 
             foreach ($reservation->rooms as $line) {
-                $fresh = $this->availability->quote($line->roomType, $in, $out, $line->room);
+                $fresh = $this->availability->quote($line->roomType, $in, $out, $line->room, $reservation->ratePlan);
                 $kept = array_intersect_key($line->nightly_rates ?? [], $fresh);
                 $rates = array_merge($fresh, $kept);
                 ksort($rates);

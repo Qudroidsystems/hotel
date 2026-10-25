@@ -85,7 +85,7 @@
                     <div class="small text-muted mt-1" id="payHint"></div></div>
                 <div class="col-12"><label>Method</label>
                     <div class="d-flex flex-wrap gap-2">
-                        @foreach (PaymentMethod::cases() as $m)
+                        @foreach (PaymentMethod::takeable() as $m)
                             <input type="radio" class="btn-check" name="method" id="m{{ $m->value }}" value="{{ $m->value }}" data-ref="{{ $m->needsReference() ? 1 : 0 }}" @checked(old('method', 'cash') === $m->value)>
                             <label class="btn btn-sm btn-outline-secondary" for="m{{ $m->value }}"><i class="{{ $m->icon() }}"></i> {{ $m->label() }}</label>
                         @endforeach
@@ -186,3 +186,28 @@ document.addEventListener('DOMContentLoaded', function () {
     @endif
 });
 </script>
+
+@can('Bill to company')
+@php
+    $billCompanies = \Illuminate\Support\Facades\Schema::hasTable('companies') ? \App\Models\Company::active()->orderBy('name')->get() : collect();
+    $billDefault = $folio->reservation?->company_id ?? $folio->guest?->company_id;
+@endphp
+<div class="modal fade" id="companyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content rm-form" method="POST" action="{{ route('folios.to-company', $folio) }}">@csrf
+            <div class="modal-header"><h5 class="modal-title">Bill to a company</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body row g-3">
+                @if ($billCompanies->isEmpty())
+                    <div class="col-12"><div class="cb-banner warning mb-0"><i class="ri-building-2-line"></i><div>No company accounts yet. @can('Manage company accounts')<a href="{{ route('companies.create') }}">Open one</a>@else Ask a manager to open one.@endcan</div></div></div>
+                @else
+                    <div class="col-12 small text-muted">The amount comes off the guest's bill and goes on the company's account as an invoice, to be paid on their statement.</div>
+                    <div class="col-12"><label for="bc_company">Company</label><select name="company_id" id="bc_company" class="form-select" required>@foreach ($billCompanies as $bc)<option value="{{ $bc->id }}" @selected($billDefault === $bc->id)>{{ $bc->name }}{{ (float) $bc->credit_limit > 0 ? ' (limit ' . config('hotel.currency_symbol') . number_format((float) $bc->credit_limit) . ')' : '' }}</option>@endforeach</select></div>
+                    <div class="col-sm-6"><label for="bc_amount">Amount</label><div class="input-group"><span class="input-group-text">{{ config('hotel.currency_symbol') }}</span><input type="number" step="0.01" min="0.01" max="{{ number_format(max(0, $balance), 2, '.', '') }}" name="amount" id="bc_amount" class="form-control" required value="{{ number_format(max(0, $balance), 2, '.', '') }}"></div><div class="small text-muted">Less than the whole bill if the guest pays the rest (e.g. their bar).</div></div>
+                    <div class="col-sm-6"><label for="bc_note">Note / their order number</label><input name="note" id="bc_note" class="form-control" maxlength="150" placeholder="e.g. LPO 4471"></div>
+                @endif
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>@if ($billCompanies->isNotEmpty())<button class="btn btn-primary">Move to company</button>@endif</div>
+        </form>
+    </div>
+</div>
+@endcan

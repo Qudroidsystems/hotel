@@ -25,6 +25,7 @@ class DemoSeeder extends Seeder
             ItDemoSeeder::class,            // IT assets and monitors
             OperationsDemoSeeder::class,    // housekeeping, repairs, security, IT tickets
             GuestServicesDemoSeeder::class, // loyalty, guest requests, messages
+            CommercialDemoSeeder::class,    // rates & seasons, company accounts, halls & events
         ]);
     }
 }

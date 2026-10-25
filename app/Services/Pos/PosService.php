@@ -169,7 +169,7 @@ class PosService
             'number'            => 'required|string|max:40',
             'outlet_id'         => 'required|integer|exists:pos_outlets,id',
             'ordered_at'        => 'required|date',
-            'method'            => ['required', Rule::in(array_merge(array_map(fn ($m) => $m->value, PaymentMethod::cases()), [PosOrder::ROOM]))],
+            'method'            => ['required', Rule::in(array_merge(array_map(fn ($m) => $m->value, PaymentMethod::takeable()), [PosOrder::ROOM]))],
             'reservation_id'    => 'nullable|required_if:method,room|integer',
             'room_number'       => 'nullable|string|max:20',
             'guest_name'        => 'nullable|string|max:120',

@@ -41,6 +41,24 @@
                                 @endforeach
                             </div>
                         </div>
+                        @if ($companies->isNotEmpty())
+                        <div class="col-sm-6">
+                            <label for="company_id">Bill to company</label>
+                            <select name="company_id" id="company_id" class="form-select">
+                                <option value="">No — the guest pays</option>
+                                @foreach ($companies as $c)<option value="{{ $c->id }}" @selected((string) old('company_id', request('company')) === (string) $c->id)>{{ $c->name }}</option>@endforeach
+                            </select>
+                            <div class="small text-muted mt-1">The bill can be moved to the company's account at check-out.</div>
+                        </div>
+                        @endif
+                        <div class="col-sm-6">
+                            <label for="rate_plan_id">Rate</label>
+                            <select name="rate_plan_id" id="rate_plan_id" class="form-select">
+                                <option value="">Standard rate</option>
+                                @foreach ($plans as $p)<option value="{{ $p->id }}" data-company="{{ $p->company_id }}" @selected((string) old('rate_plan_id') === (string) $p->id)>{{ $p->name }}{{ $p->company_id ? ' (' . $p->company?->name . ')' : '' }}</option>@endforeach
+                            </select>
+                            <div class="small text-muted mt-1" id="planNote"></div>
+                        </div>
                     </div>
                 </x-cb.card>
 
@@ -131,7 +149,8 @@
                 <div class="rs-summary">
                     <x-cb.card title="Summary" icon="ri-file-list-3-line">
                         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">Stay</span><strong id="sumStay">—</strong></div>
-                        <div class="d-flex justify-content-between small mb-3"><span class="text-muted">Rooms</span><strong id="sumRooms">0</strong></div>
+                        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">Rooms</span><strong id="sumRooms">0</strong></div>
+                        <div class="d-flex justify-content-between small mb-3"><span class="text-muted">Rate</span><strong id="sumPlan" class="text-end">Standard rate</strong></div>
                         <div id="sumLines" class="small mb-3"></div>
                         <div class="d-flex justify-content-between align-items-end border-top pt-3">
                             <span class="text-muted fw-semibold">Total</span>
@@ -161,6 +180,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     const inEl = document.getElementById('check_in_date'), outEl = document.getElementById('check_out_date');
+    const planEl = document.getElementById('rate_plan_id'), companyEl = document.getElementById('company_id');
+    planEl.addEventListener('change', load);
+    companyEl?.addEventListener('change', () => {
+        // A company's own negotiated rate is picked for it; another company's rate is cleared.
+        const own = [...planEl.options].find(o => o.dataset.company && o.dataset.company === companyEl.value);
+        const chosen = planEl.selectedOptions[0];
+        if (own) planEl.value = own.value; else if (chosen?.dataset.company) planEl.value = '';
+        load();
+    });
     const typeList = document.getElementById('typeList'), lineList = document.getElementById('lineList');
     let data = null;       // availability response
     let lines = [];        // [{typeId, roomId, adults, children}]
@@ -183,7 +211,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!inEl.value || !outEl.value || outEl.value <= inEl.value) { typeList.innerHTML = '<div class="cb-banner warning mb-0"><i class="ri-calendar-line"></i><div>Pick a check-out date after check-in.</div></div>'; return; }
         typeList.innerHTML = '<div class="text-muted small py-3"><span class="spinner-border spinner-border-sm me-2"></span>Checking availability…</div>';
         try {
-            const res = await fetch(AVAIL_URL + '?in=' + inEl.value + '&out=' + outEl.value, { headers: { Accept: 'application/json' } });
+            const qs = new URLSearchParams({ in: inEl.value, out: outEl.value, plan: planEl.value || '', company: companyEl?.value || '' });
+            const res = await fetch(AVAIL_URL + '?' + qs, { headers: { Accept: 'application/json' } });
             const json = await res.json();
             if (!res.ok) throw new Error(json.message || 'Could not check availability.');
             data = json;
@@ -193,8 +222,10 @@ document.addEventListener('DOMContentLoaded', function () {
             lines = OLD_ROOMS.map(r => ({ typeId: +r.room_type_id, roomId: r.room_id ? +r.room_id : null, adults: +r.adults || 1, children: +r.children || 0 }));
             restored = true;
         }
-        // Drop lines that no longer fit the new dates.
-        lines = lines.filter(l => typeById(l.typeId));
+        // Drop lines that no longer fit the new dates (or the rate).
+        lines = lines.filter(l => typeById(l.typeId) && !typeById(l.typeId).plan_problem);
+        document.getElementById('planNote').textContent = data.plan ? [data.plan.summary, data.plan.inclusions].filter(Boolean).join(' · ') : '';
+        document.getElementById('sumPlan').textContent = data.plan ? data.plan.name : 'Standard rate';
         data.types.forEach(t => { const mine = lines.filter(l => l.typeId === t.id); mine.slice(t.available).forEach(x => lines.splice(lines.indexOf(x), 1)); });
         lines.forEach(l => { if (l.roomId && !typeById(l.typeId).rooms.some(r => r.id === l.roomId)) l.roomId = null; });
         render();
@@ -214,11 +245,13 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="small text-muted fw-semibold ms-1">${esc(t.capacity)}</span></div>
                     <div class="small mt-1"><strong>${money(t.amount)}</strong> <span class="text-muted">for ${data.nights} night${data.nights === 1 ? '' : 's'} · avg ${money(avg)}/night</span></div>
                     <div class="small ${t.available ? 'text-success' : 'text-danger'} fw-semibold">${t.available ? t.available + ' of ' + t.total + ' available' : 'Sold out for these dates'}</div>
+                    ${t.plan_problem ? `<div class="small text-danger"><i class="ri-forbid-line"></i> ${esc(t.plan_problem)}</div>` : ''}
+                    ${t.warning ? `<div class="small text-warning-emphasis"><i class="ri-error-warning-line"></i> ${esc(t.warning)} You can still book it here.</div>` : ''}
                 </div>
                 <div class="rs-qty">
                     <button type="button" data-minus="${t.id}" ${n ? '' : 'disabled'} aria-label="Remove a ${esc(t.name)} room">−</button>
                     <span>${n}</span>
-                    <button type="button" data-plus="${t.id}" ${n < t.available ? '' : 'disabled'} aria-label="Add a ${esc(t.name)} room">+</button>
+                    <button type="button" data-plus="${t.id}" ${n < t.available && !t.plan_problem ? '' : 'disabled'} aria-label="Add a ${esc(t.name)} room">+</button>
                 </div></div>`;
         }).join('');
 
@@ -240,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function lineAmount(l) {
         const t = typeById(l.typeId), r = l.roomId ? t.rooms.find(x => x.id === l.roomId) : null;
-        return r && r.rate_override !== null ? r.rate_override * data.nights : t.amount;
+        return r && r.amount !== null ? r.amount : t.amount;
     }
 
     function summary() {

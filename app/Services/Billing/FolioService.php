@@ -93,6 +93,7 @@ class FolioService
         if ($charge->source_type === Reservation::class) {
             throw new BookingException('This line follows the booking discount. Change the discount on the reservation instead.');
         }
+        $this->assertDayOpen($charge->service_date, 'charge');
 
         $charge->forceFill(['voided_at' => now(), 'voided_by' => auth()->id(), 'void_reason' => $reason])->save();
         $charge->folio->reservation?->log('charge_voided', sprintf('Voided charge “%s” (%s). Reason: %s', $charge->description, $this->money((float) $charge->total), $reason));
@@ -220,9 +221,14 @@ class FolioService
         if ($payment->isVoided()) {
             throw new BookingException('This payment is already voided.');
         }
+        $this->assertDayOpen($payment->received_at, 'payment');
 
         DB::transaction(function () use ($payment, $reason) {
             $payment->forceFill(['voided_at' => now(), 'voided_by' => auth()->id(), 'void_reason' => $reason])->save();
+            // A bill moved to a company: the company's invoice goes too.
+            if ($payment->method === \App\Enums\PaymentMethod::Company) {
+                app(\App\Services\Companies\CompanyLedger::class)->folioPaymentVoided($payment);
+            }
             $payment->folio->reservation?->log('payment_voided', sprintf('Voided %s %s (%s). Reason: %s',
                 strtolower($payment->kind->label()), $payment->receipt_number, $this->money((float) $payment->amount), $reason));
             $this->syncStatus($payment->folio);
@@ -242,6 +248,14 @@ class FolioService
             $folio->forceFill(['status' => 'closed', 'closed_at' => now(), 'closed_by' => auth()->id()])->save();
         } elseif ((! $stayOver || ! $settled) && ! $folio->isOpen()) {
             $folio->forceFill(['status' => 'open', 'closed_at' => null, 'closed_by' => null])->save();
+        }
+    }
+
+    /** Money dated on a day the night audit has closed can only be undone by someone allowed to change closed days. */
+    private function assertDayOpen($date, string $what): void
+    {
+        if ($date && \App\Models\NightAudit::isClosed($date) && ! auth()->user()?->can('Change closed days')) {
+            throw new BookingException("This {$what} is dated " . Carbon::parse($date)->format('D j M Y') . ', a day the night audit has closed. A manager who can change closed days must void it.');
         }
     }
 

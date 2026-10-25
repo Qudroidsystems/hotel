@@ -126,19 +126,12 @@ class AvailabilityService
     }
 
     /**
-     * Nightly rates for a stay: {"2026-10-23": 40000.0, …}.
-     * A room's custom rate (if any) applies to every night.
+     * Nightly rates for a stay: {"2026-10-23": 40000.0, …}, from the rates engine (rate calendar, seasons,
+     * the room's custom rate, and the rate plan when one is given).
      */
-    public function quote(RoomType $type, $in, $out, ?Room $room = null): array
+    public function quote(RoomType $type, $in, $out, ?Room $room = null, ?\App\Models\Rates\RatePlan $plan = null): array
     {
-        $rates = [];
-        foreach (Reservation::nightsBetween($in, $out) as $night) {
-            $rates[$night] = $room?->rate_override !== null
-                ? (float) $room->rate_override
-                : $type->rateFor(Carbon::parse($night));
-        }
-
-        return $rates;
+        return app(\App\Services\Rates\RateService::class)->quote($type, $in, $out, $room, $plan);
     }
 
     /** Is a specific room free for the stay (ignoring one reservation, e.g. the one being edited)? */

@@ -153,6 +153,12 @@ class StaffAlerts
         ]);
     }
 
+    /** An alert to everyone who holds a permission (night audit reminders, events…). */
+    public function notify(string $permission, array $data): void
+    {
+        $this->send($this->staffWith($permission), $data + ['group' => 'work', 'level' => 'normal']);
+    }
+
     // ------------------------------------------------------------------
 
     private function becomes($model, string $status): bool

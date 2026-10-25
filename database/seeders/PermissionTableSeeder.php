@@ -136,6 +136,25 @@ class PermissionTableSeeder extends Seeder
         'Hotel Settings' => [
             'Manage hotel settings',
         ],
+        'Rates & Seasons' => [
+            'Manage rates',
+        ],
+        'Company Accounts' => [
+            'View company accounts',
+            'Manage company accounts',
+            'Bill to company',
+            'Receive company payments',
+        ],
+        'Night Audit' => [
+            'Run night audit',
+            'View night audit reports',
+            'Change closed days',
+        ],
+        'Events & Halls' => [
+            'View events',
+            'Manage events',
+            'Manage halls',
+        ],
         'Guest Management' => [
             'View guests',
             'Manage guests',

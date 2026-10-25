@@ -20,6 +20,8 @@
             <span class="cb-meta-pill" style="background: {{ $st->color() }}; border-color: {{ $st->color() }}"><i class="{{ $st->icon() }}"></i> {{ $st->label() }}</span>
             <span class="cb-meta-pill"><i class="ri-hashtag"></i> {{ $r->reference }}</span>
             <span class="cb-meta-pill"><i class="ri-route-line"></i> {{ $r->source->label() }}</span>
+            @if ($r->rate_plan_name)<span class="cb-meta-pill" title="{{ $r->ratePlan?->summary }}{{ $r->ratePlan?->inclusions ? ' · ' . $r->ratePlan->inclusions : '' }}"><i class="ri-price-tag-3-line"></i> {{ $r->rate_plan_name }}{{ $r->promo_code ? ' · ' . $r->promo_code : '' }}</span>@endif
+            @if ($r->company)<a class="cb-meta-pill text-decoration-none" @can('View company accounts') href="{{ route('companies.show', $r->company) }}" @endcan><i class="ri-building-2-line"></i> Bill to {{ $r->company->name }}</a>@endif
             @if ($g->is_vip)<span class="cb-meta-pill"><i class="ri-vip-crown-line"></i> VIP</span>@endif
         </x-slot:pills>
         <x-slot:actions>
@@ -162,6 +164,11 @@
                                 @unless (in_array($st, [ReservationStatus::Cancelled, ReservationStatus::NoShow], true))
                                     <button type="button" class="action-btn btn-more" data-bs-toggle="modal" data-bs-target="#chargeModal"><i class="ri-add-line"></i> Add charge</button>
                                 @endunless
+                            @endcan
+                            @can('Bill to company')
+                                @if ($bal > 0.004 && in_array($st, [ReservationStatus::CheckedIn, ReservationStatus::CheckedOut], true))
+                                    <button type="button" class="action-btn btn-more" data-bs-toggle="modal" data-bs-target="#companyModal"><i class="ri-building-2-line"></i> Bill to company</button>
+                                @endif
                             @endcan
                         </div>
                         @if ($bill['recent']->isNotEmpty())
@@ -403,6 +410,9 @@
                     </div>
                     @can('Receive payments')
                         <button type="button" class="btn btn-success w-100 mb-3" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="ri-bank-card-line"></i> Take payment first</button>
+                    @endcan
+                    @can('Bill to company')
+                        <button type="button" class="btn btn-outline-primary w-100 mb-3" data-bs-toggle="modal" data-bs-target="#companyModal"><i class="ri-building-2-line"></i> {{ $r->company ? 'Bill ' . $r->company->name : 'Bill to a company' }}</button>
                     @endcan
                     @can('Check out with balance')
                         <form method="POST" action="{{ route('reservations.check-out', $r) }}" class="border rounded-3 p-3">

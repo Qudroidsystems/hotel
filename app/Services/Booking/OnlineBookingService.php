@@ -75,32 +75,68 @@ class OnlineBookingService
         return [$in, $out, $adults, $children, $rooms];
     }
 
-    /** Room types that can take this party for these dates, cheapest first. */
-    public function search(Carbon $in, Carbon $out, int $adults, int $children, int $rooms): Collection
+    /**
+     * Room types that can take this party for these dates, cheapest first. Each has its rates: the standard
+     * rate and every rate plan sold online that fits the stay (a promo code unlocks its plan), cheapest first.
+     */
+    public function search(Carbon $in, Carbon $out, int $adults, int $children, int $rooms, ?string $promo = null): Collection
     {
         $perRoomAdults = (int) ceil($adults / $rooms);
         $perRoomChildren = (int) ceil($children / $rooms);
+        $engine = app(\App\Services\Rates\RateService::class);
 
         return $this->availability->summary($in, $out)
             ->filter(fn ($row) => $row['type']->is_active)
-            ->map(function ($row) use ($rooms, $perRoomAdults, $perRoomChildren) {
+            ->map(function ($row) use ($rooms, $perRoomAdults, $perRoomChildren, $engine, $in, $out, $promo) {
                 $type = $row['type'];
                 $fits = $perRoomAdults <= (int) $type->max_adults && $perRoomChildren <= (int) $type->max_children;
+                $restriction = $engine->restriction($type, $in, $out);
+
+                $rates = collect([(object) [
+                    'plan' => null, 'key' => 'standard', 'name' => 'Room only', 'inclusions' => null, 'non_refundable' => false, 'promo' => false,
+                    'nights' => $row['nights'], 'per_room' => (float) $row['amount'], 'total' => round((float) $row['amount'] * $rooms, 2),
+                ]])->merge($engine->options($type, $in, $out, \App\Services\Rates\RateService::ONLINE, $promo)->map(fn ($o) => (object) [
+                    'plan' => $o->plan, 'key' => (string) $o->plan->id, 'name' => $o->plan->name, 'inclusions' => $o->plan->inclusions,
+                    'non_refundable' => $o->plan->non_refundable, 'promo' => (bool) $o->plan->promo_code,
+                    'nights' => $o->nights, 'per_room' => $o->amount, 'total' => round($o->amount * $rooms, 2),
+                ]))->sortBy('per_room')->values();
+                $best = $rates->first();
 
                 return (object) [
-                    'type'      => $type,
-                    'available' => (int) $row['available'],
-                    'bookable'  => $fits && $row['available'] >= $rooms,
-                    'fits'      => $fits,
-                    'nights'    => $row['nights'],
-                    'per_room'  => (float) $row['amount'],
-                    'total'     => (float) $row['amount'] * $rooms,
+                    'type'        => $type,
+                    'available'   => (int) $row['available'],
+                    'bookable'    => $fits && $row['available'] >= $rooms && ! $restriction,
+                    'fits'        => $fits,
+                    'restriction' => $restriction,
+                    'rates'       => $rates,
+                    'nights'      => $best->nights,
+                    'per_room'    => $best->per_room,
+                    'total'       => $best->total,
                 ];
             })
             ->sortBy([['bookable', 'desc'], ['per_room', 'asc']])->values();
     }
 
-    /** data: room_type_id, check_in, check_out, adults, children, rooms, first_name, last_name, email, phone, arrival_time?, special_requests? */
+    /** Why a promo code gives nothing for this search (null when it works or none was typed). */
+    public function promoProblem(?string $promo, Collection $results, Carbon $in, Carbon $out): ?string
+    {
+        if (blank($promo)) {
+            return null;
+        }
+        $engine = app(\App\Services\Rates\RateService::class);
+        $plan = $engine->promo($promo);
+        if (! $plan) {
+            return 'The code ' . strtoupper(trim($promo)) . ' isn’t valid. Check it, or book at our standard rates below.';
+        }
+        if ($results->contains(fn ($r) => $r->rates->contains(fn ($o) => $o->plan?->id === $plan->id))) {
+            return null;
+        }
+        $type = $results->first()?->type;
+
+        return $type ? (($engine->problems($plan, $type, $in, $out, \App\Services\Rates\RateService::ONLINE, $promo)[0] ?? null) ?: 'The code doesn’t apply to these rooms or dates.') : null;
+    }
+
+    /** data: room_type_id, check_in, check_out, adults, children, rooms, first_name, last_name, email, phone, arrival_time?, special_requests?, rate_plan_id?, promo? */
     public function book(array $data): Reservation
     {
         if (! config('hotel.booking.enabled', true)) {
@@ -112,6 +148,9 @@ class OnlineBookingService
             throw new BookingException("A {$type->name} takes up to {$type->capacity_label}. Choose more rooms or another room type.");
         }
 
+        if ($why = app(\App\Services\Rates\RateService::class)->restriction($type, $in, $out)) {
+            throw new BookingException($why);
+        }
         $depositPct = max(0, min(100, (float) config('hotel.booking.deposit_percent', 30)));
 
         return DB::transaction(function () use ($data, $in, $out, $adults, $children, $rooms, $type, $depositPct) {
@@ -133,11 +172,13 @@ class OnlineBookingService
                 'expected_arrival_time' => $data['arrival_time'] ?? null,
                 'special_requests'      => $data['special_requests'] ?? null,
                 'notes'                 => 'Booked online by the guest.',
+                'rate_plan_id'          => $data['rate_plan_id'] ?? null,
+                'promo_code'            => $data['promo'] ?? null,
             ], $lines);
 
-            // Returning guests in a loyalty tier get its discount on the room rate.
+            // Returning guests in a loyalty tier get its discount on the standard room rate (not on top of a special rate).
             $loyalty = app(\App\Services\Loyalty\LoyaltyService::class);
-            if (($pct = $loyalty->discountPercent($guest)) > 0) {
+            if (empty($data['rate_plan_id']) && ($pct = $loyalty->discountPercent($guest)) > 0) {
                 $off = round((float) $reservation->room_total * $pct / 100, 2);
                 $this->reservations->applyDiscount($reservation, $off, $guest->tier_label . ' member rate (' . rtrim(rtrim(number_format($pct, 1), '0'), '.') . '% off)');
                 $reservation->refresh();

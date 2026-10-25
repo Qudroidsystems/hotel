@@ -14,8 +14,9 @@
 
         <form method="POST" action="{{ route('book.store') }}" class="form" novalidate>
             @csrf
-            @foreach (['check_in', 'check_out', 'adults', 'children', 'rooms'] as $k)<input type="hidden" name="{{ $k }}" value="{{ $q[$k] }}">@endforeach
+            @foreach (['check_in', 'check_out', 'adults', 'children', 'rooms', 'promo'] as $k)<input type="hidden" name="{{ $k }}" value="{{ $q[$k] }}">@endforeach
             <input type="hidden" name="room_type_id" value="{{ $option->type->id }}">
+            <input type="hidden" name="rate_plan_id" value="{{ $rate->plan?->id }}">
             <div class="hp" aria-hidden="true"><label for="website">Leave empty</label><input type="text" name="website" id="website" tabindex="-1" autocomplete="off"></div>
 
             <div class="grid2">
@@ -49,12 +50,14 @@
         @include('booking._keytag', ['in' => $in, 'out' => $out, 'title' => ($rooms > 1 ? $rooms . ' × ' : '') . $option->type->name,
             'sub' => $adults . ' adult' . ($adults == 1 ? '' : 's') . ($children ? ', ' . $children . ' child' . ($children == 1 ? '' : 'ren') : '')])
         <div class="panel totals">
-            @foreach ($option->nights as $night => $rate)
-                @if ($loop->index < 7)<div class="row"><span>{{ \Illuminate\Support\Carbon::parse($night)->format('D j M') }}</span><span>{{ $sym }}{{ number_format($rate * $rooms) }}</span></div>@endif
+            <div class="row"><span><strong>{{ $rate->name }}</strong>@if ($rate->inclusions)<br><span class="muted small">{{ $rate->inclusions }}</span>@endif</span><span></span></div>
+            @foreach ($rate->nights as $night => $nightRate)
+                @if ($loop->index < 7)<div class="row"><span>{{ \Illuminate\Support\Carbon::parse($night)->format('D j M') }}</span><span>{{ $sym }}{{ number_format($nightRate * $rooms) }}</span></div>@endif
             @endforeach
-            @if (count($option->nights) > 7)<div class="row muted"><span>{{ count($option->nights) - 7 }} more night(s)</span><span></span></div>@endif
-            <div class="row total"><span>Total{{ config('hotel.prices_include_tax') ? ' (taxes included)' : '' }}</span><span>{{ $sym }}{{ number_format($option->total, 2) }}</span></div>
-            @if ($deposit > 0)<div class="row"><span>Due now</span><span>{{ $sym }}{{ number_format($deposit, 2) }}</span></div><div class="row muted"><span>At the hotel</span><span>{{ $sym }}{{ number_format($option->total - $deposit, 2) }}</span></div>@endif
+            @if (count($rate->nights) > 7)<div class="row muted"><span>{{ count($rate->nights) - 7 }} more night(s)</span><span></span></div>@endif
+            <div class="row total"><span>Total{{ config('hotel.prices_include_tax') ? ' (taxes included)' : '' }}</span><span>{{ $sym }}{{ number_format($rate->total, 2) }}</span></div>
+            @if ($deposit > 0)<div class="row"><span>Due now</span><span>{{ $sym }}{{ number_format($deposit, 2) }}</span></div><div class="row muted"><span>At the hotel</span><span>{{ $sym }}{{ number_format($rate->total - $deposit, 2) }}</span></div>@endif
+            @if ($rate->non_refundable)<div class="row muted small"><span>Non-refundable: what you pay is kept if you cancel.</span><span></span></div>@endif
         </div>
         @php $silver = (float) config('hotel.loyalty.silver_discount'); $gold = (float) config('hotel.loyalty.gold_discount'); @endphp
         @if (config('hotel.loyalty.enabled') && ($silver > 0 || $gold > 0))

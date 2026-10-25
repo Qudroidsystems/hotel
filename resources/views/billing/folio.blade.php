@@ -38,6 +38,9 @@
             @can('Post charges')
                 <button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#chargeModal"><i class="ri-add-line"></i> Add charge</button>
             @endcan
+            @can('Bill to company')
+                @if ($bal > 0.004)<button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#companyModal"><i class="ri-building-2-line"></i> Bill to company</button>@endif
+            @endcan
             <a class="cb-hero-btn" href="{{ route('folios.print', $folio) }}" target="_blank" rel="noopener"><i class="ri-printer-line"></i> Invoice</a>
         </x-slot:actions>
     </x-cb.hero>

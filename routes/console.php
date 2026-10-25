@@ -81,6 +81,35 @@ Artisan::command('messages:arrival-reminders', function (\App\Services\Messaging
     $this->info("{$sent} arrival reminder(s) sent.");
 })->purpose('Text guests arriving tomorrow');
 
+// Night audit: remind staff when a finished day hasn't been closed, and close it by itself when that is switched on.
+Artisan::command('night-audit:auto', function (\App\Services\NightAudit\NightAuditService $audits) {
+    $closed = 0;
+    for ($i = 0; $i < 7; $i++) {
+        $date = \App\Models\NightAudit::businessDate();
+        if ($date->gte(today())) {
+            break;   // the day being worked hasn't ended yet
+        }
+        $now = now()->format('H:i');
+        $key = 'night-audit-reminded:' . $date->toDateString();
+        if ($now >= (string) config('hotel.night_audit.day_ends_at', '06:00') && ! \Illuminate\Support\Facades\Cache::has($key)) {
+            \Illuminate\Support\Facades\Cache::put($key, true, now()->addDays(2));
+            app(\App\Services\Mobile\StaffAlerts::class)->notify('Run night audit', [
+                'title' => 'Night audit: ' . $date->format('D j M') . ' is not closed',
+                'body'  => config('hotel.night_audit.auto_close') ? 'It will close by itself at ' . config('hotel.night_audit.auto_close_at') . '.' : 'Close the day from Front Desk → Night Audit.',
+                'url'   => route('night-audit.index'), 'thread' => 'night-audit', 'level' => 'high',
+            ]);
+        }
+        if (! config('hotel.night_audit.auto_close') || $now < (string) config('hotel.night_audit.auto_close_at', '05:00')) {
+            break;
+        }
+        $noShows = config('hotel.night_audit.auto_no_shows', true) ? $audits->checks($date)['arrivals']->pluck('id')->all() : [];
+        $audits->close($date, $noShows, 'Closed automatically.', true);
+        $closed++;
+    }
+    $this->info($closed ? "{$closed} day(s) closed." : 'Nothing to close.');
+})->purpose('Remind about, or automatically run, the night audit');
+
+Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('bookings:expire-holds')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
