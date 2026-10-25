@@ -60,4 +60,10 @@ return [
         'live_public_key' => env('PAYSTACK_LIVE_PUBLIC_KEY'),
     ],
 
+    // Push notifications for the staff mobile app: path to the Firebase service-account JSON key
+    // (keep it outside public/, e.g. storage/app/private/firebase.json).
+    'fcm' => [
+        'credentials' => env('FCM_CREDENTIALS'),
+    ],
+
 ];

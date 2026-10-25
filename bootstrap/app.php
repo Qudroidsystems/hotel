@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        apiPrefix: 'api/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -28,6 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         // The mobile API always answers in JSON, even without an Accept header.
         $exceptions->shouldRenderJsonWhen(fn ($request, $e) => $request->is('api/*') || $request->expectsJson());
+
+        // A business rule said no (e.g. "someone else must approve it"): show the reason in the app.
+        $exceptions->render(fn (\App\Exceptions\BookingException $e, $request) => $request->is('api/*')
+            ? response()->json(['success' => false, 'code' => 'not_allowed_now', 'message' => $e->getMessage()], 422)
+            : null);
 
         // Fallback for an expired session / CSRF token anywhere else.
         // Laravel turns TokenMismatchException into an HttpException(419)

@@ -17,7 +17,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Sign-in tokens for the staff mobile app. Registered here because composer.json
+        // lists Sanctum under "dont-discover"; skipped until it is installed.
+        if (class_exists(\Laravel\Sanctum\SanctumServiceProvider::class)) {
+            $this->app->register(\Laravel\Sanctum\SanctumServiceProvider::class);
+        }
     }
 
     public function boot(): void
@@ -43,6 +47,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
         RateLimiter::for('booking-lookup', fn (Request $r) => Limit::perMinute(6)->by('bl|' . $r->ip()));
         RateLimiter::for('paystack-webhook', fn (Request $r) => Limit::perMinute(300)->by('pw|' . $r->ip()));
+
+        // Staff mobile app: sign-in attempts per address and login name; signed-in calls per person.
+        RateLimiter::for('mobile-public', fn (Request $r) => Limit::perMinute(60)->by('mp|' . $r->ip()));
+        RateLimiter::for('mobile-login', fn (Request $r) => [
+            Limit::perMinute(10)->by('ml|' . $r->ip()),
+            Limit::perMinute(5)->by('mlu|' . mb_strtolower((string) $r->input('login', $r->input('email')))),
+        ]);
+        RateLimiter::for('mobile-api', fn (Request $r) => Limit::perMinute(180)->by('ma|' . ($r->user()?->id ?? $r->ip())));
+
+        // Alerts for the staff app and phones when work is assigned or something needs approving.
+        \App\Services\Mobile\StaffAlerts::register();
 
         // Room lifecycle: a room that needs cleaning gets a housekeeping task (spec §3.3).
         RoomStatusLog::created(fn (RoomStatusLog $log) => app(HousekeepingService::class)->roomStatusChanged($log));
