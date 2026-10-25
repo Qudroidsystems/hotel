@@ -70,12 +70,14 @@ class HotelSettings
             ],
             'messaging' => [
                 'title' => 'Guest Messages', 'icon' => 'ri-message-3-line',
-                'intro' => 'Text messages to guests by SMS or WhatsApp through Twilio. The Twilio account (SID, token and numbers) is set in the server\'s .env file by IT. Guests who asked not to be texted are skipped.',
+                'intro' => 'Text messages to guests by SMS or WhatsApp through Twilio or Termii. The provider\'s account (keys and sender) is set in the server\'s .env file by IT. Guests who asked not to be texted are skipped.',
                 'fields' => [
                     'messaging.enabled'      => ['type' => 'bool', 'label' => 'Send text messages to guests'],
+                    'messaging.provider'     => ['type' => 'select', 'label' => 'Send through', 'options' => ['twilio' => 'Twilio', 'termii' => 'Termii']],
+                    'messaging.termii_route' => ['type' => 'select', 'label' => 'Termii SMS route', 'options' => ['dnd' => 'DND route (reaches numbers on Do-Not-Disturb; needs an approved sender ID)', 'generic' => 'Generic route (cheaper; not delivered to DND numbers)'], 'help' => 'Only used when sending through Termii.'],
                     'messaging.channel'      => ['type' => 'select', 'label' => 'Send by', 'options' => ['sms' => 'SMS', 'whatsapp' => 'WhatsApp (needs an approved WhatsApp sender)']],
                     'messaging.country_code' => ['type' => 'text', 'label' => 'Country code for local numbers', 'rules' => ['required', 'regex:/^[0-9]{1,4}$/'], 'help' => 'Digits only, e.g. 234. A number written 0803 123 4567 is sent to +234 803 123 4567.'],
-                    'messaging.sender_name'  => ['type' => 'text', 'label' => 'SMS sender name', 'rules' => ['nullable', 'regex:/^[A-Za-z0-9 ]{1,11}$/'], 'help' => 'Up to 11 letters or digits, where the mobile networks allow it. Empty: the Twilio number.'],
+                    'messaging.sender_name'  => ['type' => 'text', 'label' => 'SMS sender name', 'rules' => ['nullable', 'regex:/^[A-Za-z0-9 ]{1,11}$/'], 'help' => 'Up to 11 letters or digits, where the mobile networks allow it (for Termii, an approved sender ID). Empty: the number or sender ID in .env.'],
                     'messaging.send_confirmation'    => ['type' => 'bool', 'label' => 'When a booking is confirmed'],
                     'messaging.send_payment_link'    => ['type' => 'bool', 'label' => 'When an online booking waits for its deposit (with the payment link)'],
                     'messaging.send_reminder'        => ['type' => 'bool', 'label' => 'The day before arrival'],

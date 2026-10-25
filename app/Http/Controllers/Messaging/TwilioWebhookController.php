@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
  * back. Both are checked against Twilio's signature, so nobody else can post here.
  * In the Twilio console set the number's "A message comes in" webhook to
  * https://<your site>/twilio/inbound (HTTP POST).
+ *
+ * Termii posts JSON events (delivery reports, replies) to /termii/events,
+ * signed with the account's secret key.
  */
 class TwilioWebhookController extends Controller
 {
@@ -22,6 +25,14 @@ class TwilioWebhookController extends Controller
     {
         abort_unless($this->messenger->validSignature($request), 403);
         $this->messenger->statusUpdate($request->post());
+
+        return response()->noContent();
+    }
+
+    public function termii(Request $request)
+    {
+        abort_unless($this->messenger->validTermiiSignature($request), 403);
+        $this->messenger->termiiEvent($request->json()->all());
 
         return response()->noContent();
     }

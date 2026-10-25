@@ -31,7 +31,7 @@ class MessageController extends Controller
         $unread = GuestMessage::where('direction', 'in')->whereNull('read_at')->count();
         $today = GuestMessage::where('direction', 'out')->where('created_at', '>=', today())->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status');
         $pagetitle = 'Guest Messages';
-        $ready = ['enabled' => $this->messenger->enabled(), 'configured' => $this->messenger->configured(), 'channel' => $this->messenger->channel()];
+        $ready = ['enabled' => $this->messenger->enabled(), 'configured' => $this->messenger->configured(), 'channel' => $this->messenger->channel(), 'provider' => $this->messenger->providerLabel(), 'missing' => $this->messenger->missingSettings()];
 
         return view('messages.index', compact('pagetitle', 'messages', 'show', 'q', 'unread', 'today', 'ready'));
     }

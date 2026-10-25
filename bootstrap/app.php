@@ -21,8 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
-        // Paystack and Twilio post without a CSRF token; they are checked by signature instead.
-        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound']);
+        // Paystack, Twilio and Termii post without a CSRF token; they are checked by signature instead.
+        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound', 'termii/events']);
 
         // Signed-in users go to the dashboard instead of the login page.
         $middleware->redirectUsersTo('/dashboard');

@@ -25,6 +25,7 @@ class AppController extends ApiController
         return $this->ok([
             'api_version'   => 1,
             'kind'          => 'smart-hotel',
+            'staff_api'     => class_exists(\Laravel\Sanctum\Sanctum::class),
             'name'          => config('hotel.name'),
             'company'       => config('hotel.name'),
             'tagline'       => config('hotel.tagline'),

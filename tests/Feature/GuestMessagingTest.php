@@ -115,3 +115,35 @@ test('arrival reminders go to tomorrow\'s guests once', function () {
     $this->artisan('messages:arrival-reminders')->assertSuccessful();
     expect(GuestMessage::where('reservation_id', $r->id)->where('template', 'arrival_reminder')->count())->toBe(1);
 });
+
+test('texts go through Termii when chosen, and its signed events update and reply', function () {
+    config([
+        'hotel.messaging.provider' => 'termii', 'hotel.messaging.termii_route' => 'dnd',
+        'services.termii.api_key' => 'TLkey', 'services.termii.secret_key' => 'tsecret', 'services.termii.sender_id' => 'BLuxury',
+        'services.termii.base_url' => 'https://api.ng.termii.com',
+    ]);
+    Http::fake(['api.ng.termii.com/*' => Http::response(['message_id' => '9122821270554876574', 'message' => 'Successfully Sent', 'balance' => 9, 'user' => 'B Luxury'], 200)]);
+    $r = Reservation::where('status', ReservationStatus::Confirmed->value)->first();
+    $r->guest->forceFill(['phone' => '0803 123 4567', 'messages_opt_out' => false])->save();
+
+    $msg = app(GuestMessenger::class)->send($r->guest, $r, 'Your room is ready.', 'manual', $this->admin);
+    expect($msg->status)->toBe('sent')->and($msg->provider_id)->toBe('9122821270554876574')->and($msg->from)->toBe('BLuxury');
+    Http::assertSent(fn ($req) => str_ends_with($req->url(), '/api/sms/send') && $req['to'] === '2348031234567'
+        && $req['from'] === 'BLuxury' && $req['channel'] === 'dnd' && $req['api_key'] === 'TLkey' && $req['sms'] === 'Your room is ready.');
+
+    // Delivery report: signed with the secret key.
+    $event = json_encode(['type' => 'outbound', 'message_id' => '9122821270554876574', 'receiver' => '2348031234567', 'status' => 'Delivered', 'channel' => 'dnd']);
+    $this->call('POST', '/termii/events', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_TERMII_SIGNATURE' => 'bad'], $event)->assertForbidden();
+    $this->call('POST', '/termii/events', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_TERMII_SIGNATURE' => hash_hmac('sha512', $event, 'tsecret')], $event)->assertNoContent();
+    expect($msg->fresh()->status)->toBe('delivered');
+
+    // A reply from the guest.
+    $reply = json_encode(['type' => 'inbound', 'message_id' => 'in-1', 'sender' => '2348031234567', 'receiver' => 'BLuxury', 'message' => 'Can I check in early?', 'status' => 'Received']);
+    $this->call('POST', '/termii/events', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_TERMII_SIGNATURE' => hash_hmac('sha512', $reply, 'tsecret')], $reply)->assertNoContent();
+    expect(GuestMessage::where('direction', 'in')->where('body', 'Can I check in early?')->first())->guest_id->toBe($r->guest->id);
+});
+
+test('the messages page names what is missing for the chosen provider', function () {
+    config(['hotel.messaging.provider' => 'termii', 'services.termii.api_key' => null, 'services.termii.sender_id' => null, 'hotel.messaging.sender_name' => null]);
+    $this->get(route('messages.index'))->assertOk()->assertSee('Termii account')->assertSee('TERMII_API_KEY')->assertSee('TERMII_SENDER_ID');
+});

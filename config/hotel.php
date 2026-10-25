@@ -11,7 +11,7 @@
 */
 
 return [
-    'name'       => env('HOTEL_NAME', env('APP_NAME', 'Smart Hotel')),
+    'name'       => env('HOTEL_NAME', env('APP_NAME', 'B Luxury')),
     'tagline'    => env('HOTEL_TAGLINE', 'Hotel Management & Security Platform'),
     'logo'       => env('HOTEL_LOGO', 'theme/layouts/assets/images/logo-dark.png'),
     'logo_light' => env('HOTEL_LOGO_LIGHT', 'theme/layouts/assets/images/logo-light.png'),
@@ -139,15 +139,18 @@ return [
     ],
 
     /*
-    | Text messages to guests (SMS or WhatsApp through Twilio). The Twilio
+    | Text messages to guests (SMS or WhatsApp through Twilio or Termii). The
     | account itself is in .env (TWILIO_SID, TWILIO_AUTH_TOKEN,
-    | TWILIO_PHONE_NUMBER, TWILIO_WHATSAPP_FROM). Templates may use
+    | TWILIO_PHONE_NUMBER, TWILIO_WHATSAPP_FROM, or TERMII_API_KEY,
+    | TERMII_SECRET_KEY, TERMII_SENDER_ID, TERMII_WHATSAPP_FROM). Templates may use
     | {first_name} {guest} {hotel} {reference} {check_in} {check_out} {nights}
     | {link} {amount} {points} {phone}.
     */
     'messaging' => [
         'enabled'        => (bool) env('HOTEL_MESSAGING_ENABLED', false),
+        'provider'       => env('HOTEL_MESSAGING_PROVIDER', 'twilio'), // twilio | termii
         'channel'        => env('HOTEL_MESSAGING_CHANNEL', 'sms'),   // sms | whatsapp
+        'termii_route'   => 'dnd',      // Termii SMS route: dnd (reaches DND numbers, transactional) | generic
         'country_code'   => '234',      // added to numbers written like 0803…
         'sender_name'    => null,       // SMS sender ID (letters), where the network allows it
         'reminder_time'  => '10:00',

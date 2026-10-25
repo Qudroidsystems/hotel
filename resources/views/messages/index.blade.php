@@ -26,7 +26,7 @@
     @if (! $ready['enabled'])
         <div class="cb-banner warning"><i class="ri-information-line"></i><div>Guest messages are switched off, so nothing is being sent. Turn them on under Hotel Settings → Guest Messages.</div></div>
     @elseif (! $ready['configured'])
-        <div class="cb-banner warning"><i class="ri-information-line"></i><div>The Twilio account isn't set up yet, so messages are logged but not sent. IT adds <code>TWILIO_SID</code>, <code>TWILIO_AUTH_TOKEN</code> and {{ $ready['channel'] === 'whatsapp' ? 'TWILIO_WHATSAPP_FROM' : 'TWILIO_PHONE_NUMBER' }} to the server's .env file.</div></div>
+        <div class="cb-banner warning"><i class="ri-information-line"></i><div>The {{ $ready['provider'] }} account isn't set up yet, so messages are logged but not sent. IT adds @foreach ($ready['missing'] as $key)<code>{{ $key }}</code>{{ $loop->remaining > 1 ? ', ' : ($loop->remaining === 1 ? ' and ' : '') }}@endforeach to the server's .env file.</div></div>
     @endif
 
     <div class="row g-3 mb-3">

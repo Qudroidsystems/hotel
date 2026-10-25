@@ -105,6 +105,8 @@ Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middlew
 // Twilio: delivery reports and guests' replies to texts (checked by signature).
 Route::post('/twilio/status', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'status'])->middleware('throttle:twilio-webhook')->name('twilio.status');
 Route::post('/twilio/inbound', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'inbound'])->middleware('throttle:twilio-webhook')->name('twilio.inbound');
+// Termii: delivery reports and replies (Termii dashboard → Webhook URL: https://<your site>/termii/events).
+Route::post('/termii/events', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'termii'])->middleware('throttle:twilio-webhook')->name('termii.events');
 
 // Staff App manifest: fetched by the browser without cookies, so it must be public.
 Route::get('/staff/manifest.webmanifest', [StaffAppController::class, 'manifest'])->name('staff.manifest');

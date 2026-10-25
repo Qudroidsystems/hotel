@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Text messages to guests by SMS or WhatsApp, through Twilio
- * (Hotel Settings → Guest Messages; the Twilio account is in .env).
+ * Text messages to guests by SMS or WhatsApp, through Twilio or Termii
+ * (Hotel Settings → Guest Messages; the provider's account is in .env).
  *
  * Every message is logged, including the ones not sent and why (switched off,
  * the guest asked not to be texted, no phone number), so staff can see what a
@@ -35,14 +35,51 @@ class GuestMessenger
         return config('hotel.messaging.channel') === 'whatsapp' ? 'whatsapp' : 'sms';
     }
 
-    /** The Twilio account is filled in for the chosen channel. */
+    /** twilio | termii */
+    public function provider(): string
+    {
+        return config('hotel.messaging.provider') === 'termii' ? 'termii' : 'twilio';
+    }
+
+    public function providerLabel(): string
+    {
+        return $this->provider() === 'termii' ? 'Termii' : 'Twilio';
+    }
+
+    /** The provider's account is filled in for the chosen channel. */
     public function configured(): bool
     {
+        if ($this->provider() === 'termii') {
+            return filled(config('services.termii.api_key')) && filled($this->fromNumber());
+        }
+
         return filled(config('services.twilio.sid')) && filled(config('services.twilio.auth_token')) && filled($this->fromNumber());
+    }
+
+    /** What IT still has to add to .env, for the warning on the Messages page. */
+    public function missingSettings(): array
+    {
+        if ($this->provider() === 'termii') {
+            return array_keys(array_filter([
+                'TERMII_API_KEY'   => blank(config('services.termii.api_key')),
+                $this->channel() === 'whatsapp' ? 'TERMII_WHATSAPP_FROM' : 'TERMII_SENDER_ID' => blank($this->fromNumber()),
+            ]));
+        }
+
+        return array_keys(array_filter([
+            'TWILIO_SID'        => blank(config('services.twilio.sid')),
+            'TWILIO_AUTH_TOKEN' => blank(config('services.twilio.auth_token')),
+            $this->channel() === 'whatsapp' ? 'TWILIO_WHATSAPP_FROM' : 'TWILIO_PHONE_NUMBER' => blank($this->fromNumber()),
+        ]));
     }
 
     private function fromNumber(): ?string
     {
+        if ($this->provider() === 'termii') {
+            return $this->channel() === 'whatsapp'
+                ? config('services.termii.whatsapp_from')
+                : (config('hotel.messaging.sender_name') ?: config('services.termii.sender_id'));
+        }
         if ($this->channel() === 'whatsapp') {
             return config('services.twilio.whatsapp_from');
         }
@@ -162,7 +199,7 @@ class GuestMessenger
             ! $guest                    => 'No guest on this booking.',
             (bool) $guest->messages_opt_out => 'The guest asked not to be texted.',
             ! $to                       => 'No mobile number for this guest.',
-            ! $this->configured()       => 'The Twilio account is not set up in .env yet.',
+            ! $this->configured()       => 'The ' . $this->providerLabel() . ' account is not set up in .env yet.',
             default                     => null,
         };
         if ($skip) {
@@ -173,22 +210,9 @@ class GuestMessenger
         }
 
         try {
-            $sid = config('services.twilio.sid');
-            $prefix = $channel === 'whatsapp' ? 'whatsapp:' : '';
-            $res = Http::asForm()->withBasicAuth($sid, config('services.twilio.auth_token'))->timeout(10)
-                ->post("https://api.twilio.com/2010-04-01/Accounts/{$sid}/Messages.json", array_filter([
-                    'To'             => $prefix . $to,
-                    'From'           => $prefix . $this->fromNumber(),
-                    'Body'           => $msg->body,
-                    'StatusCallback' => $this->publicUrl() ? route('twilio.status') : null,
-                ]));
-            if ($res->successful()) {
-                $msg->fill(['status' => 'sent', 'provider_id' => $res->json('sid')]);
-            } else {
-                $msg->fill(['status' => 'failed', 'error' => mb_substr((string) ($res->json('message') ?? 'Twilio error ' . $res->status()), 0, 255)]);
-            }
+            $this->provider() === 'termii' ? $this->sendTermii($msg) : $this->sendTwilio($msg);
         } catch (Throwable $e) {
-            $msg->fill(['status' => 'failed', 'error' => mb_substr('Could not reach Twilio: ' . $e->getMessage(), 0, 255)]);
+            $msg->fill(['status' => 'failed', 'error' => mb_substr('Could not reach ' . $this->providerLabel() . ': ' . $e->getMessage(), 0, 255)]);
             Log::warning('Guest message not sent: ' . $e->getMessage());
         }
         $msg->save();
@@ -199,12 +223,90 @@ class GuestMessenger
         return $msg;
     }
 
+    private function sendTwilio(GuestMessage $msg): void
+    {
+        $sid = config('services.twilio.sid');
+        $prefix = $msg->channel === 'whatsapp' ? 'whatsapp:' : '';
+        $res = Http::asForm()->withBasicAuth($sid, config('services.twilio.auth_token'))->timeout(10)
+            ->post("https://api.twilio.com/2010-04-01/Accounts/{$sid}/Messages.json", array_filter([
+                'To'             => $prefix . $msg->to,
+                'From'           => $prefix . $msg->from,
+                'Body'           => $msg->body,
+                'StatusCallback' => $this->publicUrl() ? route('twilio.status') : null,
+            ]));
+        if ($res->successful()) {
+            $msg->fill(['status' => 'sent', 'provider_id' => $res->json('sid')]);
+        } else {
+            $msg->fill(['status' => 'failed', 'error' => mb_substr((string) ($res->json('message') ?? 'Twilio error ' . $res->status()), 0, 255)]);
+        }
+    }
+
+    /**
+     * Termii (termii.com): numbers without the +; SMS by the "dnd" route (reaches
+     * numbers on Do-Not-Disturb, needs an approved sender ID) or "generic".
+     */
+    private function sendTermii(GuestMessage $msg): void
+    {
+        $base = rtrim((string) config('services.termii.base_url', 'https://api.ng.termii.com'), '/');
+        $route = $msg->channel === 'whatsapp' ? 'whatsapp' : (config('hotel.messaging.termii_route') === 'generic' ? 'generic' : 'dnd');
+        $res = Http::acceptJson()->asJson()->timeout(10)->post("{$base}/api/sms/send", [
+            'api_key' => config('services.termii.api_key'),
+            'to'      => ltrim((string) $msg->to, '+'),
+            'from'    => $msg->from,
+            'sms'     => $msg->body,
+            'type'    => 'plain',
+            'channel' => $route,
+        ]);
+        $id = $res->json('message_id');
+        if ($res->successful() && filled($id)) {
+            $msg->fill(['status' => 'sent', 'provider_id' => (string) $id]);
+        } else {
+            $msg->fill(['status' => 'failed', 'error' => mb_substr((string) ($res->json('message') ?? 'Termii error ' . $res->status()), 0, 255)]);
+        }
+    }
+
     /** Twilio can only call back to an address the internet can reach. */
     private function publicUrl(): bool
     {
         $host = parse_url((string) config('app.url'), PHP_URL_HOST);
 
         return $host && ! in_array($host, ['localhost', '127.0.0.1'], true) && ! str_ends_with($host, '.test') && ! str_ends_with($host, '.local');
+    }
+
+    // ── Webhooks from Termii ──────────────────────────────────────────
+
+    /** Termii signs the raw body with HMAC-SHA512 and the account's secret key. */
+    public function validTermiiSignature(Request $request): bool
+    {
+        $secret = (string) config('services.termii.secret_key');
+        $given = strtolower((string) $request->header('X-Termii-Signature'));
+
+        return $secret !== '' && $given !== '' && hash_equals(hash_hmac('sha512', $request->getContent(), $secret), $given);
+    }
+
+    /** One event from Termii: a delivery report for a text we sent, or a guest's reply. */
+    public function termiiEvent(array $p): void
+    {
+        $status = strtolower(trim((string) ($p['status'] ?? '')));
+        if ($status === 'received' || strtolower((string) ($p['type'] ?? '')) === 'inbound') {
+            $this->inbound([
+                'MessageSid' => 'termii:' . ($p['message_id'] ?? $p['id'] ?? sha1(json_encode($p))),
+                'From'       => ($p['channel'] ?? '') === 'whatsapp' ? 'whatsapp:+' . ltrim((string) ($p['sender'] ?? ''), '+') : '+' . ltrim((string) ($p['sender'] ?? ''), '+'),
+                'To'         => (string) ($p['receiver'] ?? ''),
+                'Body'       => (string) ($p['message'] ?? ''),
+            ]);
+
+            return;
+        }
+        $this->statusUpdate([
+            'MessageSid'    => (string) ($p['message_id'] ?? ''),
+            'MessageStatus' => match ($status) {
+                'delivered' => 'delivered',
+                'message failed', 'rejected', 'expired', 'dnd active on phone number' => 'failed',
+                default => '',
+            },
+            'reason' => $p['status'] ?? null,
+        ]);
     }
 
     // ── Webhooks from Twilio ──────────────────────────────────────────
@@ -241,7 +343,8 @@ class GuestMessenger
         };
         // Never step back (a late "sent" after "delivered").
         if ($status && ! ($msg->status === 'read' || ($msg->status === 'delivered' && $status !== 'read'))) {
-            $msg->forceFill(['status' => $status, 'error' => $status === 'failed' ? ('Not delivered' . (isset($p['ErrorCode']) ? ' (Twilio ' . $p['ErrorCode'] . ')' : '')) : $msg->error])->save();
+            $why = isset($p['ErrorCode']) ? ' (Twilio ' . $p['ErrorCode'] . ')' : (isset($p['reason']) ? ' (' . $p['reason'] . ')' : '');
+            $msg->forceFill(['status' => $status, 'error' => $status === 'failed' ? 'Not delivered' . $why : $msg->error])->save();
         }
     }
 

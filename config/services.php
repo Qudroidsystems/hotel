@@ -47,6 +47,14 @@ return [
     // Guest messages by WhatsApp: the approved WhatsApp sender number, e.g. +2348000000000.
     'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
     ],
+    // Termii (termii.com), the other SMS provider (Hotel Settings → Guest Messages → Send through).
+    'termii' => [
+        'api_key'       => env('TERMII_API_KEY'),
+        'secret_key'    => env('TERMII_SECRET_KEY'),      // checks delivery reports (Termii signs them)
+        'sender_id'     => env('TERMII_SENDER_ID'),       // approved sender ID, up to 11 characters
+        'whatsapp_from' => env('TERMII_WHATSAPP_FROM'),   // WhatsApp device ID from the Termii dashboard
+        'base_url'      => env('TERMII_BASE_URL', 'https://api.ng.termii.com'),
+    ],
     'device' => [
         'key' => env('DEVICE_API_KEY'),
     ],

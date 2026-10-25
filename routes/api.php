@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Staff mobile app API — /api/v1
+| Mobile apps API — /api/v1
 |--------------------------------------------------------------------------
-| Sign-in uses Laravel Sanctum tokens. Until Sanctum is installed
-| (composer require laravel/sanctum) the app's address check answers
-| "not set up yet" and nothing else is registered.
+| The guest app uses /guest/... (no sign-in). The staff app signs in with
+| Laravel Sanctum tokens; until Sanctum is installed (composer require
+| laravel/sanctum) only /app/config and the guest routes exist, and
+| /app/config says so (staff_api: false).
 */
 
 // Guests: their own booking, opened with the reference + e-mail/phone or the private link (no staff sign-in).
@@ -29,17 +30,14 @@ Route::prefix('guest')->group(function () {
     });
 });
 
-if (! class_exists(\Laravel\Sanctum\Sanctum::class)) {
-    Route::get('/app/config', fn () => response()->json([
-        'success' => false, 'code' => 'api_not_installed',
-        'message' => 'The mobile app connection is not set up on this server yet. Run: composer require laravel/sanctum',
-    ], 503));
+// The hotel's name, logo and colour, for both apps. `staff_api` says whether staff can sign in yet.
+Route::get('/app/config', [AppController::class, 'config'])->middleware('throttle:mobile-public');
 
-    return;
+if (! class_exists(\Laravel\Sanctum\Sanctum::class)) {
+    return;   // staff sign-in needs Laravel Sanctum (composer require laravel/sanctum)
 }
 
 Route::middleware('throttle:mobile-public')->group(function () {
-    Route::get('/app/config', [AppController::class, 'config']);
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:mobile-login');
     Route::post('/auth/forgot-password', [AuthController::class, 'forgot'])->middleware('throttle:mobile-login');
 });
