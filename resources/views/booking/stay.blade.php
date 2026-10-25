@@ -77,6 +77,7 @@
         <div class="col">
             <div class="panel money">
                 <h2>Payment</h2>
+                @if ($r->discount_amount > 0)<div class="row muted"><span>{{ $r->discount_reason ?: 'Discount' }}</span><span>−{{ $m($r->discount_amount) }}</span></div>@endif
                 <div class="row"><span>{{ in_array($r->status, [S::CheckedIn, S::CheckedOut], true) ? 'Your bill so far' : 'Stay total' }}</span><span>{{ $m(max((float) $r->total_amount, (float) ($r->folio?->charges->sum('total') ?? 0))) }}</span></div>
                 <div class="row"><span>Paid</span><span>{{ $m($paid) }}</span></div>
                 <div class="row total"><span>{{ $r->status === S::Pending ? 'Deposit due now' : 'Still to pay' }}</span><span>{{ $m($r->status === S::Pending ? $depositDue : $balanceDue) }}</span></div>

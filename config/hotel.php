@@ -139,6 +139,51 @@ return [
     ],
 
     /*
+    | Text messages to guests (SMS or WhatsApp through Twilio). The Twilio
+    | account itself is in .env (TWILIO_SID, TWILIO_AUTH_TOKEN,
+    | TWILIO_PHONE_NUMBER, TWILIO_WHATSAPP_FROM). Templates may use
+    | {first_name} {guest} {hotel} {reference} {check_in} {check_out} {nights}
+    | {link} {amount} {points} {phone}.
+    */
+    'messaging' => [
+        'enabled'        => (bool) env('HOTEL_MESSAGING_ENABLED', false),
+        'channel'        => env('HOTEL_MESSAGING_CHANNEL', 'sms'),   // sms | whatsapp
+        'country_code'   => '234',      // added to numbers written like 0803…
+        'sender_name'    => null,       // SMS sender ID (letters), where the network allows it
+        'reminder_time'  => '10:00',
+        'send_confirmation' => true,
+        'send_payment_link' => true,
+        'send_reminder'     => true,
+        'send_thank_you'    => true,
+        'send_request_updates' => false,
+        'templates' => [
+            'booking_confirmed' => 'Hi {first_name}, your stay at {hotel} is confirmed: {check_in} to {check_out}, ref {reference}. Your booking page: {link}',
+            'payment_link'      => 'Hi {first_name}, we are holding your room at {hotel} ({check_in}, ref {reference}). Pay the {amount} deposit to confirm: {link}',
+            'arrival_reminder'  => 'Hi {first_name}, we look forward to welcoming you to {hotel} tomorrow. Check-in from {check_in_time}. Questions? Call {phone}. Ref {reference}.',
+            'thank_you'         => 'Thank you for staying at {hotel}, {first_name}. You have {points} loyalty points. We hope to see you again soon.',
+            'request_update'    => '{hotel}: {request} — {status}. {note}',
+        ],
+    ],
+
+    /*
+    | Guest loyalty: points earned on every settled stay (on the bill before
+    | tax, including bar and restaurant charges to the room), spent on a later
+    | bill, and tiers from nights stayed in the last 12 months. Members of a
+    | tier get its discount on room rates booked online.
+    */
+    'loyalty' => [
+        'enabled'         => (bool) env('HOTEL_LOYALTY_ENABLED', true),
+        'prefix'          => 'SH',      // member numbers: SH000123
+        'points_per_1000' => 10,        // points per 1,000 spent
+        'point_value'     => 1.0,       // money value of one point when spent
+        'min_redeem'      => 500,       // fewest points that can be spent at once
+        'silver_nights'   => 5,
+        'gold_nights'     => 15,
+        'silver_discount' => 5.0,       // % off room rates booked online
+        'gold_discount'   => 10.0,
+    ],
+
+    /*
     | Operating expenses (spec §9, §14). Expenses above approval_limit need
     | approval by someone other than the person who recorded them (0 = all).
     | Departments are the cost centres expenses are charged to.

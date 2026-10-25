@@ -153,7 +153,9 @@ class AuthController extends ApiController
         }
         $digits = preg_replace('/\D+/', '', $login);
         if (strlen($digits) >= 9) {
-            $matches = User::whereNotNull('phone_number')->where('phone_number', 'like', '%' . substr($digits, -9))->limit(2)->get();
+            $matches = User::whereNotNull('phone_number')
+                ->whereRaw("replace(replace(replace(replace(replace(phone_number, ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') like ?", ['%' . substr($digits, -9)])
+                ->limit(2)->get();
 
             return $matches->count() === 1 ? $matches->first() : null;   // never guess between two people
         }

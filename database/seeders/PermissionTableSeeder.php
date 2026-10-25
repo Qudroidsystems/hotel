@@ -119,6 +119,7 @@ class PermissionTableSeeder extends Seeder
         ],
         'Guest Services' => [
             'Handle guest requests',
+            'Message guests',
         ],
         'Expenses' => [
             'Record expenses',

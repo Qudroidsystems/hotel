@@ -135,6 +135,14 @@ class OnlineBookingService
                 'notes'                 => 'Booked online by the guest.',
             ], $lines);
 
+            // Returning guests in a loyalty tier get its discount on the room rate.
+            $loyalty = app(\App\Services\Loyalty\LoyaltyService::class);
+            if (($pct = $loyalty->discountPercent($guest)) > 0) {
+                $off = round((float) $reservation->room_total * $pct / 100, 2);
+                $this->reservations->applyDiscount($reservation, $off, $guest->tier_label . ' member rate (' . rtrim(rtrim(number_format($pct, 1), '0'), '.') . '% off)');
+                $reservation->refresh();
+            }
+
             $hold = null;
             if ($depositPct > 0) {
                 // Released after hold_hours — or at check-in time if that comes first.

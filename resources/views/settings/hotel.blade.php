@@ -98,6 +98,14 @@
                                         @endif
                                     </div>
                                     @break
+                                @case('select')
+                                    <select class="form-select @error($name) is-invalid @enderror" style="max-width: 360px" name="{{ $name }}" id="{{ $id }}">
+                                        @foreach ($f['options'] as $optValue => $optLabel)<option value="{{ $optValue }}" @selected((string) old($name, $value) === (string) $optValue)>{{ $optLabel }}</option>@endforeach
+                                    </select>
+                                    @break
+                                @case('textarea')
+                                    <textarea class="form-control @error($name) is-invalid @enderror" name="{{ $name }}" id="{{ $id }}" rows="3">{{ old($name, $value) }}</textarea>
+                                    @break
                                 @case('bool')
                                     @break
                                 @default

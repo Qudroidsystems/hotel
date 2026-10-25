@@ -68,6 +68,42 @@ class HotelSettings
                     'booking.guest_requests'  => ['type' => 'bool', 'label' => 'Guests can send requests (towels, cleaning, repairs…) from their booking page during their stay'],
                 ],
             ],
+            'messaging' => [
+                'title' => 'Guest Messages', 'icon' => 'ri-message-3-line',
+                'intro' => 'Text messages to guests by SMS or WhatsApp through Twilio. The Twilio account (SID, token and numbers) is set in the server\'s .env file by IT. Guests who asked not to be texted are skipped.',
+                'fields' => [
+                    'messaging.enabled'      => ['type' => 'bool', 'label' => 'Send text messages to guests'],
+                    'messaging.channel'      => ['type' => 'select', 'label' => 'Send by', 'options' => ['sms' => 'SMS', 'whatsapp' => 'WhatsApp (needs an approved WhatsApp sender)']],
+                    'messaging.country_code' => ['type' => 'text', 'label' => 'Country code for local numbers', 'rules' => ['required', 'regex:/^[0-9]{1,4}$/'], 'help' => 'Digits only, e.g. 234. A number written 0803 123 4567 is sent to +234 803 123 4567.'],
+                    'messaging.sender_name'  => ['type' => 'text', 'label' => 'SMS sender name', 'rules' => ['nullable', 'regex:/^[A-Za-z0-9 ]{1,11}$/'], 'help' => 'Up to 11 letters or digits, where the mobile networks allow it. Empty: the Twilio number.'],
+                    'messaging.send_confirmation'    => ['type' => 'bool', 'label' => 'When a booking is confirmed'],
+                    'messaging.send_payment_link'    => ['type' => 'bool', 'label' => 'When an online booking waits for its deposit (with the payment link)'],
+                    'messaging.send_reminder'        => ['type' => 'bool', 'label' => 'The day before arrival'],
+                    'messaging.reminder_time'        => ['type' => 'text', 'label' => 'Send arrival reminders at', 'rules' => ['required', 'date_format:H:i']],
+                    'messaging.send_thank_you'       => ['type' => 'bool', 'label' => 'After check-out (thank you, with their points)'],
+                    'messaging.send_request_updates' => ['type' => 'bool', 'label' => 'When staff answer a guest request'],
+                    'messaging.templates.booking_confirmed' => ['type' => 'textarea', 'label' => 'Booking confirmed', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Words in {braces} are filled in: {first_name} {guest} {hotel} {reference} {check_in} {check_out} {nights} {link} {amount} {points} {phone}.'],
+                    'messaging.templates.payment_link'      => ['type' => 'textarea', 'label' => 'Deposit needed', 'rules' => ['required', 'string', 'max:640']],
+                    'messaging.templates.arrival_reminder'  => ['type' => 'textarea', 'label' => 'Arrival reminder', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Also {check_in_time}.'],
+                    'messaging.templates.thank_you'         => ['type' => 'textarea', 'label' => 'Thank you after check-out', 'rules' => ['required', 'string', 'max:640']],
+                    'messaging.templates.request_update'    => ['type' => 'textarea', 'label' => 'Guest request answered', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Also {request}, {status} and {note}.'],
+                ],
+            ],
+            'loyalty' => [
+                'title' => 'Guest Loyalty', 'icon' => 'ri-vip-diamond-line',
+                'intro' => 'Points guests earn on every settled stay and spend on a later bill, and member tiers from nights stayed in the last 12 months. Points are earned when the bill is fully paid after check-out.',
+                'fields' => [
+                    'loyalty.enabled'         => ['type' => 'bool', 'label' => 'Run the loyalty programme'],
+                    'loyalty.prefix'          => ['type' => 'text', 'label' => 'Member number starts with', 'rules' => ['required', 'string', 'alpha_num', 'max:6'], 'help' => 'e.g. SH gives member numbers like SH000123.'],
+                    'loyalty.points_per_1000' => ['type' => 'int', 'label' => 'Points earned per 1,000 spent', 'min' => 0, 'max' => 1000, 'help' => 'Counted on the bill before tax, after discounts.'],
+                    'loyalty.point_value'     => ['type' => 'money', 'label' => 'Value of one point when spent'],
+                    'loyalty.min_redeem'      => ['type' => 'int', 'label' => 'Fewest points spent at once', 'min' => 1, 'max' => 1000000],
+                    'loyalty.silver_nights'   => ['type' => 'int', 'label' => 'Silver: nights in the last 12 months', 'min' => 1, 'max' => 365],
+                    'loyalty.gold_nights'     => ['type' => 'int', 'label' => 'Gold: nights in the last 12 months', 'min' => 1, 'max' => 365],
+                    'loyalty.silver_discount' => ['type' => 'percent', 'label' => 'Silver discount on rooms booked online', 'max' => 50],
+                    'loyalty.gold_discount'   => ['type' => 'percent', 'label' => 'Gold discount on rooms booked online', 'max' => 50],
+                ],
+            ],
             'money' => [
                 'title' => 'Currency & Tax', 'icon' => 'ri-percent-line',
                 'intro' => 'How amounts are shown, and the taxes and service charge on guest bills and bar sales. Changes apply to new charges only; bills already posted keep the tax they were charged.',
@@ -192,6 +228,8 @@ class HotelSettings
                     }
                 }],
                 'image'    => ['nullable', 'file', 'mimes:' . ($f['mimes'] ?? 'png,jpg,jpeg,webp'), 'max:1024'],
+                'select'   => ['required', 'in:' . implode(',', array_keys($f['options']))],
+                'textarea' => $f['rules'] ?? ['nullable', 'string', 'max:1000'],
                 default    => $f['rules'] ?? ['nullable', 'string', 'max:255'],
             };
         }
@@ -290,6 +328,7 @@ class HotelSettings
             'money'    => config('hotel.currency_symbol') . number_format((float) $value, 2),
             'percent'  => rtrim(rtrim(number_format((float) $value, 2), '0'), '.') . '%',
             'list', 'int_list', 'email_list' => implode(', ', (array) $value),
+            'select'   => (string) ($field['options'][$value] ?? $value),
             default    => (string) $value,
         };
     }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AppController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\GuestStayController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\WorkController;
 use App\Http\Middleware\MobileStaff;
@@ -15,6 +16,18 @@ use Illuminate\Support\Facades\Route;
 | (composer require laravel/sanctum) the app's address check answers
 | "not set up yet" and nothing else is registered.
 */
+
+// Guests: their own booking, opened with the reference + e-mail/phone or the private link (no staff sign-in).
+Route::prefix('guest')->group(function () {
+    Route::post('/find', [GuestStayController::class, 'find'])->middleware('throttle:booking-lookup');
+    Route::middleware('throttle:mobile-public')->group(function () {
+        Route::get('/stays/{token}', [GuestStayController::class, 'show']);
+    });
+    Route::middleware('throttle:stay-actions')->group(function () {
+        Route::post('/stays/{token}/requests', [GuestStayController::class, 'request']);
+        Route::post('/stays/{token}/cancel', [GuestStayController::class, 'cancel']);
+    });
+});
 
 if (! class_exists(\Laravel\Sanctum\Sanctum::class)) {
     Route::get('/app/config', fn () => response()->json([

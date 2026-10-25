@@ -141,6 +141,18 @@ class StaffAlerts
         ]);
     }
 
+    /** A guest texted back (anything but STOP): the front desk hears about it. */
+    public function guestReply(\App\Models\Messaging\GuestMessage $m): void
+    {
+        $m->loadMissing('guest', 'reservation.rooms.room');
+        $room = $m->reservation?->rooms->pluck('room.number')->filter()->first();
+        $this->send($this->staffWith('Message guests'), [
+            'title' => ($m->guest?->full_name ?? $m->from) . ($room ? " (room {$room})" : '') . ' replied',
+            'body'  => str($m->body)->limit(180)->toString(),
+            'group' => 'guests', 'level' => 'normal', 'url' => route('messages.index', ['show' => 'replies']), 'thread' => "guest-message:{$m->guest_id}",
+        ]);
+    }
+
     // ------------------------------------------------------------------
 
     private function becomes($model, string $status): bool

@@ -14,11 +14,15 @@ class Guest extends Model
     protected $fillable = [
         'title', 'first_name', 'last_name', 'email', 'phone', 'gender', 'date_of_birth',
         'nationality', 'id_type', 'id_number', 'address', 'company', 'is_vip', 'preferences', 'notes',
+        'messages_opt_out', 'marketing_opt_in',
     ];
 
     protected $casts = [
         'date_of_birth' => 'date',
         'is_vip'        => 'boolean',
+        'loyalty_points'   => 'integer',
+        'messages_opt_out' => 'boolean',
+        'marketing_opt_in' => 'boolean',
     ];
 
     public function reservations(): HasMany
@@ -29,6 +33,21 @@ class Guest extends Model
     public function folios(): HasMany
     {
         return $this->hasMany(Folio::class);
+    }
+
+    public function loyaltyEntries(): HasMany
+    {
+        return $this->hasMany(\App\Models\Loyalty\LoyaltyEntry::class)->latest('id');
+    }
+
+    public function getTierLabelAttribute(): string
+    {
+        return \App\Services\Loyalty\LoyaltyService::TIERS[$this->loyalty_tier ?? 'member'][0] ?? 'Member';
+    }
+
+    public function getTierColorAttribute(): string
+    {
+        return \App\Services\Loyalty\LoyaltyService::TIERS[$this->loyalty_tier ?? 'member'][1] ?? '#64748b';
     }
 
     public function createdBy(): BelongsTo
@@ -71,6 +90,7 @@ class Guest extends Model
               ->orWhere('email', 'like', $like)
               ->orWhere('phone', 'like', $like)
               ->orWhere('company', 'like', $like)
+              ->orWhere('loyalty_number', $term)
               ->orWhereRaw("{$fullName} like ?", [$like]);
         });
     }

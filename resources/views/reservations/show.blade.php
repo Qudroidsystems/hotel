@@ -223,7 +223,50 @@
                     @if ($g->id_type)<dt>ID</dt><dd>{{ $g->id_type }}@can('Manage guests'){{ $g->id_number ? ' · ' . $g->id_number : '' }}@endcan</dd>@endif
                 </dl>
                 @if ($g->preferences)<div class="cb-banner violet mt-3 mb-0"><i class="ri-heart-line"></i><div>{{ $g->preferences }}</div></div>@endif
+                @if (config('hotel.loyalty.enabled') && ($g->loyalty_number || $g->loyalty_points > 0))
+                    @php $ptsValue = round($g->loyalty_points * (float) config('hotel.loyalty.point_value', 1), 2); $minPts = (int) config('hotel.loyalty.min_redeem', 500); @endphp
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                        <div><span class="status-pill" style="background: {{ $g->tier_color }}22; color: {{ $g->tier_color }}"><i class="ri-vip-diamond-line"></i> {{ $g->tier_label }}</span>
+                            <span class="small text-muted ms-1">{{ $g->loyalty_number }}</span></div>
+                        <div class="text-end"><strong>{{ number_format($g->loyalty_points) }}</strong> <span class="small text-muted">pts · @money($ptsValue)</span></div>
+                    </div>
+                    @can('Receive payments')
+                        @if ($folio->isOpen() && $bal > 0.004 && $g->loyalty_points >= $minPts)
+                            @php $maxPts = (int) min($g->loyalty_points, floor($bal / max(0.01, (float) config('hotel.loyalty.point_value', 1)))); @endphp
+                            <form method="POST" action="{{ route('folios.loyalty', $folio) }}" class="d-flex gap-2 mt-2" onsubmit="return confirm('Use these points on the bill?')">
+                                @csrf
+                                <input type="number" name="points" class="form-control form-control-sm" min="{{ $minPts }}" max="{{ $maxPts }}" step="1" value="{{ $maxPts }}" aria-label="Points to use" required>
+                                <button class="action-btn btn-go text-nowrap" type="submit"><i class="ri-gift-line"></i> Use points</button>
+                            </form>
+                            <div class="small text-muted mt-1">Up to {{ number_format($maxPts) }} points can go on this bill.</div>
+                        @endif
+                    @endcan
+                @endif
             </x-cb.card>
+
+            {{-- Texts to and from the guest --}}
+            @can('Message guests')
+                @php $gMsgs = \App\Models\Messaging\GuestMessage::where('reservation_id', $r->id)->latest('id')->limit(6)->get()->reverse(); @endphp
+                <x-cb.card title="Messages" icon="ri-message-3-line" :count="$gMsgs->count() ?: null">
+                    @foreach ($gMsgs as $m)
+                        <div class="mb-2 {{ $m->direction === 'in' ? '' : 'text-end' }}">
+                            <div class="d-inline-block text-start small px-3 py-2" style="border-radius: 12px; max-width: 92%; background: {{ $m->direction === 'in' ? 'rgba(183,131,47,.12)' : 'rgba(15,118,110,.08)' }}">{{ $m->body }}</div>
+                            <div class="small text-muted" style="font-size: 11px">{{ $m->direction === 'in' ? 'Guest' : $m->template_label }} · {{ $m->created_at->format('j M, g:i A') }} · <span class="{{ in_array($m->status, ['failed', 'skipped'], true) ? 'text-danger' : '' }}" title="{{ $m->error }}">{{ $m->status_label }}</span></div>
+                        </div>
+                    @endforeach
+                    @if ($g->messages_opt_out)
+                        <div class="small text-muted mb-2"><i class="ri-chat-off-line"></i> The guest asked not to receive texts. Call them instead, or turn texts back on in their profile if they ask.</div>
+                    @endif
+                    <form method="POST" action="{{ route('reservations.messages.store', $r) }}" data-once>
+                        @csrf
+                        <textarea name="body" class="form-control form-control-sm" rows="2" maxlength="640" required placeholder="Text {{ $g->first_name }} at {{ $g->phone ?: 'no number on file' }}…" aria-label="Message to the guest"></textarea>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <a href="{{ route('messages.index', ['q' => $r->reference]) }}" class="small">All messages</a>
+                            <button class="action-btn btn-go" type="submit" @disabled(! $g->phone || $g->messages_opt_out)><i class="ri-send-plane-line"></i> Send</button>
+                        </div>
+                    </form>
+                </x-cb.card>
+            @endcan
 
             {{-- Details --}}
             <x-cb.card title="Booking details" icon="ri-information-line">

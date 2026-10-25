@@ -44,6 +44,8 @@ return [
     'sid' => env('TWILIO_SID'),
     'auth_token' => env('TWILIO_AUTH_TOKEN'),
     'phone_number' => env('TWILIO_PHONE_NUMBER'),
+    // Guest messages by WhatsApp: the approved WhatsApp sender number, e.g. +2348000000000.
+    'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
     ],
     'device' => [
         'key' => env('DEVICE_API_KEY'),

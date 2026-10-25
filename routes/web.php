@@ -102,6 +102,9 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
 Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middleware('throttle:paystack-webhook')->name('book.paystack.webhook');
+// Twilio: delivery reports and guests' replies to texts (checked by signature).
+Route::post('/twilio/status', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'status'])->middleware('throttle:twilio-webhook')->name('twilio.status');
+Route::post('/twilio/inbound', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'inbound'])->middleware('throttle:twilio-webhook')->name('twilio.inbound');
 
 // Staff App manifest: fetched by the browser without cookies, so it must be public.
 Route::get('/staff/manifest.webmanifest', [StaffAppController::class, 'manifest'])->name('staff.manifest');
@@ -228,6 +231,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/guests/search', [GuestController::class, 'search'])->name('guests.search');
     Route::resource('guests', GuestController::class)->except(['create', 'store']);
+    Route::post('/guests/{guest}/points', [GuestController::class, 'adjustPoints'])->name('guests.points');
+    Route::post('/folios/{folio}/loyalty', [GuestController::class, 'redeemPoints'])->name('folios.loyalty');
 
     // Guest billing
     Route::controller(FolioController::class)->group(function () {
@@ -394,6 +399,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/audit-trail', [AuditLogController::class, 'index'])->name('audit.index');
 
     // Guest requests sent from the guest portal (spec §12.2)
+    // Texts to and from guests (SMS / WhatsApp)
+    Route::get('/messages', [\App\Http\Controllers\Messaging\MessageController::class, 'index'])->name('messages.index');
+    Route::post('/messages/{message}/read', [\App\Http\Controllers\Messaging\MessageController::class, 'markRead'])->name('messages.read');
+    Route::post('/reservations/{reservation}/messages', [\App\Http\Controllers\Messaging\MessageController::class, 'sendForReservation'])->middleware('throttle:30,1')->name('reservations.messages.store');
+    Route::post('/guests/{guest}/messages', [\App\Http\Controllers\Messaging\MessageController::class, 'sendForGuest'])->middleware('throttle:30,1')->name('guests.messages.store');
+
     Route::get('/guest-requests', [GuestRequestController::class, 'index'])->name('guest-requests.index');
     Route::post('/guest-requests/{guestRequest}', [GuestRequestController::class, 'update'])->name('guest-requests.update');
     Route::post('/guest-requests/{guestRequest}/maintenance', [GuestRequestController::class, 'toMaintenance'])->name('guest-requests.maintenance');

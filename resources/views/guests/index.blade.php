@@ -20,10 +20,16 @@
     <div class="cb-card">
         <form method="GET" class="cb-toolbar">
             <div class="cb-search"><i class="ri-search-line"></i>
-                <input type="text" name="q" value="{{ request('q') }}" placeholder="Name, phone, email or company…" aria-label="Search guests"></div>
+                <input type="text" name="q" value="{{ request('q') }}" placeholder="Name, phone, email, company or member no.…" aria-label="Search guests"></div>
             <label class="d-flex align-items-center gap-2 small fw-semibold text-muted m-0">
                 <input type="checkbox" name="vip" value="1" class="form-check-input m-0" @checked(request()->boolean('vip')) onchange="this.form.submit()"> VIP only
             </label>
+            @if (config('hotel.loyalty.enabled'))
+                <select name="tier" class="cb-select" aria-label="Member tier" onchange="this.form.submit()">
+                    <option value="">All tiers</option>
+                    @foreach (\App\Services\Loyalty\LoyaltyService::TIERS as $k => [$label])<option value="{{ $k }}" @selected(request('tier') === $k)>{{ $label }}</option>@endforeach
+                </select>
+            @endif
             <button class="action-btn btn-open" type="submit"><i class="ri-search-line"></i> Search</button>
         </form>
 
@@ -32,14 +38,16 @@
         @else
             <div class="table-responsive">
                 <table class="cb-table stack">
-                    <thead><tr><th>Guest</th><th>Contact</th><th>Company</th><th class="num">Bookings</th><th>Last arrival</th><th></th></tr></thead>
+                    <thead><tr><th>Guest</th><th>Contact</th><th>Company</th>@if (config('hotel.loyalty.enabled'))<th class="num">Points</th>@endif<th class="num">Bookings</th><th>Last arrival</th><th></th></tr></thead>
                     <tbody>
                         @foreach ($guests as $g)
                             <tr>
                                 <td data-label="Guest"><a href="{{ route('guests.show', $g) }}" class="rs-guest text-decoration-none">{{ $g->full_name }}</a>
-                                    @if ($g->is_vip)<span class="status-pill st-violet ms-1">VIP</span>@endif</td>
+                                    @if ($g->is_vip)<span class="status-pill st-violet ms-1">VIP</span>@endif
+                                    @if (config('hotel.loyalty.enabled') && $g->loyalty_tier !== 'member')<span class="status-pill ms-1" style="background: {{ $g->tier_color }}22; color: {{ $g->tier_color }}">{{ $g->tier_label }}</span>@endif</td>
                                 <td data-label="Contact" class="small">{{ $g->phone }}<div class="text-muted">{{ $g->email }}</div></td>
                                 <td data-label="Company" class="small">{{ $g->company ?: '—' }}</td>
+                                @if (config('hotel.loyalty.enabled'))<td data-label="Points" class="num">{{ number_format($g->loyalty_points) }}</td>@endif
                                 <td data-label="Bookings" class="num">{{ $g->reservations_count }}</td>
                                 <td data-label="Last arrival" class="small text-muted">{{ $g->reservations_max_check_in_date ? \Carbon\Carbon::parse($g->reservations_max_check_in_date)->format('j M Y') : '—' }}</td>
                                 <td class="text-end"><a href="{{ route('guests.show', $g) }}" class="action-btn btn-more"><i class="ri-arrow-right-line"></i></a></td>

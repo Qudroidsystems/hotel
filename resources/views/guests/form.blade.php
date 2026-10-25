@@ -40,6 +40,15 @@
                 <div class="col-12"><label>Address</label><input type="text" name="address" class="form-control" maxlength="500" value="{{ old('address', $guest->address) }}"></div>
                 <div class="col-md-6"><label>Preferences</label><textarea name="preferences" class="form-control" rows="3" maxlength="2000" placeholder="e.g. High floor, no feather pillows">{{ old('preferences', $guest->preferences) }}</textarea></div>
                 <div class="col-md-6"><label>Internal notes</label><textarea name="notes" class="form-control" rows="3" maxlength="2000">{{ old('notes', $guest->notes) }}</textarea></div>
+                <div class="col-12"><div class="small fw-bold text-muted mt-1">Messages</div></div>
+                <div class="col-md-6"><div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" name="messages_opt_out" id="messages_opt_out" value="1" @checked(old('messages_opt_out', $guest->messages_opt_out))>
+                    <label class="form-check-label" for="messages_opt_out">No SMS or WhatsApp messages</label>
+                    <div class="small text-muted">Booking e-mails still go out. Set this when the guest asks not to be texted.</div></div></div>
+                <div class="col-md-6"><div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" name="marketing_opt_in" id="marketing_opt_in" value="1" @checked(old('marketing_opt_in', $guest->marketing_opt_in))>
+                    <label class="form-check-label" for="marketing_opt_in">Happy to receive offers</label>
+                    <div class="small text-muted">Only tick this when the guest has said yes.</div></div></div>
             </div>
         </x-cb.card>
         <div class="d-flex justify-content-between gap-2 mb-4">

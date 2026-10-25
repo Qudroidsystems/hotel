@@ -47,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
         RateLimiter::for('booking-lookup', fn (Request $r) => Limit::perMinute(6)->by('bl|' . $r->ip()));
         RateLimiter::for('paystack-webhook', fn (Request $r) => Limit::perMinute(300)->by('pw|' . $r->ip()));
+        RateLimiter::for('twilio-webhook', fn (Request $r) => Limit::perMinute(600)->by('tw|' . $r->ip()));
 
         // Staff mobile app: sign-in attempts per address and login name; signed-in calls per person.
         RateLimiter::for('mobile-public', fn (Request $r) => Limit::perMinute(60)->by('mp|' . $r->ip()));
@@ -59,7 +60,30 @@ class AppServiceProvider extends ServiceProvider
         // Alerts for the staff app and phones when work is assigned or something needs approving.
         \App\Services\Mobile\StaffAlerts::register();
 
+        // Texts to guests (Hotel Settings → Guest Messages): confirmation, deposit link, thank you, request updates.
+        \App\Services\Messaging\MessagingHooks::register();
+
+        // Guest loyalty: points follow the bill (earned when it settles after check-out; a voided points line gives them back).
+        \App\Models\Folio::saved(function (\App\Models\Folio $folio) {
+            if ($folio->wasChanged('status') && self::loyaltyReady()) {
+                app(\App\Services\Loyalty\LoyaltyService::class)->syncEarn($folio);
+            }
+        });
+        \App\Models\FolioCharge::saved(function (\App\Models\FolioCharge $charge) {
+            if ($charge->wasChanged('voided_at') && $charge->voided_at && self::loyaltyReady()) {
+                app(\App\Services\Loyalty\LoyaltyService::class)->chargeVoided($charge);
+            }
+        });
+
         // Room lifecycle: a room that needs cleaning gets a housekeeping task (spec §3.3).
         RoomStatusLog::created(fn (RoomStatusLog $log) => app(HousekeepingService::class)->roomStatusChanged($log));
+    }
+
+    /** The loyalty tables exist (false until `php artisan migrate` has run). */
+    private static function loyaltyReady(): bool
+    {
+        static $ready = null;
+
+        return $ready ??= \Illuminate\Support\Facades\Schema::hasTable('loyalty_entries');
     }
 }

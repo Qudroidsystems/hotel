@@ -56,6 +56,10 @@
             <div class="row total"><span>Total{{ config('hotel.prices_include_tax') ? ' (taxes included)' : '' }}</span><span>{{ $sym }}{{ number_format($option->total, 2) }}</span></div>
             @if ($deposit > 0)<div class="row"><span>Due now</span><span>{{ $sym }}{{ number_format($deposit, 2) }}</span></div><div class="row muted"><span>At the hotel</span><span>{{ $sym }}{{ number_format($option->total - $deposit, 2) }}</span></div>@endif
         </div>
+        @php $silver = (float) config('hotel.loyalty.silver_discount'); $gold = (float) config('hotel.loyalty.gold_discount'); @endphp
+        @if (config('hotel.loyalty.enabled') && ($silver > 0 || $gold > 0))
+            <p class="small muted" style="margin-top:10px">Stayed with us before? Silver members get {{ rtrim(rtrim(number_format($silver, 1), '0'), '.') }}% and Gold members {{ rtrim(rtrim(number_format($gold, 1), '0'), '.') }}% off the room rate, taken off automatically when you book with the e-mail you used before.</p>
+        @endif
     </aside>
 </div>
 @endsection

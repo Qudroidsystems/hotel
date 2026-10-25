@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Reservations;
 
 use App\Http\Controllers\Controller;
+use App\Exceptions\BookingException;
+use App\Models\Folio;
 use App\Models\Guest;
+use App\Services\Loyalty\LoyaltyService;
 use Illuminate\Http\Request;
 
 /** Guest directory and profiles (spec §12.5 guest relationship management). */
@@ -12,7 +15,8 @@ class GuestController extends Controller
     public function __construct()
     {
         $this->middleware('permission:View guests', ['only' => ['index', 'show', 'search']]);
-        $this->middleware('permission:Manage guests', ['only' => ['edit', 'update', 'destroy']]);
+        $this->middleware('permission:Manage guests', ['only' => ['edit', 'update', 'destroy', 'adjustPoints']]);
+        $this->middleware('permission:Receive payments', ['only' => ['redeemPoints']]);
     }
 
     public function index(Request $request)
@@ -20,6 +24,7 @@ class GuestController extends Controller
         $pagetitle = 'Guests';
         $guests = Guest::search($request->query('q'))
             ->when($request->boolean('vip'), fn ($q) => $q->where('is_vip', true))
+            ->when(isset(\App\Services\Loyalty\LoyaltyService::TIERS[$request->query('tier')]), fn ($q) => $q->where('loyalty_tier', $request->query('tier')))
             ->withCount('reservations')
             ->withMax('reservations', 'check_in_date')
             ->orderBy('last_name')->orderBy('first_name')
@@ -44,15 +49,51 @@ class GuestController extends Controller
             'company' => $g->company,
             'vip'     => $g->is_vip,
             'stays'   => $g->reservations_count,
+            'tier'    => $g->loyalty_tier !== 'member' ? $g->tier_label : null,
+            'points'  => $g->loyalty_points,
         ]));
     }
 
-    public function show(Guest $guest)
+    public function show(Guest $guest, LoyaltyService $loyalty)
     {
         $pagetitle = $guest->full_name;
         $reservations = $guest->reservations()->with('rooms.room', 'rooms.roomType')->paginate(10);
+        $stats = $loyalty->stats($guest);
+        $entries = $guest->loyaltyEntries()->with('reservation:id,reference', 'creator:id,name')->limit(12)->get();
+        $next = $loyalty->enabled() ? $loyalty->nextTier($guest) : null;
+        $nights12 = $loyalty->recentNights($guest);
 
-        return view('guests.show', compact('pagetitle', 'guest', 'reservations'));
+        return view('guests.show', compact('pagetitle', 'guest', 'reservations', 'stats', 'entries', 'next', 'nights12', 'loyalty'));
+    }
+
+    /** Add or take away points by hand, with a reason (goodwill, correction ...). */
+    public function adjustPoints(Request $request, Guest $guest, LoyaltyService $loyalty)
+    {
+        $data = $request->validate([
+            'direction' => 'required|in:add,remove',
+            'points'    => 'required|integer|min:1|max:10000000',
+            'reason'    => 'required|string|max:255',
+        ]);
+        try {
+            $loyalty->adjust($guest, $data['direction'] === 'add' ? (int) $data['points'] : -(int) $data['points'], $data['reason'], $request->user());
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Points ' . ($data['direction'] === 'add' ? 'added.' : 'taken away.'));
+    }
+
+    /** Spend a guest's points on their open bill. */
+    public function redeemPoints(Request $request, Folio $folio, LoyaltyService $loyalty)
+    {
+        $data = $request->validate(['points' => 'required|integer|min:1|max:10000000']);
+        try {
+            $charge = $loyalty->redeem($folio, (int) $data['points'], $request->user());
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', number_format((int) $data['points']) . ' points used: ' . config('hotel.currency_symbol') . number_format(abs((float) $charge->total), 2) . ' off the bill.');
     }
 
     public function edit(Guest $guest)
@@ -79,6 +120,8 @@ class GuestController extends Controller
             'notes'         => 'nullable|string|max:2000',
         ]);
         $data['is_vip'] = $request->boolean('is_vip');
+        $data['messages_opt_out'] = $request->boolean('messages_opt_out');
+        $data['marketing_opt_in'] = $request->boolean('marketing_opt_in');
 
         $guest->update($data);
 
