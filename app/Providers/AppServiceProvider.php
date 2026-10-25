@@ -28,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Settings saved by the administrator override config/hotel.php (Settings → Hotel Settings).
         HotelSettings::apply();
+        // The template's sample logo is not the hotel's: until one is uploaded (Hotel Settings → Branding),
+        // pages show the hotel's name instead of a picture.
+        config(['hotel.has_logo' => filled(config('hotel.logo')) && ! str_starts_with((string) config('hotel.logo'), 'theme/')]);
 
         // Render pagination with the Bootstrap 5 theme (matches the Velzon UI).
         Paginator::useBootstrapFive();

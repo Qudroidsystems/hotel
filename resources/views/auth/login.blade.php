@@ -529,11 +529,13 @@
                                 <div class="card mb-0 border-0 shadow-none mb-0" style="background: transparent;">
                                     <div class="card-body p-sm-5 m-lg-4" id="loginCardBody">
                                         <!-- Hotel logo on login form -->
+                                        @if (config('hotel.has_logo'))
                                         <div class="logo-container">
                                             <img src="{{ asset(config('hotel.logo')) }}"
                                                  alt="{{ config('hotel.name') }}"
                                                  class="hotel-login-logo">
                                         </div>
+                                        @endif
 
                                         <div class="text-center mt-2">
                                             <h5 class="fs-2xl fw-semibold" style="animation: fadeInScale 0.5s ease;">{{ config('hotel.name') }}</h5>

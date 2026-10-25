@@ -11,14 +11,18 @@ use Illuminate\Support\Facades\Log;
 /**
  * Push notifications through Firebase Cloud Messaging (HTTP v1).
  *
- * Off until FCM_CREDENTIALS in .env points to the Firebase service-account
- * JSON file (Firebase console → Project settings → Service accounts →
+ * Off until the Firebase service-account key is pasted under Hotel Settings →
+ * Phone Notifications (stored encrypted), or FCM_CREDENTIALS in .env points to
+ * the key file (Firebase console → Project settings → Service accounts →
  * Generate new private key). Keep that file outside the public folder.
  */
 class PushSender
 {
     public function enabled(): bool
     {
+        if (filled(config('services.fcm.credentials_json'))) {
+            return true;
+        }
         $path = $this->credentialsPath();
 
         return $path !== null && is_readable($path);
@@ -107,9 +111,10 @@ class PushSender
 
     private function credentials(): array
     {
-        $json = json_decode((string) file_get_contents($this->credentialsPath()), true);
+        $raw = config('services.fcm.credentials_json') ?: (string) file_get_contents($this->credentialsPath());
+        $json = json_decode((string) $raw, true);
         if (! is_array($json) || empty($json['project_id']) || empty($json['client_email']) || empty($json['private_key'])) {
-            throw new \RuntimeException('FCM_CREDENTIALS is not a Firebase service-account key file.');
+            throw new \RuntimeException('The Firebase key (Hotel Settings → Phone Notifications or FCM_CREDENTIALS) is not a service-account key file.');
         }
 
         return $json;

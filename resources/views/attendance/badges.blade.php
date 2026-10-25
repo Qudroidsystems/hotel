@@ -44,7 +44,7 @@
         @foreach ($profiles as $p)
             <div class="card">
                 <div class="side">
-                    <img class="logo" src="{{ asset(config('hotel.logo')) }}" alt="">
+                    @if (config('hotel.has_logo'))<img class="logo" src="{{ asset(config('hotel.logo')) }}" alt="">@endif
                     <img class="ph" src="{{ $p->user->avatar_url }}" alt="">
                     <div class="no">{{ $p->staff_no }}</div>
                 </div>

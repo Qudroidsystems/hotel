@@ -48,7 +48,7 @@
                 <h1>Booking confirmation</h1>
                 <p>{{ config('hotel.name') }} · {{ config('hotel.tagline') }}</p>
             </div>
-            <img src="{{ asset(config('hotel.logo')) }}" alt="{{ config('hotel.name') }}">
+            @if (config('hotel.has_logo'))<img src="{{ asset(config('hotel.logo')) }}" alt="{{ config('hotel.name') }}">@endif
         </div>
         <div class="body">
             <div class="grid">

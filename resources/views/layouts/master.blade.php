@@ -101,6 +101,9 @@
         /* =====================================================
            SIDEBAR LOGOUT FOOTER — pushed down with margin-top auto
            ===================================================== */
+        .hotel-name-logo { font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 22px; line-height: 70px; color: #fff !important; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .hotel-name-logo .logo-sm { font-size: 26px; }
+        #page-topbar .hotel-name-logo { color: inherit !important; }
         .sidebar-footer {
             flex-shrink: 0;
             border-top: 1px solid rgba(255,255,255,.1);
@@ -379,6 +382,7 @@
                 $logoLight = asset(config('hotel.logo_light'));
             @endphp
 
+            @if (config('hotel.has_logo'))
             <a href="{{ url('/') }}" class="logo logo-dark">
                 <span class="logo-sm">
                     <img src="{{ $logoDark }}" alt="{{ $hotelName }}"
@@ -399,6 +403,10 @@
                          style="height:80px;width:auto;border-radius:12px;object-fit:contain;padding:2px;background:rgb(37,36,36);">
                 </span>
             </a>
+            @else
+            <a href="{{ url('/') }}" class="logo logo-dark hotel-name-logo"><span class="logo-sm">{{ mb_substr($hotelName, 0, 1) }}</span><span class="logo-lg">{{ $hotelName }}</span></a>
+            <a href="{{ url('/') }}" class="logo logo-light hotel-name-logo"><span class="logo-sm">{{ mb_substr($hotelName, 0, 1) }}</span><span class="logo-lg">{{ $hotelName }}</span></a>
+            @endif
 
             <button type="button" class="btn btn-sm p-0 fs-3xl header-item float-end btn-vertical-sm-hover" id="vertical-hover">
                 <i class="ri-record-circle-line"></i>
@@ -838,14 +846,7 @@
             <div class="navbar-header">
                 <div class="d-flex">
                     <div class="navbar-brand-box horizontal-logo">
-                        <a href="index.html" class="logo logo-dark">
-                            <span class="logo-sm"><img src="{{ asset('theme/layouts/assets/images/logo-sm.png')}}" alt="" height="22"></span>
-                            <span class="logo-lg"><img src="{{ asset('theme/layouts/assets/images/logo-dark.png')}}" alt="" height="22"></span>
-                        </a>
-                        <a href="index.html" class="logo logo-light">
-                            <span class="logo-sm"><img src="{{ asset('theme/layouts/assets/images/logo-sm.png')}}" alt="" height="22"></span>
-                            <span class="logo-lg"><img src="{{ asset('theme/layouts/assets/images/logo-light.png')}}" alt="" height="22"></span>
-                        </a>
+                        <a href="{{ url('/') }}" class="logo hotel-name-logo"><span class="logo-lg">{{ config('hotel.name') }}</span></a>
                     </div>
                     <button type="button" class="btn btn-sm px-3 fs-16 header-item vertical-menu-btn topnav-hamburger shadow-none" id="topnav-hamburger-icon">
                         <span class="hamburger-icon"><span></span><span></span><span></span></span>

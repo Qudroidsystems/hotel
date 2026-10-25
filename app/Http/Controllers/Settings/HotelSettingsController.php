@@ -7,6 +7,7 @@ use App\Models\HotelSetting;
 use App\Support\Audit;
 use App\Support\HotelSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -43,6 +44,24 @@ class HotelSettingsController extends Controller
             foreach ($groups[$group]['fields'] as $key => $field) {
                 $name = HotelSettings::input($key);
 
+                if (HotelSettings::isSecret($field)) {
+                    // Keys and passwords: never shown, kept when left empty, stored encrypted.
+                    $typed = trim((string) $request->input($name));
+                    if ($request->boolean($name . '__remove')) {
+                        if (HotelSetting::where('key', $key)->delete()) {
+                            $old[$key] = 'set';
+                            $new[$key] = HotelSettings::display($field, HotelSettings::default($key)) . ' (from .env)';
+                            $labels[] = $field['label'];
+                        }
+                    } elseif ($typed !== '') {
+                        HotelSetting::updateOrCreate(['key' => $key], ['value' => Crypt::encryptString($typed), 'updated_by' => $request->user()->id]);
+                        $old[$key] = HotelSettings::display($field, HotelSettings::value($key));
+                        $new[$key] = 'changed';
+                        $labels[] = $field['label'];
+                    }
+                    continue;
+                }
+
                 if ($field['type'] === 'image') {
                     if ($request->boolean($name . '__remove')) {
                         $value = null;           // back to the default logo
@@ -53,10 +72,13 @@ class HotelSettingsController extends Controller
                     }
                 } else {
                     $value = HotelSettings::cast($field, $field['type'] === 'bool' ? $request->boolean($name) : $request->input($name));
+                    if ($value === '') {
+                        $value = null;           // an emptied box: back to the default
+                    }
                 }
 
                 // An emptied field goes back to the default.
-                $current = config('hotel.' . $key);
+                $current = HotelSettings::value($key);
                 if ($this->same($current, $value ?? HotelSettings::default($key))) {
                     continue;
                 }

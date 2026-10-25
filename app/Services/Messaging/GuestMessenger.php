@@ -56,20 +56,20 @@ class GuestMessenger
         return filled(config('services.twilio.sid')) && filled(config('services.twilio.auth_token')) && filled($this->fromNumber());
     }
 
-    /** What IT still has to add to .env, for the warning on the Messages page. */
+    /** What is still missing (Hotel Settings → SMS & WhatsApp Accounts), for the warning on the Messages page. */
     public function missingSettings(): array
     {
         if ($this->provider() === 'termii') {
             return array_keys(array_filter([
-                'TERMII_API_KEY'   => blank(config('services.termii.api_key')),
-                $this->channel() === 'whatsapp' ? 'TERMII_WHATSAPP_FROM' : 'TERMII_SENDER_ID' => blank($this->fromNumber()),
+                'Termii API key' => blank(config('services.termii.api_key')),
+                $this->channel() === 'whatsapp' ? 'Termii WhatsApp device ID' : 'Termii sender ID' => blank($this->fromNumber()),
             ]));
         }
 
         return array_keys(array_filter([
-            'TWILIO_SID'        => blank(config('services.twilio.sid')),
-            'TWILIO_AUTH_TOKEN' => blank(config('services.twilio.auth_token')),
-            $this->channel() === 'whatsapp' ? 'TWILIO_WHATSAPP_FROM' : 'TWILIO_PHONE_NUMBER' => blank($this->fromNumber()),
+            'Twilio Account SID' => blank(config('services.twilio.sid')),
+            'Twilio Auth Token'  => blank(config('services.twilio.auth_token')),
+            $this->channel() === 'whatsapp' ? 'Twilio WhatsApp sender' : 'Twilio phone number (SMS)' => blank($this->fromNumber()),
         ]));
     }
 
@@ -199,7 +199,7 @@ class GuestMessenger
             ! $guest                    => 'No guest on this booking.',
             (bool) $guest->messages_opt_out => 'The guest asked not to be texted.',
             ! $to                       => 'No mobile number for this guest.',
-            ! $this->configured()       => 'The ' . $this->providerLabel() . ' account is not set up in .env yet.',
+            ! $this->configured()       => 'The ' . $this->providerLabel() . ' account is not set up yet (Hotel Settings → SMS & WhatsApp Accounts).',
             default                     => null,
         };
         if ($skip) {

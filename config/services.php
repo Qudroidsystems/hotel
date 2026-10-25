@@ -48,6 +48,7 @@ return [
     'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
     ],
     // Termii (termii.com), the other SMS provider (Hotel Settings → Guest Messages → Send through).
+    // These, Twilio, Paystack, mail and the Firebase key can also be entered under Hotel Settings, which wins over .env.
     'termii' => [
         'api_key'       => env('TERMII_API_KEY'),
         'secret_key'    => env('TERMII_SECRET_KEY'),      // checks delivery reports (Termii signs them)
@@ -74,6 +75,7 @@ return [
     // (keep it outside public/, e.g. storage/app/private/firebase.json).
     'fcm' => [
         'credentials' => env('FCM_CREDENTIALS'),
+        'credentials_json' => null,   // the key itself, when pasted under Hotel Settings → Phone Notifications
     ],
 
 ];

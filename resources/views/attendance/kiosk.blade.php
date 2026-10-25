@@ -13,7 +13,7 @@
 <body>
 <div class="k" id="app">
     <header class="k-top">
-        <div class="k-brand"><img src="{{ asset(config('hotel.logo_light', config('hotel.logo'))) }}" alt=""><span><strong>{{ config('hotel.name') }}</strong><small id="pointName">Staff clock-in</small></span></div>
+        <div class="k-brand">@if (config('hotel.has_logo'))<img src="{{ asset(config('hotel.logo_light', config('hotel.logo'))) }}" alt="">@endif<span><strong>{{ config('hotel.name') }}</strong><small id="pointName">Staff clock-in</small></span></div>
         <div class="k-clock"><span id="clock">--:--</span><small id="date"></small></div>
         <div class="k-status">
             <span class="k-net" id="net"><span class="dot"></span><span id="netText">Checking…</span></span>

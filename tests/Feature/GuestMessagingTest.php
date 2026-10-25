@@ -145,5 +145,5 @@ test('texts go through Termii when chosen, and its signed events update and repl
 
 test('the messages page names what is missing for the chosen provider', function () {
     config(['hotel.messaging.provider' => 'termii', 'services.termii.api_key' => null, 'services.termii.sender_id' => null, 'hotel.messaging.sender_name' => null]);
-    $this->get(route('messages.index'))->assertOk()->assertSee('Termii account')->assertSee('TERMII_API_KEY')->assertSee('TERMII_SENDER_ID');
+    $this->get(route('messages.index'))->assertOk()->assertSee('Termii account')->assertSee('Termii API key')->assertSee('Termii sender ID');
 });

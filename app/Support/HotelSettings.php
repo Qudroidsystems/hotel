@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\HotelSetting;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -19,7 +20,11 @@ use Throwable;
  * back to config/.env again.
  *
  * Each key is the setting's path inside config('hotel'), e.g.
- * "procurement.approval_limit".
+ * "procurement.approval_limit". A field with a 'config' entry sets another
+ * config value instead (the SMS, payment, email and push accounts, e.g.
+ * services.twilio.sid), so those can be entered here rather than in .env.
+ * Fields of type 'secret' / 'secret_text' are stored encrypted with the
+ * app key and never shown again; leaving them empty keeps what is saved.
  */
 class HotelSettings
 {
@@ -27,6 +32,9 @@ class HotelSettings
 
     /** config('hotel') as loaded from the file, before saved values were applied. */
     private static ?array $defaults = null;
+
+    /** The .env values of fields that set other config (services.*, mail.*), before saved values. */
+    private static array $outside = [];
 
     /**
      * group key => [title, icon, intro, fields]
@@ -70,14 +78,14 @@ class HotelSettings
             ],
             'messaging' => [
                 'title' => 'Guest Messages', 'icon' => 'ri-message-3-line',
-                'intro' => 'Text messages to guests by SMS or WhatsApp through Twilio or Termii. The provider\'s account (keys and sender) is set in the server\'s .env file by IT. Guests who asked not to be texted are skipped.',
+                'intro' => 'Text messages to guests by SMS or WhatsApp through Twilio or Termii. The provider\'s account (keys and sender) is entered under SMS & WhatsApp Accounts. Guests who asked not to be texted are skipped.',
                 'fields' => [
                     'messaging.enabled'      => ['type' => 'bool', 'label' => 'Send text messages to guests'],
                     'messaging.provider'     => ['type' => 'select', 'label' => 'Send through', 'options' => ['twilio' => 'Twilio', 'termii' => 'Termii']],
                     'messaging.termii_route' => ['type' => 'select', 'label' => 'Termii SMS route', 'options' => ['dnd' => 'DND route (reaches numbers on Do-Not-Disturb; needs an approved sender ID)', 'generic' => 'Generic route (cheaper; not delivered to DND numbers)'], 'help' => 'Only used when sending through Termii.'],
                     'messaging.channel'      => ['type' => 'select', 'label' => 'Send by', 'options' => ['sms' => 'SMS', 'whatsapp' => 'WhatsApp (needs an approved WhatsApp sender)']],
                     'messaging.country_code' => ['type' => 'text', 'label' => 'Country code for local numbers', 'rules' => ['required', 'regex:/^[0-9]{1,4}$/'], 'help' => 'Digits only, e.g. 234. A number written 0803 123 4567 is sent to +234 803 123 4567.'],
-                    'messaging.sender_name'  => ['type' => 'text', 'label' => 'SMS sender name', 'rules' => ['nullable', 'regex:/^[A-Za-z0-9 ]{1,11}$/'], 'help' => 'Up to 11 letters or digits, where the mobile networks allow it (for Termii, an approved sender ID). Empty: the number or sender ID in .env.'],
+                    'messaging.sender_name'  => ['type' => 'text', 'label' => 'SMS sender name', 'rules' => ['nullable', 'regex:/^[A-Za-z0-9 ]{1,11}$/'], 'help' => 'Up to 11 letters or digits, where the mobile networks allow it (for Termii, an approved sender ID). Empty: the number or sender ID under SMS & WhatsApp Accounts.'],
                     'messaging.send_confirmation'    => ['type' => 'bool', 'label' => 'When a booking is confirmed'],
                     'messaging.send_payment_link'    => ['type' => 'bool', 'label' => 'When an online booking waits for its deposit (with the payment link)'],
                     'messaging.send_reminder'        => ['type' => 'bool', 'label' => 'The day before arrival'],
@@ -186,6 +194,51 @@ class HotelSettings
                     'security.lost_item_days' => ['type' => 'int', 'label' => 'Unclaimed lost items can be disposed of after (days)', 'min' => 1, 'max' => 3650],
                 ],
             ],
+            'sms_accounts' => [
+                'title' => 'SMS & WhatsApp Accounts', 'icon' => 'ri-chat-settings-line',
+                'intro' => 'The Twilio or Termii account guest messages are sent from (choose which one under Guest Messages). Keys are stored encrypted and never shown again; leave a key empty to keep the one saved.',
+                'fields' => [
+                    'accounts.twilio.sid'           => ['type' => 'text', 'config' => 'services.twilio.sid', 'label' => 'Twilio Account SID', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'Starts with AC. From the Twilio console home page.'],
+                    'accounts.twilio.auth_token'    => ['type' => 'secret', 'config' => 'services.twilio.auth_token', 'label' => 'Twilio Auth Token'],
+                    'accounts.twilio.phone_number'  => ['type' => 'text', 'config' => 'services.twilio.phone_number', 'label' => 'Twilio phone number (SMS)', 'rules' => ['nullable', 'string', 'max:30'], 'help' => 'In international form, e.g. +15550001111.'],
+                    'accounts.twilio.whatsapp_from' => ['type' => 'text', 'config' => 'services.twilio.whatsapp_from', 'label' => 'Twilio WhatsApp sender', 'rules' => ['nullable', 'string', 'max:30']],
+                    'accounts.termii.api_key'       => ['type' => 'secret', 'config' => 'services.termii.api_key', 'label' => 'Termii API key', 'help' => 'Termii dashboard → API settings.'],
+                    'accounts.termii.secret_key'    => ['type' => 'secret', 'config' => 'services.termii.secret_key', 'label' => 'Termii secret key', 'help' => 'Checks Termii\'s delivery reports. Set the webhook URL in Termii to ' . (app()->bound('url') ? url('/termii/events') : '/termii/events') . '.'],
+                    'accounts.termii.sender_id'     => ['type' => 'text', 'config' => 'services.termii.sender_id', 'label' => 'Termii sender ID', 'rules' => ['nullable', 'string', 'max:11'], 'help' => 'An approved sender ID, up to 11 characters.'],
+                    'accounts.termii.whatsapp_from' => ['type' => 'text', 'config' => 'services.termii.whatsapp_from', 'label' => 'Termii WhatsApp device ID', 'rules' => ['nullable', 'string', 'max:64']],
+                    'accounts.termii.base_url'      => ['type' => 'text', 'config' => 'services.termii.base_url', 'label' => 'Termii base URL', 'rules' => ['nullable', 'url', 'max:120'], 'help' => 'Shown on your Termii dashboard. Usually https://api.ng.termii.com.'],
+                ],
+            ],
+            'payments' => [
+                'title' => 'Online Payments', 'icon' => 'ri-bank-card-line',
+                'intro' => 'The Paystack account guests pay deposits into from the booking page. Card details never touch this system. Keys are stored encrypted.',
+                'fields' => [
+                    'accounts.paystack.active'     => ['type' => 'bool', 'config' => 'services.paystack.active', 'label' => 'Take card payments with Paystack', 'help' => 'Off: online bookings are held and guests pay by bank transfer or at the hotel.'],
+                    'accounts.paystack.public_key' => ['type' => 'text', 'config' => 'services.paystack.public_key', 'label' => 'Paystack public key', 'rules' => ['nullable', 'string', 'max:120', 'regex:/^pk_(test|live)_/'], 'help' => 'pk_live_… for real payments, pk_test_… while testing.'],
+                    'accounts.paystack.secret_key' => ['type' => 'secret', 'config' => 'services.paystack.secret_key', 'label' => 'Paystack secret key', 'prefix' => '/^sk_(test|live)_/', 'help' => 'sk_live_… or sk_test_…, from Paystack → Settings → API keys & webhooks. Set the webhook URL there to ' . (app()->bound('url') ? url('/paystack/webhook') : '/paystack/webhook') . '.'],
+                ],
+            ],
+            'email' => [
+                'title' => 'Email', 'icon' => 'ri-mail-settings-line',
+                'intro' => 'How the system sends email: booking confirmations, password resets and IT alerts.',
+                'fields' => [
+                    'accounts.mail.mailer'     => ['type' => 'select', 'config' => 'mail.default', 'label' => 'Send email', 'options' => ['smtp' => 'Through an SMTP server (e.g. your email provider)', 'log' => 'Don\'t send — write to the log (testing)']],
+                    'accounts.mail.host'       => ['type' => 'text', 'config' => 'mail.mailers.smtp.host', 'label' => 'SMTP server', 'rules' => ['nullable', 'string', 'max:150'], 'help' => 'e.g. smtp.gmail.com or mail.yourhotel.com'],
+                    'accounts.mail.port'       => ['type' => 'int', 'config' => 'mail.mailers.smtp.port', 'label' => 'SMTP port', 'min' => 1, 'max' => 65535, 'help' => '587 (STARTTLS) or 465 (SSL).'],
+                    'accounts.mail.scheme'     => ['type' => 'select', 'config' => 'mail.mailers.smtp.scheme', 'label' => 'Security', 'options' => ['smtp' => 'STARTTLS / none (port 587 or 25)', 'smtps' => 'SSL (port 465)']],
+                    'accounts.mail.username'   => ['type' => 'text', 'config' => 'mail.mailers.smtp.username', 'label' => 'SMTP username', 'rules' => ['nullable', 'string', 'max:150']],
+                    'accounts.mail.password'   => ['type' => 'secret', 'config' => 'mail.mailers.smtp.password', 'label' => 'SMTP password'],
+                    'accounts.mail.from'       => ['type' => 'text', 'config' => 'mail.from.address', 'label' => 'Send from (email address)', 'rules' => ['nullable', 'email', 'max:150']],
+                    'accounts.mail.from_name'  => ['type' => 'text', 'config' => 'mail.from.name', 'label' => 'Send from (name)', 'rules' => ['nullable', 'string', 'max:100'], 'help' => 'Usually the hotel\'s name.'],
+                ],
+            ],
+            'push' => [
+                'title' => 'Phone Notifications', 'icon' => 'ri-notification-badge-line',
+                'intro' => 'Push notifications to the staff app (new work, approvals, guest replies). Without this, alerts still appear inside the app.',
+                'fields' => [
+                    'accounts.fcm.credentials_json' => ['type' => 'secret_text', 'config' => 'services.fcm.credentials_json', 'label' => 'Firebase service-account key (JSON)', 'help' => 'Firebase console → Project settings → Service accounts → Generate new private key. Paste the whole file here. Stored encrypted.'],
+                ],
+            ],
             'audit' => [
                 'title' => 'Audit Alerts', 'icon' => 'ri-alarm-warning-line',
                 'intro' => 'When the audit trail flags something for a manager to review.',
@@ -231,6 +284,13 @@ class HotelSettings
                 }],
                 'image'    => ['nullable', 'file', 'mimes:' . ($f['mimes'] ?? 'png,jpg,jpeg,webp'), 'max:1024'],
                 'select'   => ['required', 'in:' . implode(',', array_keys($f['options']))],
+                'secret'   => ['nullable', 'string', 'max:500', ...(isset($f['prefix']) ? ['regex:' . $f['prefix']] : [])],
+                'secret_text' => ['nullable', 'string', 'max:20000', function ($attribute, $value, $fail) {
+                    $json = json_decode((string) $value, true);
+                    if (filled($value) && (! is_array($json) || empty($json['client_email']) || empty($json['private_key']))) {
+                        $fail('That is not a Firebase service-account key: paste the whole JSON file.');
+                    }
+                }],
                 'textarea' => $f['rules'] ?? ['nullable', 'string', 'max:1000'],
                 default    => $f['rules'] ?? ['nullable', 'string', 'max:255'],
             };
@@ -254,6 +314,23 @@ class HotelSettings
         };
     }
 
+    /** Where a setting lives in the config: hotel.<key>, or the field's own 'config' path. */
+    public static function path(string $key): string
+    {
+        return self::fields()[$key]['config'] ?? 'hotel.' . $key;
+    }
+
+    /** The setting's value now (saved or default). */
+    public static function value(string $key): mixed
+    {
+        return config(self::path($key));
+    }
+
+    public static function isSecret(array $field): bool
+    {
+        return in_array($field['type'], ['secret', 'secret_text'], true);
+    }
+
     public static function input(string $key): string
     {
         return str_replace('.', '__', $key);
@@ -273,6 +350,11 @@ class HotelSettings
     /** The config/.env value for a setting, ignoring anything saved. */
     public static function default(string $key): mixed
     {
+        $field = self::fields()[$key] ?? [];
+        if (isset($field['config'])) {
+            return array_key_exists($key, self::$outside) ? self::$outside[$key] : config($field['config']);
+        }
+
         return Arr::get(self::$defaults ?? config('hotel'), $key);
     }
 
@@ -302,14 +384,32 @@ class HotelSettings
 
         $config = self::$defaults;
         $fields = self::fields();
+        $outside = [];
+        foreach ($fields as $key => $field) {
+            if (isset($field['config']) && ! array_key_exists($key, self::$outside)) {
+                self::$outside[$key] = config($field['config']);
+            }
+        }
         foreach ($stored as $key => $value) {
-            if (isset($fields[$key]) && $value !== null) {
+            if (! isset($fields[$key]) || $value === null) {
+                continue;
+            }
+            if (self::isSecret($fields[$key])) {
+                try {
+                    $value = Crypt::decryptString((string) $value);
+                } catch (Throwable) {
+                    continue;   // saved under another APP_KEY: fall back to .env
+                }
+            }
+            if (isset($fields[$key]['config'])) {
+                $outside[$fields[$key]['config']] = $value;
+            } else {
                 Arr::set($config, $key, $value);
             }
         }
         $config['taxes'] = self::taxes($config['tax_rates'] ?? []);
 
-        config(['hotel' => $config]);
+        config(['hotel' => $config] + $outside);
     }
 
     /** The tax list used on bills, rebuilt from the individual rates (0 = off). */
@@ -331,6 +431,7 @@ class HotelSettings
             'percent'  => rtrim(rtrim(number_format((float) $value, 2), '0'), '.') . '%',
             'list', 'int_list', 'email_list' => implode(', ', (array) $value),
             'select'   => (string) ($field['options'][$value] ?? $value),
+            'secret', 'secret_text' => filled($value) ? 'set' : 'not set',
             default    => (string) $value,
         };
     }

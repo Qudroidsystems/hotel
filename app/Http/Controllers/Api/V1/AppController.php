@@ -20,7 +20,7 @@ class AppController extends ApiController
     /** GET /app/config — before anyone signs in: the hotel's name, logo and colour. */
     public function config()
     {
-        $logo = config('hotel.logo');
+        $logo = config('hotel.has_logo') ? config('hotel.logo') : null;
 
         return $this->ok([
             'api_version'   => 1,

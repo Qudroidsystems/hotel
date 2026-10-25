@@ -46,7 +46,7 @@
     <div class="sheet">
         <div class="head">
             <div><h1>@yield('heading')</h1><p>{{ config('hotel.name') }}{{ config('hotel.tagline') ? ' · ' . config('hotel.tagline') : '' }}</p></div>
-            <img src="{{ asset(config('hotel.logo')) }}" alt="{{ config('hotel.name') }}">
+            @if (config('hotel.has_logo'))<img src="{{ asset(config('hotel.logo')) }}" alt="{{ config('hotel.name') }}">@endif
         </div>
         <div class="body">@yield('body')</div>
         <div class="foot"><span>Printed {{ now()->format('j M Y, g:i A') }} by {{ auth()->user()->name }}</span><span>{{ config('hotel.name') }}</span></div>

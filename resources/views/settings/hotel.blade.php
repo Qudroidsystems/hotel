@@ -51,7 +51,7 @@
                     @foreach ($group['fields'] as $key => $f)
                         @php
                             $name = HotelSettings::input($key);
-                            $value = config('hotel.' . $key);
+                            $value = HotelSettings::value($key);
                             $default = HotelSettings::default($key);
                             $row = $saved->get($key);
                             $id = 'hs_' . $name;
@@ -103,6 +103,20 @@
                                         @foreach ($f['options'] as $optValue => $optLabel)<option value="{{ $optValue }}" @selected((string) old($name, $value) === (string) $optValue)>{{ $optLabel }}</option>@endforeach
                                     </select>
                                     @break
+                                @case('secret')
+                                @case('secret_text')
+                                    @php $isSet = filled($value); @endphp
+                                    @if ($f['type'] === 'secret')
+                                        <input type="password" class="form-control @error($name) is-invalid @enderror" style="max-width: 420px" name="{{ $name }}" id="{{ $id }}" autocomplete="new-password" spellcheck="false"
+                                               placeholder="{{ $isSet ? '•••••••• saved — type a new one to replace it' : 'Not set' }}">
+                                    @else
+                                        <textarea class="form-control font-monospace small @error($name) is-invalid @enderror" name="{{ $name }}" id="{{ $id }}" rows="4" spellcheck="false" autocomplete="off"
+                                                  placeholder="{{ $isSet ? 'Saved — paste a new key file to replace it' : 'Not set' }}"></textarea>
+                                    @endif
+                                    @if ($row)
+                                        <label class="form-check mt-1 mb-0"><input type="checkbox" class="form-check-input" name="{{ $name }}__remove" value="1"> <span class="form-check-label small">Remove the saved one and use the server's .env</span></label>
+                                    @endif
+                                    @break
                                 @case('textarea')
                                     <textarea class="form-control @error($name) is-invalid @enderror" name="{{ $name }}" id="{{ $id }}" rows="3">{{ old($name, $value) }}</textarea>
                                     @break
@@ -119,8 +133,10 @@
                                 @if ($row)
                                     <span class="hs-custom">Changed</span>
                                     <span>by {{ $row->updatedBy?->name ?? 'someone' }}, {{ $row->updated_at?->diffForHumans() }}</span>
-                                    @if ($f['type'] !== 'image')<span>· default {{ HotelSettings::display($f, $default) ?: '—' }}</span>@endif
-                                    <button type="submit" form="resetForm" name="key" value="{{ $key }}" class="btn btn-link btn-sm p-0" onclick="return confirm('Put “{{ $f['label'] }}” back to the default?')">Use default</button>
+                                    @if ($f['type'] !== 'image' && ! HotelSettings::isSecret($f))<span>· default {{ HotelSettings::display($f, $default) ?: '—' }}</span>@endif
+                                    @if (! HotelSettings::isSecret($f))<button type="submit" form="resetForm" name="key" value="{{ $key }}" class="btn btn-link btn-sm p-0" onclick="return confirm('Put “{{ $f['label'] }}” back to the default?')">Use default</button>@endif
+                                @elseif (HotelSettings::isSecret($f))
+                                    <span>{{ filled($value) ? 'Set in the server\'s .env' : 'Not set' }}</span>
                                 @else
                                     <span>Using the default</span>
                                 @endif

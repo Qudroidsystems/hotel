@@ -26,7 +26,7 @@
     @if (! $ready['enabled'])
         <div class="cb-banner warning"><i class="ri-information-line"></i><div>Guest messages are switched off, so nothing is being sent. Turn them on under Hotel Settings → Guest Messages.</div></div>
     @elseif (! $ready['configured'])
-        <div class="cb-banner warning"><i class="ri-information-line"></i><div>The {{ $ready['provider'] }} account isn't set up yet, so messages are logged but not sent. IT adds @foreach ($ready['missing'] as $key)<code>{{ $key }}</code>{{ $loop->remaining > 1 ? ', ' : ($loop->remaining === 1 ? ' and ' : '') }}@endforeach to the server's .env file.</div></div>
+        <div class="cb-banner warning"><i class="ri-information-line"></i><div>The {{ $ready['provider'] }} account isn't set up yet, so messages are logged but not sent. Still needed: @foreach ($ready['missing'] as $key)<strong>{{ $key }}</strong>{{ $loop->remaining > 1 ? ', ' : ($loop->remaining === 1 ? ' and ' : '') }}@endforeach. @can('Manage hotel settings')<a href="{{ route('settings.hotel.index', ['tab' => 'sms_accounts']) }}">Enter them under Hotel Settings → SMS &amp; WhatsApp Accounts</a>.@else An administrator enters them under Hotel Settings.@endcan</div></div>
     @endif
 
     <div class="row g-3 mb-3">
