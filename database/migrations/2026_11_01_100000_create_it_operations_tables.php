@@ -12,7 +12,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('it_assets', function (Blueprint $table) {
+        $this->createOnce('it_assets', function (Blueprint $table) {
             $table->id();
             $table->string('name', 120);
             $table->string('type', 30)->index();                    // router, switch, access_point, server, …
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('it_monitors', function (Blueprint $table) {
+        $this->createOnce('it_monitors', function (Blueprint $table) {
             $table->id();
             $table->string('name', 120);
             $table->string('category', 20)->default('network');     // network, application, infrastructure
@@ -55,22 +55,22 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('it_checks', function (Blueprint $table) {
+        $this->createOnce('it_checks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('monitor_id')->constrained('it_monitors')->cascadeOnDelete();
             $table->string('status', 12);
             $table->unsignedInteger('latency_ms')->nullable();
             $table->string('message', 500)->nullable();
-            $table->timestamp('checked_at');
+            $table->dateTime('checked_at');
             $table->index(['monitor_id', 'checked_at']);
         });
 
-        Schema::create('it_maintenance_windows', function (Blueprint $table) {
+        $this->createOnce('it_maintenance_windows', function (Blueprint $table) {
             $table->id();
             $table->string('title', 150);
             $table->string('description', 2000)->nullable();
-            $table->timestamp('starts_at')->index();
-            $table->timestamp('ends_at')->index();
+            $table->dateTime('starts_at')->index();
+            $table->dateTime('ends_at')->index();
             $table->string('affects', 255)->nullable();             // what staff will notice
             $table->json('monitor_ids')->nullable();                // alerts held for these while it runs
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
@@ -78,7 +78,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('it_tickets', function (Blueprint $table) {
+        $this->createOnce('it_tickets', function (Blueprint $table) {
             $table->id();
             $table->string('number', 20)->nullable()->unique();     // IT-000123
             $table->string('title', 150);
@@ -103,7 +103,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('it_ticket_updates', function (Blueprint $table) {
+        $this->createOnce('it_ticket_updates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')->constrained('it_tickets')->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
@@ -113,7 +113,7 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
         });
 
-        Schema::create('it_alerts', function (Blueprint $table) {
+        $this->createOnce('it_alerts', function (Blueprint $table) {
             $table->id();
             $table->string('number', 20)->nullable()->unique();     // AL-000123
             $table->foreignId('monitor_id')->nullable()->constrained('it_monitors')->nullOnDelete();
@@ -121,7 +121,7 @@ return new class extends Migration
             $table->string('title', 200);
             $table->string('message', 1000)->nullable();
             $table->string('status', 15)->default('open')->index(); // open, acknowledged, resolved
-            $table->timestamp('opened_at')->index();
+            $table->dateTime('opened_at')->index();
             $table->timestamp('acknowledged_at')->nullable();
             $table->foreignId('acknowledged_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('resolved_at')->nullable();
@@ -131,6 +131,17 @@ return new class extends Migration
             $table->foreignId('ticket_id')->nullable()->constrained('it_tickets')->nullOnDelete();
             $table->timestamps();
         });
+    }
+
+    /**
+     * Create a table unless an earlier, interrupted run of this migration already made it
+     * (MySQL can't undo a half-finished migration, so a re-run must skip what exists).
+     */
+    private function createOnce(string $name, \Closure $columns): void
+    {
+        if (! Schema::hasTable($name)) {
+            Schema::create($name, $columns);
+        }
     }
 
     public function down(): void

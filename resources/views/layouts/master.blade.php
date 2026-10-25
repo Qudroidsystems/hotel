@@ -361,9 +361,11 @@
          Remove class="cb-ui" from <body> to switch the global skin off. --}}
     <link href="{{ asset('vendor/fonts/fonts.css') }}" rel="stylesheet">
     <link href="{{ asset('css/cb-ui.css') }}?v={{ @filemtime(public_path('css/cb-ui.css')) }}" rel="stylesheet">
+    @include('partials.qlouds-head', ['key' => 'web'])
 </head>
 
 <body class="cb-ui">
+@include('partials.qlouds-splash', ['key' => 'web'])
 <div id="layout-wrapper">
 
     <!-- ========== SIDEBAR ========== -->
@@ -959,8 +961,7 @@
                 </div>
                 <div class="col-sm-6">
                     <div class="text-sm-end">
-                        Created by
-                        <a href="{{ config('hotel.vendor_url') }}" target="_blank" rel="noopener noreferrer" class="fw-semibold">{{ config('hotel.vendor') }}</a>
+                        @include('partials.qlouds-credit')
                     </div>
                 </div>
             </div>

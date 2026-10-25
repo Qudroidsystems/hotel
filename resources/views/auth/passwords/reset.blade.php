@@ -28,6 +28,7 @@
     <!-- custom Css-->
     <link href="{{ asset('theme/layouts/assets/css/custom.min.css')}}" rel="stylesheet" type="text/css">
 
+    @include('partials.qlouds-head', ['key' => 'web'])
 </head>
 
 <body>
@@ -95,7 +96,7 @@
                         
                                         <div class="text-center">
                                             <p class="text-white opacity-75 mb-0 mt-3">
-                                                &copy; <script>document.write(new Date().getFullYear())</script> {{ config('hotel.name') }} · Built by {{ config('hotel.vendor') }}
+                                                &copy; <script>document.write(new Date().getFullYear())</script> {{ config('hotel.name') }}<br>@include('partials.qlouds-credit', ['onDark' => true])
                                             </p>
                                         </div>
                                     </div>

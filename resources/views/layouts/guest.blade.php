@@ -82,6 +82,7 @@
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
     </style>
     @stack('head')
+    <link href="{{ asset('qlouds/qlouds.css') }}?v=1" rel="stylesheet">
 </head>
 <body>
     <header class="topbar">
@@ -102,6 +103,7 @@
                 @if (config('hotel.booking.contact_phone'))<div><i class="ri-phone-line"></i> <a href="tel:{{ preg_replace('/[^0-9+]/', '', config('hotel.booking.contact_phone')) }}">{{ config('hotel.booking.contact_phone') }}</a></div>@endif
                 @if (config('hotel.booking.contact_email'))<div><i class="ri-mail-line"></i> <a href="mailto:{{ config('hotel.booking.contact_email') }}">{{ config('hotel.booking.contact_email') }}</a></div>@endif
             </div>
+            <div class="w-100" style="flex-basis:100%;text-align:center;margin-top:8px">@include('partials.qlouds-credit')</div>
             <div>Check-in from {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_in_time', '14:00'))->format('g:i A') }}, check-out by {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_out_time', '12:00'))->format('g:i A') }}</div>
         </div>
     </footer>

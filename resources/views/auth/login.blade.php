@@ -483,9 +483,11 @@
             .login-success { top: 12px; right: 12px; left: 12px; max-width: none; min-width: auto; }
         }
     </style>
+    @include('partials.qlouds-head', ['key' => 'web'])
 </head>
 
 <body>
+@include('partials.qlouds-splash', ['key' => 'web'])
 
 
     <section class="auth-page-wrapper position-relative d-flex align-items-center justify-content-center min-vh-100">
@@ -515,7 +517,7 @@
 
                                         <div class="text-center">
                                             <p class="text-white opacity-75 mb-0 mt-3">
-                                                © <script>document.write(new Date().getFullYear())</script> {{ config('hotel.name') }} · Built by {{ config('hotel.vendor') }}
+                                                © <script>document.write(new Date().getFullYear())</script> {{ config('hotel.name') }}<br>@include('partials.qlouds-credit', ['onDark' => true])
                                             </p>
                                         </div>
                                     </div>

@@ -1,0 +1,2 @@
+{{-- "Qlouds" logotype. $play: run the entrance animation. --}}
+<span class="qlouds-logo{{ ($play ?? false) ? ' play' : '' }}{{ ($onDark ?? false) ? ' on-dark' : '' }}" role="img" aria-label="Qlouds"><span class="q" aria-hidden="true">@if ($play ?? false)<span class="ghost g1">Q</span><span class="ghost g2">Q</span>@endif<span class="solid">Q</span></span>@foreach (str_split('louds') as $i => $ch)<span class="l" style="--i:{{ $i }}" aria-hidden="true">{{ $ch }}</span>@endforeach</span>

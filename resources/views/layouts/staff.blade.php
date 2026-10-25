@@ -81,8 +81,10 @@
         .sa-main .cb-banner { border-radius: 12px; }
         details.sa-more > summary { list-style: none; cursor: pointer; } details.sa-more > summary::-webkit-details-marker { display: none; }
     </style>
+    @include('partials.qlouds-head', ['key' => 'web'])
 </head>
 <body>
+@include('partials.qlouds-splash', ['key' => 'web'])
     <header class="sa-top">
         <div style="min-width:0;flex:1"><span class="hotel">{{ config('hotel.name') }}</span><h1>{{ $pagetitle ?? 'Staff' }}</h1></div>
         <a href="{{ route('staff.more') }}" class="sa-avatar" aria-label="My account">{{ $me->initials }}</a>
