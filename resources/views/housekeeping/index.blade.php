@@ -17,6 +17,7 @@
 
     <x-cb.hero :title="$pagetitle" icon="ri-brush-line" subtitle="Rooms are added here automatically when a guest checks out. Clean, then a supervisor inspects before the room goes back on sale.">
         <x-slot:actions>
+            <a class="cb-hero-btn" href="{{ route('housekeeping.board') }}"><i class="ri-tablet-line"></i> Tablet board</a>
             @if ($everyone)
                 <a class="cb-hero-btn" href="{{ route('housekeeping.index', $mine ? [] : ['mine' => 1]) }}"><i class="ri-user-line"></i> {{ $mine ? 'Everyone' : 'My tasks' }}</a>
             @endif

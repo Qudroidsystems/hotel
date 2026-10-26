@@ -13,6 +13,8 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\Billing\FolioService;
 use App\Support\Audit;
+use App\Support\Tenancy\CurrentHotel;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -41,21 +43,143 @@ class LoyaltyService
         return (bool) config('hotel.loyalty.enabled', true);
     }
 
+    // ── Group loyalty (several hotels) ────────────────────────────────
+
+    /** One membership across every hotel of the group: shared number, points and tier. */
+    public function grouped(): bool
+    {
+        return CurrentHotel::multi() && (bool) config('hotel.group_loyalty', true);
+    }
+
+    /** The same member's guest records at the other hotels (empty with one hotel). */
+    public function siblings(Guest $guest): Collection
+    {
+        if (! $this->grouped() || ! $guest->loyalty_number) {
+            return new Collection();
+        }
+
+        return Guest::withoutGlobalScope('hotel')->where('loyalty_number', $guest->loyalty_number)->whereKeyNot($guest->id)->get();
+    }
+
+    /** Ids of all the member's guest records, this one first. */
+    public function memberIds(Guest $guest): array
+    {
+        return array_merge([$guest->id], $this->siblings($guest)->modelKeys());
+    }
+
+    /**
+     * The member record at another hotel this guest is the same person as:
+     * same email, or the same phone number (last 9 digits). Only members with
+     * a number, so there is something to share.
+     */
+    public function findMember(Guest $guest): ?Guest
+    {
+        if (! $this->grouped()) {
+            return null;
+        }
+        $others = fn () => Guest::withoutGlobalScope('hotel')->whereNotNull('loyalty_number')->where('hotel_id', '!=', (int) $guest->hotel_id);
+        if ($email = mb_strtolower(trim((string) $guest->email))) {
+            if ($found = $others()->whereRaw('LOWER(email) = ?', [$email])->orderBy('id')->first()) {
+                return $found;
+            }
+        }
+        $digits = substr(preg_replace('/\D+/', '', (string) $guest->phone), -9);
+        if (strlen($digits) === 9) {
+            return $others()->where('phone', 'like', '%' . substr($digits, -4))->orderBy('id')->get()
+                ->first(fn (Guest $g) => substr(preg_replace('/\D+/', '', (string) $g->phone), -9) === $digits);
+        }
+
+        return null;
+    }
+
+    /**
+     * Join a guest with no member number to their membership at another hotel:
+     * they take its number, points and tier. Answers whether they were linked.
+     */
+    public function link(Guest $guest): bool
+    {
+        if ($guest->loyalty_number || ! ($member = $this->findMember($guest)) || $this->numberTaken($member->loyalty_number, (int) $guest->hotel_id)) {
+            return false;
+        }
+        $guest->forceFill([
+            'loyalty_number' => $member->loyalty_number,
+            'loyalty_points' => (int) $member->loyalty_points,
+            'loyalty_tier'   => $member->loyalty_tier ?: 'member',
+        ])->saveQuietly();
+
+        return true;
+    }
+
+    /** Another guest record at that hotel already has the number (a duplicate guest record). */
+    private function numberTaken(string $number, int $hotelId): bool
+    {
+        return Guest::withoutGlobalScope('hotel')->where('hotel_id', $hotelId)->where('loyalty_number', $number)->exists();
+    }
+
+    /**
+     * Turning group loyalty on: join up members who already have a separate
+     * number at more than one hotel. The older number is kept and the points
+     * are added together (each side gets a history line for what came over).
+     * Answers how many memberships were joined.
+     */
+    public function linkAll(): int
+    {
+        if (! $this->grouped()) {
+            return 0;
+        }
+
+        return CurrentHotel::get()->across(function () {
+            $joined = 0;
+            foreach (Guest::whereNotNull('loyalty_number')->orderBy('id')->lazyById(200) as $guest) {
+                $guest->refresh();
+                $member = $this->findMember($guest);
+                if (! $member || $member->loyalty_number === $guest->loyalty_number || $member->id > $guest->id) {
+                    continue;   // nothing to join, already joined, or joined when the older record comes round
+                }
+                $from = Guest::where('loyalty_number', $guest->loyalty_number)->get();
+                $into = Guest::where('loyalty_number', $member->loyalty_number)->get();
+                if ($from->pluck('hotel_id')->intersect($into->pluck('hotel_id'))->isNotEmpty()) {
+                    continue;   // the same hotel on both sides: duplicate guest records to merge by hand
+                }
+                DB::transaction(function () use ($from, $into, $member) {
+                    $a = (int) $into->first()->loyalty_points;
+                    $b = (int) $from->first()->loyalty_points;
+                    $total = $a + $b;
+                    foreach ([[$from, $a, 'Joined group membership ' . $member->loyalty_number], [$into, $b, 'Points brought from another hotel of the group']] as [$records, $add, $note]) {
+                        foreach ($records as $g) {
+                            $g->forceFill(['loyalty_number' => $member->loyalty_number, 'loyalty_points' => $total])->saveQuietly();
+                            if ($add !== 0) {
+                                (new LoyaltyEntry())->forceFill([
+                                    'hotel_id' => $g->hotel_id, 'guest_id' => $g->id, 'type' => 'adjust', 'points' => $add,
+                                    'balance_after' => $total, 'note' => $note,
+                                ])->save();
+                            }
+                        }
+                    }
+                });
+                $this->refreshTier($member->fresh());
+                $joined++;
+            }
+
+            return $joined;
+        });
+    }
+
     // ── Members and tiers ─────────────────────────────────────────────
 
     public function ensureNumber(Guest $guest): string
     {
-        if (! $guest->loyalty_number) {
+        if (! $guest->loyalty_number && ! $this->link($guest)) {
             $guest->forceFill(['loyalty_number' => strtoupper((string) config('hotel.loyalty.prefix', 'SH')) . str_pad((string) $guest->id, 6, '0', STR_PAD_LEFT)])->saveQuietly();
         }
 
         return $guest->loyalty_number;
     }
 
-    /** Nights from stays that ended in the last 12 months. */
+    /** Nights from stays that ended in the last 12 months (at every hotel of the group, with group loyalty). */
     public function recentNights(Guest $guest): int
     {
-        return (int) $guest->reservations()->reorder()
+        return (int) Reservation::withoutGlobalScope('hotel')->whereIn('guest_id', $this->memberIds($guest))
             ->where('status', ReservationStatus::CheckedOut->value)
             ->where('check_out_date', '>=', today()->subYear())
             ->get(['check_in_date', 'check_out_date', 'checked_out_at'])
@@ -86,6 +210,11 @@ class LoyaltyService
             $old = $guest->loyalty_tier;
             $guest->forceFill(['loyalty_tier' => $tier])->saveQuietly();
             Audit::record('guests.loyalty_tier', "{$guest->full_name} is now " . self::TIERS[$tier][0] . ' (was ' . (self::TIERS[$old][0] ?? $old) . ')', $guest);
+        }
+        foreach ($this->siblings($guest) as $other) {
+            if ($other->loyalty_tier !== $tier) {
+                $other->forceFill(['loyalty_tier' => $tier])->saveQuietly();
+            }
         }
 
         return $tier;
@@ -247,8 +376,15 @@ class LoyaltyService
 
     private function write(Guest $guest, string $type, int $points, string $note, array $extra = [], ?User $by = null): LoyaltyEntry
     {
+        $siblings = $this->siblings($guest);
+        if ($siblings->isNotEmpty()) {   // the shared balance: lock every hotel's copy and start from the newest
+            Guest::withoutGlobalScope('hotel')->whereKey($siblings->modelKeys())->lockForUpdate()->get();
+        }
         $balance = (int) $guest->loyalty_points + $points;
         $guest->forceFill(['loyalty_points' => $balance])->saveQuietly();
+        if ($siblings->isNotEmpty()) {
+            Guest::withoutGlobalScope('hotel')->whereKey($siblings->modelKeys())->update(['loyalty_points' => $balance]);
+        }
 
         return LoyaltyEntry::create($extra + [
             'guest_id' => $guest->id, 'type' => $type, 'points' => $points, 'balance_after' => $balance,
@@ -257,6 +393,27 @@ class LoyaltyService
     }
 
     // ── Profile figures ───────────────────────────────────────────────
+
+    /** The member's points history, from every hotel of the group with group loyalty. */
+    public function history(Guest $guest, int $limit = 12): Collection
+    {
+        return LoyaltyEntry::withoutGlobalScope('hotel')->whereIn('guest_id', $this->memberIds($guest))
+            ->with(['reservation' => fn ($q) => $q->withoutGlobalScope('hotel')->select('id', 'reference'), 'creator:id,name', 'hotel:id,name'])
+            ->latest('id')->limit($limit)->get();
+    }
+
+    /** Where the member has stayed across the group: [hotel name => stays], for the profile. */
+    public function groupStays(Guest $guest): array
+    {
+        if (! $this->grouped()) {
+            return [];
+        }
+
+        return Reservation::withoutGlobalScope('hotel')->whereIn('guest_id', $this->memberIds($guest))
+            ->where('status', ReservationStatus::CheckedOut->value)
+            ->selectRaw('hotel_id, count(*) as n')->groupBy('hotel_id')->pluck('n', 'hotel_id')
+            ->mapWithKeys(fn ($n, $id) => [\App\Models\Hotel::find($id)?->name ?? '—' => (int) $n])->all();
+    }
 
     /** Completed stays, nights, money spent, average per stay, last stay, favourite room type. */
     public function stats(Guest $guest): array

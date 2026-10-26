@@ -137,3 +137,26 @@ test('pages load for each role', function () {
     $this->actingAs($this->cleaner)->get(route('housekeeping.index'))->assertOk()->assertSee('My Rooms to Clean');
     $this->actingAs($this->tech)->get(route('maintenance.show', $order))->assertOk()->assertDontSee('Mark as fixed');
 });
+
+test('the tablet board shows every room by what it needs, and works its cleans', function () {
+    $this->actingAs($this->gm);
+    $res = Reservation::where('status', ReservationStatus::CheckedIn->value)->with('rooms.room')->first();
+    app(ReservationService::class)->checkOut($res, 'Settling later');
+    $room = $res->rooms->first()->room;
+    $task = HousekeepingTask::open()->where('room_id', $room->id)->firstOrFail();
+
+    $this->actingAs($this->supervisor)->get(route('housekeeping.board'))->assertOk()
+        ->assertSee('Housekeeping board', false)->assertSee('data-task="' . $task->id . '"', false)->assertSee('To clean');
+    $this->get(route('housekeeping.board', ['partial' => 1]))->assertOk()->assertDontSee('<html', false)->assertSee($room->number);
+
+    // The board talks JSON.
+    $this->actingAs($this->cleaner)->postJson(route('housekeeping.start', $task))->assertOk()->assertJson(['success' => true]);
+    $this->postJson(route('housekeeping.start', $task))->assertStatus(422)->assertJson(['success' => false]);
+    $this->postJson(route('housekeeping.finish', $task), ['notes' => 'Lamp bulb out'])->assertOk();
+    $this->postJson(route('housekeeping.inspect', $task), ['result' => 'pass'])->assertForbidden();
+    $this->actingAs($this->supervisor)->postJson(route('housekeeping.inspect', $task), ['result' => 'pass'])->assertOk();
+    expect($task->fresh()->status)->toBe(HousekeepingTask::PASSED);
+
+    // A cleaner's board, "my rooms": only their own and unassigned cleans.
+    $this->actingAs($this->cleaner)->get(route('housekeeping.board'))->assertOk()->assertDontSee('data-task="' . $task->id . '"', false);
+});

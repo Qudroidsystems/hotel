@@ -28,6 +28,19 @@ class Guest extends Model
         'marketing_opt_in' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        // Group loyalty: a guest new to this hotel who is already a member at another one joins that membership.
+        static::saved(function (Guest $guest) {
+            if (! $guest->loyalty_number && ($guest->wasRecentlyCreated || $guest->wasChanged(['email', 'phone']))) {
+                $loyalty = app(\App\Services\Loyalty\LoyaltyService::class);
+                if ($loyalty->enabled()) {
+                    $loyalty->link($guest);
+                }
+            }
+        });
+    }
+
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class)->latest('check_in_date');

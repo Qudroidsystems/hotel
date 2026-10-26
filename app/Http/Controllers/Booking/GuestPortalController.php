@@ -67,6 +67,21 @@ class GuestPortalController extends Controller
         return view('booking.stay', $data);
     }
 
+    /** The guest's copy of their bill: every charge and payment, to print or save as PDF. */
+    public function receipt(string $token)
+    {
+        $r = $this->reservation($token);
+        abort_unless($r->folio && in_array($r->status, [ReservationStatus::CheckedIn, ReservationStatus::CheckedOut], true), 404);
+        $folio = $r->folio->load(['guest', 'reservation.rooms.room']);
+        $charges = $folio->charges()->whereNull('voided_at')->orderBy('service_date')->get();
+        $payments = $folio->payments()->whereNull('voided_at')->with('bankAccount')->orderBy('received_at')->get();
+        $summary = \App\Http\Controllers\Billing\FolioController::summary($folio, $charges, $payments);
+        $bankAccounts = HotelBankAccount::forInvoices();
+        $guestCopy = route('stay.show', $token);
+
+        return view('billing.print-invoice', compact('folio', 'charges', 'payments', 'summary', 'bankAccounts', 'guestCopy'));
+    }
+
     public function cancel(string $token)
     {
         $r = $this->reservation($token);

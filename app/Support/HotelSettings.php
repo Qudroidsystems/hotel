@@ -476,6 +476,9 @@ class HotelSettings
         if (! empty($group['group_name'])) {
             $config['group_name'] = (string) $group['group_name'];
         }
+        if (array_key_exists('group_loyalty', $group)) {
+            $config['group_loyalty'] = (bool) $group['group_loyalty'];
+        }
         if (array_key_exists('commission_percent', $group)) {
             $config['commission_percent'] = (float) $group['commission_percent'];
         }

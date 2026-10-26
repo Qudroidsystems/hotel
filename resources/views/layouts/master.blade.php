@@ -671,6 +671,7 @@
                                 <ul class="nav nav-sm flex-column">
                                     @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping'])
                                         <li class="nav-item"><a href="{{ route('housekeeping.index') }}" class="nav-link">@canany(['View housekeeping', 'Manage housekeeping'])Housekeeping Board @else My Rooms to Clean @endcanany</a></li>
+                                        <li class="nav-item"><a href="{{ route('housekeeping.board') }}" class="nav-link">Tablet Board</a></li>
                                     @endcanany
                                     @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])
                                         <li class="nav-item"><a href="{{ route('maintenance.index') }}" class="nav-link">Maintenance Jobs</a></li>
@@ -1498,6 +1499,7 @@
         {title:'Bank Accounts',                         url:'{{ route("settings.bank-accounts.index") }}',                   icon:'mdi-bank',                    category:'Billing',             keywords:['bank','account','transfer','invoice','settings']},
         @endcan
         @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping'])
+        {title:'Housekeeping Tablet Board',             url:'{{ route("housekeeping.board") }}',                             icon:'mdi-tablet',                  category:'Rooms',               keywords:['housekeeping','tablet','board','full screen','cleaners']},
         {title:'Housekeeping Board',                    url:'{{ route("housekeeping.index") }}',                             icon:'mdi-broom',                   category:'Rooms',               keywords:['housekeeping','clean','dirty','inspection','turnaround','stay-over','maid']},
         @endcanany
         @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Operations;
 
 use App\Exceptions\BookingException;
 use App\Http\Controllers\Controller;
+use App\Enums\RoomStatus;
 use App\Models\HousekeepingTask;
+use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\User;
 use App\Services\Operations\HousekeepingService;
@@ -54,6 +56,60 @@ class HousekeepingController extends Controller
         $pagetitle = $everyone ? 'Housekeeping' : 'My Rooms to Clean';
 
         return view('housekeeping.index', compact('pagetitle', 'columns', 'readyToday', 'stats', 'manager', 'everyone', 'mine', 'staff', 'rooms'));
+    }
+
+    /**
+     * The tablet board: every room as a big tile, coloured by what it needs,
+     * for the housekeeping office or a cleaner's tablet. Refreshes itself;
+     * tapping a room starts, finishes or inspects its clean.
+     */
+    public function board(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->canAny(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping']), 403);
+        $manager = $user->can('Manage housekeeping');
+        $mine = $request->boolean('mine') || ! ($manager || $user->can('View housekeeping'));
+        $this->service->syncDirtyRooms();
+
+        $tasks = HousekeepingTask::open()->with('assignee:id,name')->get()
+            ->sortBy([['urgent', 'desc'], ['created_at', 'asc']])->groupBy('room_id');
+        $arriving = Reservation::arrivingOn(today())->with('rooms:id,reservation_id,room_id', 'guest:id,first_name,last_name,is_vip')->get()
+            ->flatMap(fn (Reservation $r) => $r->rooms->pluck('room_id')->filter()->mapWithKeys(fn ($id) => [$id => $r]));
+        $leaving = Reservation::departingOn(today())->with('rooms:id,reservation_id,room_id')->get()
+            ->flatMap(fn (Reservation $r) => $r->rooms->pluck('room_id')->filter())->flip();
+
+        $tiles = Room::active()->with(['floor:id,name,level', 'building:id,name', 'roomType:id,name'])->get()
+            ->map(function (Room $room) use ($tasks, $arriving, $leaving, $user) {
+                $task = $tasks->get($room->id)?->first();
+                $state = match (true) {
+                    $task?->status === HousekeepingTask::PENDING     => 'clean',
+                    $task?->status === HousekeepingTask::IN_PROGRESS => 'cleaning',
+                    $task?->status === HousekeepingTask::DONE        => 'inspect',
+                    in_array($room->status, [RoomStatus::Maintenance, RoomStatus::OutOfService], true) => 'blocked',
+                    $room->status === RoomStatus::Occupied           => 'occupied',
+                    default                                          => 'ready',
+                };
+
+                return (object) [
+                    'room' => $room, 'task' => $task, 'state' => $state,
+                    'arriving' => $arriving->get($room->id), 'leaving' => $leaving->has($room->id),
+                    'mine' => $task && (int) $task->assigned_to === (int) $user->id,
+                ];
+            })
+            ->when($mine, fn ($c) => $c->filter(fn ($t) => $t->task && in_array($t->task->assigned_to, [null, $user->id])))
+            ->sortBy(fn ($t) => sprintf('%04d|%s|%08s', $t->room->floor?->level ?? 999, $t->room->building?->name, $t->room->number));
+
+        $floors = $tiles->groupBy(fn ($t) => trim(($tiles->pluck('room.building_id')->unique()->count() > 1 ? ($t->room->building?->name . ' · ') : '') . ($t->room->floor?->name ?? 'Other rooms')));
+        $counts = $tiles->countBy('state');
+        $staff = $manager ? User::permission(['Do housekeeping tasks'])->where('is_disabled', false)->orderBy('name')->get(['id', 'name']) : collect();
+        $inspection = (bool) config('hotel.housekeeping.require_inspection', true);
+
+        $data = compact('floors', 'counts', 'manager', 'mine', 'staff', 'inspection');
+        if ($request->boolean('partial')) {
+            return response()->view('housekeeping.partials.board-grid', $data);
+        }
+
+        return view('housekeeping.board', $data + ['pagetitle' => 'Housekeeping board']);
     }
 
     public function store(Request $request)
@@ -136,12 +192,13 @@ class HousekeepingController extends Controller
 
     private function attempt(callable $action, string $success)
     {
+        $json = request()->expectsJson();   // the tablet board
         try {
             $action();
         } catch (BookingException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            return $json ? response()->json(['success' => false, 'message' => $e->getMessage()], 422) : back()->withInput()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', $success);
+        return $json ? response()->json(['success' => true, 'message' => $success]) : back()->with('success', $success);
     }
 }

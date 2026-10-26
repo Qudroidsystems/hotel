@@ -105,6 +105,7 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::get('/stay', [GuestPortalController::class, 'find'])->name('stay.find');
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
+    Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
     Route::post('/stay/{token}/cancel', [GuestPortalController::class, 'cancel'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.cancel');
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
@@ -170,6 +171,7 @@ Route::middleware('auth')->group(function () {
     // Housekeeping (rooms to clean, inspection) and maintenance (work orders)
     Route::prefix('housekeeping')->name('housekeeping.')->controller(HousekeepingController::class)->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('/board', 'board')->name('board');
         Route::post('/tasks', 'store')->name('store');
         Route::post('/stayovers', 'stayovers')->name('stayovers');
         Route::post('/tasks/{task}/assign', 'assign')->name('assign');

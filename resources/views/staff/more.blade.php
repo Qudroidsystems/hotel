@@ -13,6 +13,7 @@
         [route('it.tickets.index'), 'ri-customer-service-2-line', 'My IT requests'],
         $me->canAny(['Record expenses', 'View expenses']) ? [route('expenses.index'), 'ri-wallet-3-line', $me->canAny(['View expenses', 'Approve expenses']) ? 'Expenses' : 'My expenses'] : null,
         $me->canAny(['Do housekeeping tasks', 'View housekeeping', 'Manage housekeeping']) ? [route('housekeeping.index'), 'ri-brush-line', 'Housekeeping board'] : null,
+        $me->canAny(['Do housekeeping tasks', 'View housekeeping', 'Manage housekeeping']) ? [route('housekeeping.board'), 'ri-tablet-line', 'Tablet board'] : null,
         $me->canAny(['View maintenance', 'Report maintenance issues', 'Manage maintenance']) ? [route('maintenance.index'), 'ri-tools-line', 'Repairs list'] : null,
         $me->canAny(['View reservations', 'Check in guests']) ? [route('staff.front-desk'), 'ri-door-open-line', 'Front desk today'] : null,
         $me->can('View stock') ? [route('staff.stock'), 'ri-archive-line', 'Stock lookup'] : null,

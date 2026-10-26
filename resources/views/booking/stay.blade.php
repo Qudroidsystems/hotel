@@ -112,6 +112,7 @@
                     @foreach ($r->folio->charges as $c)
                         <div class="row small"><span>{{ $c->service_date->format('j M') }} · {{ $c->description }}</span><span>{{ $m($c->total) }}</span></div>
                     @endforeach
+                    <p class="small" style="margin:10px 0 0"><a href="{{ route('stay.receipt', $r->guest_token) }}" target="_blank" rel="noopener">Print your bill or save it as a PDF</a></p>
                 </details>
             @endif
 

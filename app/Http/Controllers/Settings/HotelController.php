@@ -40,7 +40,7 @@ class HotelController extends Controller
     }
 
     /** Single hotel or a group of hotels. */
-    public function mode(Request $request)
+    public function mode(Request $request, \App\Services\Loyalty\LoyaltyService $loyalty)
     {
         $multi = $request->boolean('multi');
         $request->validate(['group_name' => 'nullable|string|max:100', 'commission_percent' => 'nullable|numeric|min:0|max:50']);
@@ -51,11 +51,17 @@ class HotelController extends Controller
         if ($request->has('group_name')) {
             HotelSettings::putGroup('group_name', trim((string) $request->input('group_name')) ?: null, $request->user()->id);
         }
+        if ($request->has('group_loyalty')) {
+            HotelSettings::putGroup('group_loyalty', $request->boolean('group_loyalty'), $request->user()->id);
+        }
         Audit::record('settings.hotel_mode', 'System set to ' . ($multi ? 'several hotels' : 'one hotel'));
+        HotelSettings::applyFor(\App\Support\Tenancy\CurrentHotel::get()->id());
+        $joined = $multi ? $loyalty->linkAll() : 0;
 
-        return back()->with('success', $multi
+        return back()->with('success', ($multi
             ? 'The system now runs several hotels. Add hotels below and choose who works at each; staff switch hotel from the top bar.'
-            : 'The system now runs one hotel. Other hotels and their data are kept but hidden.');
+            : 'The system now runs one hotel. Other hotels and their data are kept but hidden.')
+            . ($joined ? " {$joined} guest" . ($joined === 1 ? ' was' : 's were') . ' a member at more than one hotel; their points are now together.' : ''));
     }
 
     public function store(Request $request)

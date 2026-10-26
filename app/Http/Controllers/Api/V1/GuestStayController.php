@@ -136,6 +136,7 @@ class GuestStayController extends ApiController
                     'points'     => (int) $g->loyalty_points,
                     'value_label' => $money($loyalty->pointsValue((int) $g->loyalty_points)),
                     'discount_percent' => $loyalty->discountPercent($g),
+                    'group'      => $loyalty->grouped() ? (config('hotel.group_name') ?: 'the group') : null,   // points work at every hotel of it
                 ] : null,
             ],
             'money' => [
@@ -153,6 +154,7 @@ class GuestStayController extends ApiController
             'cancel_until' => $open ? $this->booking->checkInAt($r)->subHours((int) config('hotel.booking.cancel_hours', 48))->format('D j M, g:i A') : null,
             'qr'           => in_array($r->status, [S::Pending, S::Confirmed], true) ? route('reservations.qr', $r->qr_token) : null,
             'page_url'     => route('stay.show', $r->guest_token),
+            'receipt_url'  => $r->folio && in_array($r->status, [S::CheckedIn, S::CheckedOut], true) ? route('stay.receipt', $r->guest_token) : null,   // the bill, to print or save as PDF
             'can_request'  => $canRequest,
             'request_types' => $canRequest ? collect(GuestRequest::TYPES)->map(fn ($t, $k) => ['key' => $k, 'label' => $t[0]])->values() : [],
             'requests'     => $r->guestRequests->map(fn (GuestRequest $q) => [

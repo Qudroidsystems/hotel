@@ -69,6 +69,9 @@
                             {{ $nights12 }} nights in the last 12 months · top tier
                         @endif
                     </div>
+                    @if (count($groupStays) > 1 || (count($groupStays) === 1 && array_key_first($groupStays) !== $guest->hotel?->name))
+                        <div class="mt-2 small" style="opacity:.85"><i class="ri-hotel-line"></i> Group member · stays at {{ collect($groupStays)->map(fn ($n, $h) => $h . ' (' . $n . ')')->implode(', ') }}</div>
+                    @endif
                 </div>
             @endif
             <x-cb.card title="Profile" icon="ri-user-3-line">
@@ -101,11 +104,13 @@
                             <thead><tr><th>When</th><th>What</th><th class="num">Points</th><th class="num">Balance</th></tr></thead>
                             <tbody>
                                 @foreach ($entries as $e)
+                                    @php $elsewhere = $e->hotel_id && $e->hotel_id !== $guest->hotel_id; @endphp
                                     <tr>
                                         <td data-label="When" class="small">{{ $e->created_at->format('j M Y') }}<div class="text-muted">{{ $e->creator?->name ?? 'Automatic' }}</div></td>
                                         <td data-label="What" class="small"><span class="status-pill {{ $e->type_pill }}"><i class="{{ $e->type_icon }}"></i> {{ $e->type_label }}</span>
-                                            @if ($e->reservation && str_contains((string) $e->note, $e->reservation->reference)){!! str_replace(e($e->reservation->reference), '<a href="' . e(route('reservations.show', $e->reservation)) . '">' . e($e->reservation->reference) . '</a>', e($e->note)) !!}@else{{ $e->note }}@endif
-                                            @if ($e->reservation && ! str_contains((string) $e->note, $e->reservation->reference))<a href="{{ route('reservations.show', $e->reservation) }}" class="ms-1">{{ $e->reservation->reference }}</a>@endif</td>
+                                            @if ($elsewhere){{ $e->note }} <span class="text-muted">at {{ $e->hotel?->name }}</span>
+                                            @elseif ($e->reservation && str_contains((string) $e->note, $e->reservation->reference)){!! str_replace(e($e->reservation->reference), '<a href="' . e(route('reservations.show', $e->reservation)) . '">' . e($e->reservation->reference) . '</a>', e($e->note)) !!}@else{{ $e->note }}@endif
+                                            @if (! $elsewhere && $e->reservation && ! str_contains((string) $e->note, $e->reservation->reference))<a href="{{ route('reservations.show', $e->reservation) }}" class="ms-1">{{ $e->reservation->reference }}</a>@endif</td>
                                         <td data-label="Points" class="num fw-semibold" style="color: {{ $e->points < 0 ? '#b91c1c' : '#15803d' }}">{{ $e->points > 0 ? '+' : '−' }}{{ number_format(abs($e->points)) }}</td>
                                         <td data-label="Balance" class="num">{{ number_format($e->balance_after) }}</td>
                                     </tr>

@@ -2,7 +2,7 @@
 @php $r = $folio->reservation; $g = $folio->guest; $bal = $summary['balance']; @endphp
 @section('title', 'Invoice ' . $folio->number)
 @section('heading', $bal > 0.004 ? 'Invoice' : 'Guest bill')
-@section('back', route('folios.show', $folio))
+@section('back', $guestCopy ?? route('folios.show', $folio))
 
 @section('body')
     <div class="cols">
@@ -35,14 +35,14 @@
     </div>
 
     <table>
-        <thead><tr><th>Date</th><th>Description</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th class="num wide">Qty</th><th class="num wide">Price</th><th class="num">Amount</th></tr></thead>
         <tbody>
             @forelse ($charges as $c)
                 <tr>
                     <td class="muted" style="white-space:nowrap">{{ $c->service_date->format('d/m/Y') }}</td>
-                    <td>{{ $c->description }}</td>
-                    <td class="num">{{ rtrim(rtrim(number_format((float) $c->quantity, 2), '0'), '.') }}</td>
-                    <td class="num">@money($c->unit_price)</td>
+                    <td>{{ $c->description }}@if ((float) $c->quantity != 1)<div class="muted narrow">{{ rtrim(rtrim(number_format((float) $c->quantity, 2), '0'), '.') }} × @money($c->unit_price)</div>@endif</td>
+                    <td class="num wide">{{ rtrim(rtrim(number_format((float) $c->quantity, 2), '0'), '.') }}</td>
+                    <td class="num wide">@money($c->unit_price)</td>
                     <td class="num">{{ $c->total < 0 ? '−' : '' }}@money(abs($c->total))</td>
                 </tr>
             @empty

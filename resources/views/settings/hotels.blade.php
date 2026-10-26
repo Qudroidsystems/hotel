@@ -45,6 +45,9 @@
                     <div class="mb-3" style="max-width:420px"><label class="form-label small">Usual commission on group-site bookings (%)</label>
                         <input name="commission_percent" type="number" step="0.5" min="0" max="50" class="form-control" style="max-width:140px" value="{{ rtrim(rtrim(number_format((float) config('hotel.commission_percent', 0), 2), '0'), '.') }}">
                         <div class="form-text">Charged to a hotel on stays booked through the group site or the guest app's hotel list (0 = none). A hotel can have its own rate. See <a href="{{ route('group.commission') }}">Commission</a>.</div></div>
+                    <div class="form-check mb-3"><input type="hidden" name="group_loyalty" value="0"><input class="form-check-input" type="checkbox" name="group_loyalty" value="1" id="ht-loyalty" @checked(config('hotel.group_loyalty', true))>
+                        <label class="form-check-label small" for="ht-loyalty"><strong>One loyalty programme for the group</strong> <span class="text-muted">(several hotels)</span></label>
+                        <div class="form-text">A guest's member number, points and tier follow them to every hotel: points earned in one hotel can be spent in another, and nights at all of them count towards Silver and Gold. Guests are matched by email or phone number.</div></div>
                     <button class="action-btn btn-primary-cb"><i class="ri-save-3-line"></i> Save</button>
                 </form>
             </x-cb.card>

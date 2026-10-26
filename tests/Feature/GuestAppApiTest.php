@@ -54,3 +54,21 @@ test('cancelling from the app follows the hotel policy', function () {
     $this->postJson("/api/v1/guest/stays/{$token}/cancel")->assertOk()->assertJsonPath('data.status', 'cancelled')->assertJsonPath('data.can_cancel', false);
     $this->postJson("/api/v1/guest/stays/{$token}/cancel")->assertStatus(422);
 });
+
+test('an in-house guest opens their bill from the app; a guest who has not arrived has none', function () {
+    $r = Reservation::where('status', ReservationStatus::CheckedIn->value)->first();
+    $folios = app(\App\Services\Billing\FolioService::class);
+    $folios->postRoomNights($r);
+    $token = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($r);
+
+    $url = $this->getJson("/api/v1/guest/stays/{$token}")->assertOk()->json('data.receipt_url');
+    expect($url)->toContain("/stay/{$token}/bill");
+    $folio = $r->fresh()->folio;
+    $this->get($url)->assertOk()->assertSee($folio->number)->assertSee($r->reference)->assertSee('Print / save as PDF')->assertDontSee('Printed by');
+
+    $later = Reservation::where('status', ReservationStatus::Confirmed->value)->first();
+    $t2 = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($later);
+    expect($this->getJson("/api/v1/guest/stays/{$t2}")->json('data.receipt_url'))->toBeNull();
+    $this->get(route('stay.receipt', $t2))->assertNotFound();
+    $this->get(route('stay.receipt', str_repeat('x', 48)))->assertNotFound();
+});

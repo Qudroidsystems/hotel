@@ -37,7 +37,7 @@ class FolioController extends Controller
         $folio->load(['guest', 'reservation.rooms.room', 'closedBy']);
         $charges = $folio->charges()->with(['postedBy', 'voidedBy'])->get();
         $payments = $folio->payments()->with(['receivedBy', 'voidedBy', 'bankAccount'])->get();
-        $summary = $this->summary($folio, $charges, $payments);
+        $summary = self::summary($folio, $charges, $payments);
         $pagetitle = 'Bill ' . $folio->number;
 
         return view('billing.folio', compact('pagetitle', 'folio', 'charges', 'payments', 'summary'));
@@ -51,7 +51,7 @@ class FolioController extends Controller
         $folio->load(['guest', 'reservation.rooms.room']);
         $charges = $folio->charges()->whereNull('voided_at')->get();
         $payments = $folio->payments()->whereNull('voided_at')->with('bankAccount')->get();
-        $summary = $this->summary($folio, $charges, $payments);
+        $summary = self::summary($folio, $charges, $payments);
 
         $bankAccounts = HotelBankAccount::forInvoices();
 
@@ -134,7 +134,8 @@ class FolioController extends Controller
     // ─────────────────────────────────────────────────────────────────
 
     /** Totals for the bill, including tax that is already inside the prices. */
-    private function summary(Folio $folio, $charges, $payments): array
+    /** Bill totals for the bill page and the printed bill (also the guest's copy). */
+    public static function summary(Folio $folio, $charges, $payments): array
     {
         $valid = $charges->whereNull('voided_at');
         $taxes = [];

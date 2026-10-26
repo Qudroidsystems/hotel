@@ -59,11 +59,12 @@ class GuestController extends Controller
         $pagetitle = $guest->full_name;
         $reservations = $guest->reservations()->with('rooms.room', 'rooms.roomType')->paginate(10);
         $stats = $loyalty->stats($guest);
-        $entries = $guest->loyaltyEntries()->with('reservation:id,reference', 'creator:id,name')->limit(12)->get();
+        $entries = $loyalty->history($guest);
+        $groupStays = $loyalty->groupStays($guest);
         $next = $loyalty->enabled() ? $loyalty->nextTier($guest) : null;
         $nights12 = $loyalty->recentNights($guest);
 
-        return view('guests.show', compact('pagetitle', 'guest', 'reservations', 'stats', 'entries', 'next', 'nights12', 'loyalty'));
+        return view('guests.show', compact('pagetitle', 'guest', 'reservations', 'stats', 'entries', 'next', 'nights12', 'loyalty', 'groupStays'));
     }
 
     /** Add or take away points by hand, with a reason (goodwill, correction ...). */

@@ -32,7 +32,9 @@
         .bar { max-width: @yield('width', '800px'); margin: 0 auto 14px; display: flex; gap: 8px; justify-content: flex-end; }
         .bar button, .bar a { border: none; background: #0f2342; color: #fff; padding: 9px 16px; border-radius: 9px; font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; }
         .bar a { background: #64748b; }
-        @media (max-width: 600px) { body { padding: 10px; } .body { padding: 16px; } .head { padding: 16px; } }
+        .narrow { display: none; }
+        @media (max-width: 600px) { body { padding: 10px; } .body { padding: 16px; } .head { padding: 16px; }
+            .wide { display: none; } .narrow { display: block; } th, td { padding: 8px 6px; } }
         @media print { body { background: #fff; padding: 0; } .bar { display: none; } .sheet { box-shadow: none; border-radius: 0; max-width: none; }
             .head, .stamp { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         @yield('styles')
@@ -49,7 +51,7 @@
             @if (config('hotel.has_logo'))<img src="{{ asset(config('hotel.logo')) }}" alt="{{ config('hotel.name') }}">@endif
         </div>
         <div class="body">@yield('body')</div>
-        <div class="foot"><span>Printed {{ now()->format('j M Y, g:i A') }} by {{ auth()->user()->name }}</span><span>{{ config('hotel.name') }}</span></div>
+        <div class="foot"><span>Printed {{ now()->format('j M Y, g:i A') }}@auth by {{ auth()->user()->name }}@endauth</span><span>{{ config('hotel.name') }}</span></div>
     </div>
 </body>
 </html>

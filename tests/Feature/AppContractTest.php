@@ -111,7 +111,7 @@ test('the guest app finds every field it reads', function () {
     $r = \App\Models\Reservation::whereIn('status', ['confirmed', 'checked_in'])->first();
     $token = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($r);
     $stay = $get('guest/stays/' . $token)->json('data');
-    $check('guest/stays (GuestStay)', $stay, ['can_cancel', 'can_request', 'cancel_until', 'check_in', 'check_in_label', 'check_out', 'check_out_label', 'guest', 'guests_label', 'hold_until', 'hotel', 'money', 'nights', 'page_url', 'pay_url', 'qr', 'reference', 'request_types', 'requests', 'room_types', 'rooms', 'special_requests', 'state', 'status', 'status_label', 'token']);
+    $check('guest/stays (GuestStay)', $stay, ['can_cancel', 'can_request', 'cancel_until', 'check_in', 'check_in_label', 'check_out', 'check_out_label', 'guest', 'guests_label', 'hold_until', 'hotel', 'money', 'nights', 'page_url', 'pay_url', 'qr', 'receipt_url', 'reference', 'request_types', 'requests', 'room_types', 'rooms', 'special_requests', 'state', 'status', 'status_label', 'token']);
     if ($stay['guest']['loyalty'] ?? null) {
         $check('guest loyalty', $stay['guest']['loyalty'], ['discount_percent', 'number', 'points', 'tier', 'tier_label', 'value_label']);
     }
