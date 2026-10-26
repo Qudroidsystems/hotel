@@ -191,6 +191,11 @@ class OnlineBookingService
             }
             $reservation->forceFill(['guest_token' => Reservation::newGuestToken(), 'hold_expires_at' => $hold])->save();
 
+            // Booked through the group site (several hotels): the hotel owes the group its commission on it.
+            if (! empty($data['via_group']) && \App\Support\Tenancy\CurrentHotel::multi() && ($hotel = \App\Support\Tenancy\CurrentHotel::get()->hotel())) {
+                $reservation->forceFill(['via_group' => true, 'commission_percent' => $hotel->commissionRate()])->save();
+            }
+
             Audit::record('reservations.online_booking', "Online booking {$reservation->reference}: {$guest->full_name}, {$rooms} × {$type->name}, "
                 . $in->format('j M') . ' – ' . $out->format('j M Y') . ' (' . $this->money($reservation->total_amount) . ')', $reservation);
 
@@ -362,7 +367,10 @@ class OnlineBookingService
     /** Find a booking from its reference plus the guest's email or phone. */
     public function find(string $reference, string $contact): ?Reservation
     {
-        $r = Reservation::with('guest')->where('reference', strtoupper(trim($reference)))->first();
+        // References are unique across every hotel; carry on in the booking's own hotel.
+        $r = Reservation::withoutGlobalScope('hotel')->where('reference', strtoupper(trim($reference)))->first();
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($r);
+        $r?->load('guest');
         if (! $r || ! $r->guest) {
             return null;
         }

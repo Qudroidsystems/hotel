@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Cash put into or taken out of a drawer during a shift, with the reason. */
 class CashShiftMovement extends Model
 {
+    use BelongsToHotel;
+
     public const UPDATED_AT = null;
 
     public const TYPES = [

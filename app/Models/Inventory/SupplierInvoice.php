@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A bill from a supplier, matched to the delivery it charges for (spec §8.3). */
 class SupplierInvoice extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'unpaid'    => ['Unpaid', 'st-warning'],
         'part_paid' => ['Part paid', 'st-info'],

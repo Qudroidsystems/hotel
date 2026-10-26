@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Floor extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['building_id', 'name', 'level'];
 
     protected $casts = ['level' => 'integer'];

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\RoomStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RoomStatusLog extends Model
 {
+    use BelongsToHotel;
+
     public const UPDATED_AT = null;
 
     protected $fillable = ['room_id', 'from_status', 'to_status', 'reason', 'user_id'];

@@ -2,6 +2,7 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Support\Carbon;
 
 class AttendancePunch extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['uuid', 'user_id', 'point_id', 'punched_at', 'work_date', 'direction', 'source', 'photo_path', 'device_id', 'was_offline', 'ignored', 'note', 'recorded_by', 'synced_at'];
 
     protected $casts = [

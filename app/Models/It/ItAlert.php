@@ -2,6 +2,7 @@
 
 namespace App\Models\It;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** A problem the monitors found (or raised by hand) waiting for IT to act (spec §11.3 alert escalation). */
 class ItAlert extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'open'         => ['Open', 'st-danger'],
         'acknowledged' => ['Being handled', 'st-warning'],

@@ -465,7 +465,7 @@ class ReservationController extends Controller
     /** Without a cron job on XAMPP, make sure today's arrivals are marked Reserved at least once a day. */
     private function prepareArrivalsOncePerDay(): void
     {
-        if (Cache::add('arrivals-prepared-' . today()->toDateString(), true, now()->endOfDay())) {
+        if (Cache::add('arrivals-prepared-' . \App\Support\Tenancy\CurrentHotel::get()->id() . '-' . today()->toDateString(), true, now()->endOfDay())) {
             $this->service->prepareTodaysArrivals();
             app(FolioService::class)->nightAudit(); // bill last night for guests in house
         }

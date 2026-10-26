@@ -436,6 +436,7 @@ class StockService
     {
         return (float) DB::table('stock_levels')->join('stock_items', 'stock_items.id', '=', 'stock_levels.item_id')
             ->when($locationId, fn ($q) => $q->where('stock_levels.location_id', $locationId))
+            ->when(\App\Support\Tenancy\CurrentHotel::get()->id(), fn ($q, $h) => $q->where('stock_levels.hotel_id', $h))
             ->where('stock_levels.quantity', '>', 0)
             ->selectRaw('sum(stock_levels.quantity * stock_items.avg_cost) as v')->value('v');
     }

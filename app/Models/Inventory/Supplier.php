@@ -2,11 +2,14 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['name', 'contact_person', 'phone', 'email', 'address', 'payment_terms_days', 'notes', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];

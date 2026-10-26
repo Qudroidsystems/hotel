@@ -19,7 +19,7 @@
         <x-slot:pills>
             <span class="cb-meta-pill" style="background: {{ $st->color() }}; border-color: {{ $st->color() }}"><i class="{{ $st->icon() }}"></i> {{ $st->label() }}</span>
             <span class="cb-meta-pill"><i class="ri-hashtag"></i> {{ $r->reference }}</span>
-            <span class="cb-meta-pill"><i class="ri-route-line"></i> {{ $r->source->label() }}</span>
+            <span class="cb-meta-pill"><i class="ri-route-line"></i> {{ $r->channel ?: $r->source->label() }}{{ $r->channel_reference ? ' · ' . $r->channel_reference : '' }}</span>
             @if ($r->rate_plan_name)<span class="cb-meta-pill" title="{{ $r->ratePlan?->summary }}{{ $r->ratePlan?->inclusions ? ' · ' . $r->ratePlan->inclusions : '' }}"><i class="ri-price-tag-3-line"></i> {{ $r->rate_plan_name }}{{ $r->promo_code ? ' · ' . $r->promo_code : '' }}</span>@endif
             @if ($r->company)<a class="cb-meta-pill text-decoration-none" @can('View company accounts') href="{{ route('companies.show', $r->company) }}" @endcan><i class="ri-building-2-line"></i> Bill to {{ $r->company->name }}</a>@endif
             @if ($g->is_vip)<span class="cb-meta-pill"><i class="ri-vip-crown-line"></i> VIP</span>@endif

@@ -8,7 +8,7 @@
     $pct = fn ($v, $dp = 1) => $v === null ? '—' : number_format((float) $v, $dp) . '%';
     $qty = fn ($v) => \App\Models\Inventory\StockItem::qty($v);
     [$title, $icon, $area, $desc] = $reports[$tab];
-    $dated = in_array($tab, ['profit', 'tax', 'exceptions', 'variance', 'purchasing'], true);
+    $dated = in_array($tab, ['profit', 'tax', 'exceptions', 'variance', 'purchasing', 'daily', 'rates', 'companies', 'events'], true);
     $base = array_filter(['report' => $tab, 'from' => $from->toDateString(), 'to' => $to->toDateString(), 'location' => $locationId, 'category' => $categoryId]);
     $subtitle = match (true) {
         $tab === 'trend'  => '12 months to ' . $to->format('F Y'),
@@ -60,7 +60,7 @@
         </x-slot:actions>
     </x-cb.hero>
 
-    @foreach (['finance' => 'Financial', 'stock' => 'Inventory'] as $a => $label)
+    @foreach (['finance' => 'Financial', 'sales' => 'Sales', 'stock' => 'Inventory'] as $a => $label)
         @php $group = $reports->filter(fn ($r) => $r[2] === $a); @endphp
         @if ($group->isNotEmpty())
             <div class="ar-area">{{ $label }}</div>

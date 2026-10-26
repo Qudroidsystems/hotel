@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\StockMovementType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 /** One line in the stock ledger. Never edited or deleted. */
 class StockMovement extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['item_id', 'location_id', 'type', 'quantity', 'unit_cost', 'value', 'balance_after', 'source_type', 'source_id', 'note', 'user_id', 'occurred_at'];
 
     protected $casts = [

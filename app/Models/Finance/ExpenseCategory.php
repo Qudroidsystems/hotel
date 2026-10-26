@@ -2,12 +2,15 @@
 
 namespace App\Models\Finance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** A kind of running cost (diesel, salaries, repairs…), with an optional monthly budget. */
 class ExpenseCategory extends Model
 {
+    use BelongsToHotel;
+
     /** Groups used to total the profit & loss. */
     public const GROUPS = [
         'staff'       => 'Staff costs',

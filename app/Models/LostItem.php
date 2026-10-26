@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Storage;
 /** Something found on the property, from logging to handover (spec §12.3). */
 class LostItem extends Model
 {
+    use BelongsToHotel;
+
     public const CATEGORIES = [
         'phone' => 'Phone', 'electronics' => 'Electronics / charger', 'documents' => 'Documents / ID', 'jewellery' => 'Jewellery / watch',
         'money' => 'Money / cards', 'bag' => 'Bag / wallet', 'clothing' => 'Clothing / shoes', 'keys' => 'Keys', 'other' => 'Other',

@@ -96,6 +96,9 @@ class GuestPortalController extends Controller
     {
         abort_unless(strlen($token) === 48, 404);
 
-        return Reservation::where('guest_token', $token)->firstOrFail();
+        $r = Reservation::withoutGlobalScope('hotel')->where('guest_token', $token)->firstOrFail();
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($r);
+
+        return $r;
     }
 }

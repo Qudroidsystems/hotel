@@ -2,12 +2,15 @@
 
 namespace App\Models\Rates;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /** A date range when room rates go up (peak) or down (low season). */
 class RateSeason extends Model
 {
+    use BelongsToHotel;
+
     protected $attributes = ['change_percent' => 0, 'change_amount' => 0, 'priority' => 0, 'color' => '#b7832f', 'is_active' => true];
 
     protected $fillable = ['name', 'starts_on', 'ends_on', 'change_percent', 'change_amount', 'room_type_ids', 'min_nights', 'priority', 'color', 'is_active'];

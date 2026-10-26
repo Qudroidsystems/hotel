@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Building extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['name', 'code', 'description', 'sort_order', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];

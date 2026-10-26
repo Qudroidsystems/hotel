@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A guest bill. Totals are always computed from non-voided lines. */
 class Folio extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['reservation_id', 'guest_id', 'status', 'credit_limit'];
 
     protected $casts = [

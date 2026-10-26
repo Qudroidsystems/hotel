@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HotelBankAccount extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = [
         'bank_name', 'account_name', 'account_number', 'branch', 'sort_code', 'currency',
         'purpose', 'show_on_invoice', 'accepts_transfers', 'is_active', 'sort_order',

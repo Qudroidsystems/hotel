@@ -13,6 +13,7 @@
         @include('rooms.partials.flash-guest')
 
         <form method="POST" action="{{ route('book.store') }}" class="form" novalidate>
+            @if (\App\Support\Tenancy\CurrentHotel::multi())<input type="hidden" name="hotel" value="{{ \App\Support\Tenancy\CurrentHotel::get()->hotel()?->slug }}">@endif
             @csrf
             @foreach (['check_in', 'check_out', 'adults', 'children', 'rooms', 'promo'] as $k)<input type="hidden" name="{{ $k }}" value="{{ $q[$k] }}">@endforeach
             <input type="hidden" name="room_type_id" value="{{ $option->type->id }}">

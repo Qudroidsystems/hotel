@@ -2,6 +2,7 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Support\Carbon;
 
 class StaffLeave extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = ['annual' => 'Annual leave', 'sick' => 'Sick leave', 'maternity' => 'Maternity / paternity', 'compassionate' => 'Compassionate', 'training' => 'Training / course', 'unpaid' => 'Unpaid leave', 'other' => 'Other'];
 
     protected $fillable = ['user_id', 'type', 'from_date', 'to_date', 'reason', 'status', 'created_by'];

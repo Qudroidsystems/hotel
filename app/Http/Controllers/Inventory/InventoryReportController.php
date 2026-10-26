@@ -38,6 +38,7 @@ class InventoryReportController extends Controller
         if ($tab === 'valuation') {
             // Stock value now, per store and category, at average cost.
             $rows = DB::table('stock_levels')->join('stock_items', 'stock_items.id', '=', 'stock_levels.item_id')
+                ->when(\App\Support\Tenancy\CurrentHotel::get()->id(), fn ($q, $h) => $q->where('stock_levels.hotel_id', $h))
                 ->where('stock_levels.quantity', '>', 0)
                 ->selectRaw('stock_levels.location_id, stock_items.category_id, sum(stock_levels.quantity * stock_items.avg_cost) as value, count(*) as lines')
                 ->groupBy('stock_levels.location_id', 'stock_items.category_id')->get();

@@ -2,6 +2,7 @@
 
 namespace App\Models\Booking;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\HousekeepingTask;
 use App\Models\MaintenanceOrder;
 use App\Models\Reservation;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** A request sent by a guest from their booking page (spec §12.2). */
 class GuestRequest extends Model
 {
+    use BelongsToHotel;
+
     /** type => [label, icon, where it goes: housekeeping | maintenance | front_desk] */
     public const TYPES = [
         'towels'       => ['Fresh towels', 'ri-t-shirt-air-line', 'housekeeping'],

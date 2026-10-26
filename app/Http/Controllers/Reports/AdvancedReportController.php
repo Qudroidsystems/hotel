@@ -28,9 +28,13 @@ class AdvancedReportController extends Controller
         'stock'      => ['Stock health & reorder', 'ri-heart-pulse-line', 'stock', 'Usage, days of cover, what to reorder, slow-moving stock'],
         'variance'   => ['Stocktake variance', 'ri-list-check-2', 'stock', 'Differences found at stocktakes and items often short'],
         'purchasing' => ['Purchasing & suppliers', 'ri-truck-line', 'stock', 'Spend, delivery fill rate and price changes by supplier'],
+        'daily'      => ['Daily figures', 'ri-moon-clear-line', 'sales', 'Each day closed by the night audit: occupancy, rates, revenue, money in'],
+        'rates'      => ['Rates & promo codes', 'ri-price-tag-3-line', 'sales', 'Stays by rate plan, promo code and where the booking came from'],
+        'companies'  => ['Company accounts', 'ri-building-2-line', 'sales', 'Stays, billing, payments and what each company owes'],
+        'events'     => ['Events & halls', 'ri-presentation-line', 'sales', 'Event revenue, how busy each hall was, enquiries that became bookings'],
     ];
 
-    public function __construct(private AdvancedReportService $reports)
+    public function __construct(private AdvancedReportService $reports, private \App\Services\Reports\SalesReportService $sales)
     {
         $this->middleware('permission:View management reports|View finance reports|View stock reports');
     }
@@ -54,6 +58,10 @@ class AdvancedReportController extends Controller
             'stock'      => $this->reports->stockHealth($locationId, $categoryId),
             'variance'   => $this->reports->variance($from, $to, $locationId),
             'purchasing' => $this->reports->purchasing($from, $to),
+            'daily'      => $this->sales->daily($from, $to),
+            'rates'      => $this->sales->rates($from, $to),
+            'companies'  => $this->sales->companies($from, $to),
+            'events'     => $this->sales->events($from, $to),
         };
 
         if ($request->query('export') === 'csv') {
@@ -72,7 +80,7 @@ class AdvancedReportController extends Controller
     {
         $u = $request->user();
 
-        return $u->can('View management reports') || $u->can($area === 'finance' ? 'View finance reports' : 'View stock reports');
+        return $u->can('View management reports') || $u->can($area === 'stock' ? 'View stock reports' : 'View finance reports');
     }
 
     /** ?period=… or from/to. Defaults: this month so far; the trend ends this month. */
@@ -140,6 +148,16 @@ class AdvancedReportController extends Controller
                     $d['changes']->map(fn ($c) => [$c->line->receipt->received_on->toDateString(), $c->line->receipt->number, $c->line->receipt->supplier?->name, $c->line->item?->name, (float) $c->line->quantity, $r2($c->prev), $r2($c->cost), $r2($c->pct), $r2($c->extra)])]
                 : [['Supplier', 'Deliveries', 'Spend', 'Ordered value', 'Received of ordered', 'Fill rate %', 'Rejected value', 'On time %'],
                     $d['suppliers']->map(fn ($s) => [$s['supplier']?->name ?? 'No supplier', $s['receipts'], $r2($s['spend']), $r2($s['ordered']), $r2($s['received']), $r2($s['fill']), $r2($s['rejected']), $r2($s['on_time'])])],
+            'daily' => [['Day', 'Rooms sold', 'Rooms for sale', 'Occupancy %', 'ADR', 'RevPAR', 'Room revenue', 'Bar & restaurant', 'Events', 'Total revenue', 'Money in', 'Arrivals', 'Departures', 'No-shows'],
+                $d['days']->map(fn ($a) => [$a->business_date->toDateString(), data_get($a->report, 'rooms.sold'), data_get($a->report, 'rooms.sellable'), data_get($a->report, 'rooms.occupancy'), $r2(data_get($a->report, 'rooms.adr')), $r2(data_get($a->report, 'rooms.revpar')),
+                    $r2(data_get($a->report, 'rooms.revenue')), $r2(data_get($a->report, 'revenue.pos.sales')), $r2(data_get($a->report, 'revenue.events.revenue')), $r2(data_get($a->report, 'revenue.total')), $r2(data_get($a->report, 'collections.total')),
+                    data_get($a->report, 'guests.arrivals'), data_get($a->report, 'guests.departures'), data_get($a->report, 'guests.no_shows')])],
+            'rates' => [['Group', 'Rate plan / code / source', 'Stays', 'Room nights', 'Revenue', 'Average a night', 'Cancelled / no-show'],
+                collect(['Rate plan' => $d['by_plan'], 'Promo code' => $d['by_promo'], 'Source' => $d['by_source'], 'Booking site' => $d['by_channel']])->flatMap(fn ($rows, $g) => $rows->map(fn ($x) => [$g, $x['label'], $x['bookings'], $x['nights'], $r2($x['revenue']), $r2($x['avg']), $x['lost']]))],
+            'companies' => [['Company', 'Account', 'Stays', 'Room nights', 'Events', 'Billed', 'Paid', 'Owes now', 'Overdue now', 'Credit limit'],
+                $d['rows']->map(fn ($x) => [$x['company']->name, $x['company']->account_number, $x['stays'], $x['nights'], $x['events'], $r2($x['billed']), $r2($x['paid']), $r2($x['owes']), $r2($x['overdue']), $r2($x['limit'])])],
+            'events' => [['Date', 'Event', 'Number', 'Hall', 'Kind', 'Status', 'Guests', 'Total'],
+                $d['list']->map(fn ($e) => [$e->starts_at->format('Y-m-d H:i'), $e->title, $e->number, $e->hall?->name, $e->type_label, $e->status_label, $e->guests_expected, $r2($e->total)])],
         };
 
         $suffix = in_array($tab, ['ageing', 'stock'], true) ? today()->toDateString() : $from->toDateString() . '-to-' . $to->toDateString();

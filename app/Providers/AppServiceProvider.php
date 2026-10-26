@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
         if (class_exists(\Laravel\Sanctum\SanctumServiceProvider::class)) {
             $this->app->register(\Laravel\Sanctum\SanctumServiceProvider::class);
         }
+
+        // Which hotel this request works in (multi-hotel); one per request.
+        $this->app->scoped(\App\Support\Tenancy\CurrentHotel::class);
+        // Form checks (exists:, unique:) look at the current hotel's rows only.
+        $this->app->extend('validation.presence', fn ($v, $app) => new \App\Support\Tenancy\HotelPresenceVerifier($app['db']));
     }
 
     public function boot(): void

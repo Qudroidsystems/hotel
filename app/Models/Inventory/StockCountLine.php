@@ -2,11 +2,14 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockCountLine extends Model
 {
+    use BelongsToHotel;
+
     public $timestamps = false;
 
     protected $fillable = ['stock_count_id', 'item_id', 'expected_quantity', 'counted_quantity', 'unit_cost'];

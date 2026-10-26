@@ -2,11 +2,14 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockReceiptLine extends Model
 {
+    use BelongsToHotel;
+
     public $timestamps = false;
 
     protected $fillable = ['stock_receipt_id', 'item_id', 'purchase_order_line_id', 'quantity', 'unit_cost', 'rejected_quantity', 'reject_reason'];

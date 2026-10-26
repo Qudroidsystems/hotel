@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /** A company with an account at the hotel (city ledger): its staff's stays and its events are billed to it. */
 class Company extends Model
 {
+    use BelongsToHotel;
+
     protected $attributes = ['credit_limit' => 0, 'payment_terms_days' => 30, 'is_active' => true];
 
     protected $fillable = [

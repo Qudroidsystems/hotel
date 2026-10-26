@@ -2,6 +2,7 @@
 
 namespace App\Models\Loyalty;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\FolioCharge;
 use App\Models\Guest;
 use App\Models\Reservation;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** One line of a guest's points history. Lines are never changed: a correction is a new line. */
 class LoyaltyEntry extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'earn'   => ['Earned', 'st-success', 'ri-star-line'],
         'redeem' => ['Spent', 'st-info', 'ri-gift-line'],

@@ -2,6 +2,7 @@
 
 namespace App\Models\Pos;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\PaymentMethod;
 use App\Models\Folio;
 use App\Models\FolioCharge;
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class PosOrder extends Model
 {
+    use BelongsToHotel;
+
     public const PAID = 'paid';            // settled at the till (cash, card, transfer…)
     public const CHARGED = 'charged';      // added to a guest's bill
     public const ATTENTION = 'attention';  // the server couldn't settle it as sent — a supervisor must sort it out

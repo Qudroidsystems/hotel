@@ -2,12 +2,15 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 class StaffRota extends Model
 {
+    use BelongsToHotel;
+
     protected $table = 'staff_rota';
 
     protected $fillable = ['user_id', 'work_date', 'shift_id', 'note', 'created_by'];

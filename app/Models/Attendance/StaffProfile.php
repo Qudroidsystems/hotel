@@ -2,6 +2,7 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Support\Str;
 
 class StaffProfile extends Model
 {
+    use BelongsToHotel;
+
     public const DAYS = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
 
     /** What a badge QR code says: a prefix plus the random token. */
@@ -44,17 +47,18 @@ class StaffProfile extends Model
     {
         do {
             $t = Str::random(40);
-        } while (static::where('badge_token', $t)->exists());
+        } while (static::withoutGlobalScope('hotel')->where('badge_token', $t)->exists());
 
         return $t;
     }
 
     public static function nextStaffNo(): string
     {
-        $n = (int) static::max('id') + 1;
+        // Staff numbers are unique across all the group's hotels.
+        $n = (int) static::withoutGlobalScope('hotel')->max('id') + 1;
         do {
             $no = 'STF-' . str_pad((string) $n++, 4, '0', STR_PAD_LEFT);
-        } while (static::where('staff_no', $no)->exists());
+        } while (static::withoutGlobalScope('hotel')->where('staff_no', $no)->exists());
 
         return $no;
     }

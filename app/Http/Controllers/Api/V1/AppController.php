@@ -38,6 +38,9 @@ class AppController extends ApiController
             'currency_symbol' => config('hotel.currency_symbol'),
             'timezone'      => config('app.timezone'),
             'modules'       => [],
+            // Several hotels: the guest app lets guests choose one (GET /guest/hotels).
+            'multi_hotel'   => \App\Support\Tenancy\CurrentHotel::multi(),
+            'group_name'    => \App\Support\Tenancy\CurrentHotel::multi() ? (config('hotel.group_name') ?: config('app.name')) : null,
         ]);
     }
 
@@ -74,6 +77,9 @@ class AppController extends ApiController
     {
         abort_unless($request->user()->canAny(['View reservations', 'Check in guests']), 403);
         $desk = $this->app->frontDesk();
+        foreach ($desk as $list) {
+            $list->loadMissing(['folio', 'company']);
+        }
         $row = fn ($r) => [
             'id'        => $r->id,
             'reference' => $r->reference,
@@ -87,6 +93,10 @@ class AppController extends ApiController
             'status_label' => $r->status instanceof \BackedEnum && method_exists($r->status, 'label') ? $r->status->label() : ucfirst(str_replace('_', ' ', (string) ($r->status instanceof \BackedEnum ? $r->status->value : $r->status))),
             'arrival_time' => $r->expected_arrival_time,
             'url'       => route('reservations.show', $r),
+            // For billing at departure: what is owed and whose account it may go to.
+            'folio_id'  => $r->folio?->id,
+            'balance'   => $r->folio ? round($r->folio->balance(), 2) : 0,
+            'company'   => $r->company ? ['id' => $r->company->id, 'name' => $r->company->name] : null,
         ];
 
         return $this->ok([

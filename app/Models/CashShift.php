@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Pos\PosOutlet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One cashier's drawer from opening float to cash count (see CashShiftService). */
 class CashShift extends Model
 {
+    use BelongsToHotel;
+
     public const OPEN = 'open';
     public const CLOSED = 'closed';
     public const REVIEWED = 'reviewed';

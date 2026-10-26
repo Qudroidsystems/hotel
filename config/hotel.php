@@ -12,6 +12,11 @@
 
 return [
     'name'       => env('HOTEL_NAME', env('APP_NAME', 'B Luxury')),
+
+    // One hotel, or a group of hotels run from this system (Settings → Hotels).
+    'multi_hotel' => (bool) env('HOTEL_MULTI', false),
+    'group_name'  => env('HOTEL_GROUP_NAME'),   // the group booking site's name
+    'commission_percent' => 0,                  // the group's usual commission on group-site bookings
     'tagline'    => env('HOTEL_TAGLINE', 'Hotel Management & Security Platform'),
     'logo'       => env('HOTEL_LOGO', 'theme/layouts/assets/images/logo-dark.png'),
     'logo_light' => env('HOTEL_LOGO_LIGHT', 'theme/layouts/assets/images/logo-light.png'),
@@ -220,6 +225,14 @@ return [
         'auto_close_at' => '05:00',
         'auto_no_shows' => true,
         'report_emails' => [],
+    ],
+
+    // Room calendars (iCal) for Airbnb, Vrbo and similar sites.
+    'channels' => [
+        'ical' => [
+            'enabled'       => true,
+            'every_minutes' => 15,
+        ],
     ],
 
     'audit' => [

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\BookingSource;
 use App\Enums\ReservationStatus;
 use Carbon\CarbonPeriod;
@@ -13,11 +14,14 @@ use Illuminate\Support\Str;
 
 class Reservation extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = [
         'reference', 'qr_token', 'guest_id', 'status', 'source', 'check_in_date', 'check_out_date',
         'adults', 'children', 'expected_arrival_time', 'room_total', 'discount_amount', 'discount_reason',
         'total_amount', 'special_requests', 'notes', 'cancel_reason', 'created_by',
         'rate_plan_id', 'rate_plan_name', 'promo_code', 'company_id',
+        'channel', 'channel_reference', 'channel_booking_id', 'via_group', 'commission_percent',
     ];
 
     protected $casts = [
@@ -33,7 +37,21 @@ class Reservation extends Model
         'checked_out_at'  => 'datetime',
         'cancelled_at'    => 'datetime',
         'hold_expires_at' => 'datetime',
+        'via_group'       => 'boolean',
+        'commission_percent' => 'decimal:2',
+        'commission_amount'  => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        // Group-site bookings: commission follows the booking's total, and nothing is owed on a stay that didn't happen.
+        static::saving(function (self $r) {
+            if ($r->via_group && $r->commission_percent !== null) {
+                $lost = in_array($r->status, [ReservationStatus::Cancelled, ReservationStatus::NoShow], true);
+                $r->commission_amount = $lost ? 0 : round((float) $r->total_amount * (float) $r->commission_percent / 100, 2);
+            }
+        });
+    }
 
     // Store stay dates as plain Y-m-d so date comparisons behave the same on MySQL and SQLite.
     public function setCheckInDateAttribute($value): void
@@ -201,7 +219,7 @@ class Reservation extends Model
             for ($i = 0; $i < 6; $i++) {
                 $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
             }
-        } while (self::where('reference', $code)->exists());
+        } while (self::withoutGlobalScope('hotel')->where('reference', $code)->exists());
 
         return $code;
     }
@@ -212,7 +230,7 @@ class Reservation extends Model
     {
         do {
             $token = \Illuminate\Support\Str::random(48);
-        } while (static::where('guest_token', $token)->exists());
+        } while (static::withoutGlobalScope('hotel')->where('guest_token', $token)->exists());
 
         return $token;
     }
@@ -221,7 +239,7 @@ class Reservation extends Model
     {
         do {
             $token = Str::random(48);
-        } while (self::where('qr_token', $token)->exists());
+        } while (self::withoutGlobalScope('hotel')->where('qr_token', $token)->exists());
 
         return $token;
     }

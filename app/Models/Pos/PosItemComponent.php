@@ -2,6 +2,7 @@
 
 namespace App\Models\Pos;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Inventory\StockItem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Recipe line: one POS item uses this much of a stock item. */
 class PosItemComponent extends Model
 {
+    use BelongsToHotel;
+
     public $timestamps = false;
 
     protected $fillable = ['pos_item_id', 'stock_item_id', 'quantity'];

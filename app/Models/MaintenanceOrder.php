@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Storage;
 /** A fault / work order (see MaintenanceService). */
 class MaintenanceOrder extends Model
 {
+    use BelongsToHotel;
+
     public const OPEN = 'open';
     public const IN_PROGRESS = 'in_progress';
     public const ON_HOLD = 'on_hold';

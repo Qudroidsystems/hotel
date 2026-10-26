@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Support\Money;
 use App\Enums\ChargeType;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,8 @@ use Illuminate\Support\Carbon;
 
 class FolioCharge extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = [
         'folio_id', 'idempotency_key', 'type', 'description', 'quantity', 'unit_price', 'amount', 'tax_amount', 'tax_breakdown',
         'tax_inclusive', 'total', 'service_date', 'reservation_room_id', 'source_type', 'source_id', 'posted_by',

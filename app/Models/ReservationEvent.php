@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReservationEvent extends Model
 {
+    use BelongsToHotel;
+
     public const UPDATED_AT = null;
 
     protected $fillable = ['reservation_id', 'event', 'description', 'user_id'];

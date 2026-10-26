@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A department asking for stock to be bought (purchase requisition). */
 class PurchaseRequest extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'submitted' => ['Awaiting approval', 'st-warning'],
         'approved'  => ['Approved', 'st-info'],

@@ -24,7 +24,7 @@
 <div class="page-content">
 <div class="container-fluid">
 
-    <x-cb.hero title="Hotel Settings" icon="ri-settings-4-line" subtitle="Change how the system works for this hotel. Values you have not changed use the installation defaults.">
+    <x-cb.hero title="Hotel Settings" icon="ri-settings-4-line" :subtitle="(\App\Support\Tenancy\CurrentHotel::multi() ? 'Settings for ' . config('hotel.name') . ' only (switch hotel from the top bar). ' : 'Change how the system works for this hotel. ') . 'Values you have not changed use the installation defaults.'">
         <x-slot:actions>
             <a class="cb-hero-btn" href="{{ route('settings.bank-accounts.index') }}"><i class="ri-bank-line"></i> Bank accounts</a>
             @can('View audit log')<a class="cb-hero-btn" href="{{ route('audit.index', ['module' => 'settings']) }}"><i class="ri-history-line"></i> Change history</a>@endcan

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReservationRoom extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['reservation_id', 'room_type_id', 'room_id', 'adults', 'children', 'nightly_rates', 'amount'];
 
     protected $casts = [

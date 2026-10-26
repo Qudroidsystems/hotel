@@ -2,11 +2,14 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class Shift extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['name', 'code', 'start_time', 'end_time', 'grace_minutes', 'early_grace_minutes', 'break_minutes', 'color', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];

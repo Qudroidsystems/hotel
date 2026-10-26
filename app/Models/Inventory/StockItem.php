@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Pos\PosItemComponent;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockItem extends Model
 {
+    use BelongsToHotel;
+
     public const UNITS = ['pcs', 'bottle', 'can', 'crate', 'carton', 'pack', 'kg', 'g', 'litre', 'ml', 'tot', 'roll', 'bar', 'set'];
 
     protected $fillable = ['category_id', 'name', 'sku', 'unit', 'reorder_level', 'reorder_qty', 'preferred_supplier_id', 'notes', 'is_active'];

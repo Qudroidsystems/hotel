@@ -2,6 +2,7 @@
 
 namespace App\Models\It;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Planned maintenance, announced to staff; alerts for the listed monitors are held while it runs (spec §11.4). */
 class ItMaintenanceWindow extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['title', 'description', 'starts_at', 'ends_at', 'affects', 'monitor_ids', 'created_by'];
 
     protected $casts = ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'cancelled_at' => 'datetime', 'monitor_ids' => 'array'];

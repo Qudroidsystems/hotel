@@ -2,6 +2,7 @@
 
 namespace App\Models\Events;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Company;
 use App\Models\CompanyLedgerEntry;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 /** A booking of a hall: from the first enquiry, to the day, to settling the bill. */
 class Event extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'meeting' => 'Meeting', 'conference' => 'Conference / seminar', 'training' => 'Training',
         'wedding' => 'Wedding / reception', 'birthday' => 'Birthday / party', 'burial' => 'Funeral reception',

@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Support\Tenancy;
+
+/** Tables whose rows belong to one hotel (kept in step with the 2026_11_13 migration). */
+final class HotelTables
+{
+    public const LIST = [
+        'attendance_days', 'attendance_points', 'attendance_punches', 'audit_logs', 'buildings', 'cash_shift_movements', 'cash_shifts',
+        'channel_bookings', 'channel_sync_logs', 'companies', 'company_ledger_entries', 'departments', 'event_items', 'event_packages',
+        'event_payments', 'events', 'expense_categories', 'expenses', 'floors', 'folio_charges', 'folios', 'guest_messages', 'guest_requests',
+        'guests', 'halls', 'hotel_bank_accounts', 'housekeeping_tasks', 'ical_feeds', 'incident_updates', 'incidents', 'it_alerts', 'it_assets',
+        'it_checks', 'it_maintenance_windows', 'it_monitors', 'it_ticket_updates', 'it_tickets', 'lost_items', 'loyalty_entries',
+        'maintenance_orders', 'night_audits', 'online_payments', 'payments', 'pos_categories', 'pos_item_components', 'pos_items',
+        'pos_order_items', 'pos_orders', 'pos_outlets', 'purchase_order_lines', 'purchase_orders', 'purchase_request_lines',
+        'purchase_requests', 'rate_days', 'rate_plans', 'rate_seasons', 'reservation_events', 'reservation_rooms', 'reservations',
+        'room_status_logs', 'room_type_photos', 'room_types', 'rooms', 'shifts', 'staff_leaves', 'staff_profiles', 'staff_rota',
+        'stock_categories', 'stock_count_lines', 'stock_counts', 'stock_items', 'stock_levels', 'stock_locations', 'stock_movements',
+        'stock_receipt_lines', 'stock_receipts', 'stock_transfer_lines', 'stock_transfers', 'supplier_invoices', 'supplier_payments',
+        'suppliers', 'visitors',
+    ];
+}

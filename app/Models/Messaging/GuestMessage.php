@@ -2,6 +2,7 @@
 
 namespace App\Models\Messaging;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Guest;
 use App\Models\Reservation;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** One SMS / WhatsApp message to or from a guest. */
 class GuestMessage extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'sent'      => ['Sent', 'st-info'],
         'delivered' => ['Delivered', 'st-success'],

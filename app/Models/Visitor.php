@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** One visit: signed in at the gate / front desk, signed out when leaving. */
 class Visitor extends Model
 {
+    use BelongsToHotel;
+
     public const PURPOSES = [
         'guest_visit' => 'Visiting a guest',
         'meeting'     => 'Meeting / appointment',

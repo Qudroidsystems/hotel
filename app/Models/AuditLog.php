@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,8 @@ use LogicException;
  */
 class AuditLog extends Model
 {
+    use BelongsToHotel;
+
     public const UPDATED_AT = null;
 
     /** module => [label, icon] for filters and badges. */

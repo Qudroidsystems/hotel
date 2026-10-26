@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class RoomType extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = [
         'name', 'code', 'description', 'base_rate', 'weekend_rate',
         'max_adults', 'max_children', 'bed_type', 'size_sqm',

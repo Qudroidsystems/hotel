@@ -126,4 +126,45 @@ class User extends Authenticatable
     {
         return $this->hasOne(\App\Models\Attendance\StaffProfile::class);
     }
+
+    // ── Hotels (multi-hotel) ──────────────────────────────────────────
+
+    protected static function booted(): void
+    {
+        // A new member of staff works at the hotel they were added in.
+        static::created(function (self $user) {
+            if ($id = \App\Support\Tenancy\CurrentHotel::get()->id()) {
+                $user->hotels()->syncWithoutDetaching([$id]);
+            }
+        });
+    }
+
+    public function hotels(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Hotel::class);
+    }
+
+    /** Sees every hotel: the Super Admin and anyone with "Access all hotels" (owners, group managers). */
+    public function seesAllHotels(): bool
+    {
+        return $this->hasRole('Super Admin') || $this->checkPermissionTo('Access all hotels');
+    }
+
+    /** Hotels this person can work in, in order. */
+    public function accessibleHotels(): \Illuminate\Support\Collection
+    {
+        $q = \App\Models\Hotel::active()->ordered();
+        try {
+            $all = $this->seesAllHotels();
+        } catch (\Throwable) {
+            $all = false;   // permission not set up yet
+        }
+
+        return $all ? $q->get() : $q->whereHas('users', fn ($u) => $u->where('users.id', $this->id))->get();
+    }
+
+    public function canWorkAt(int $hotelId): bool
+    {
+        return $this->accessibleHotels()->contains('id', $hotelId);
+    }
 }

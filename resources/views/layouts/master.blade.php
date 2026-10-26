@@ -527,7 +527,7 @@
                     @canany(['View rooms', 'Manage room types', 'Manage buildings', 'View reservations', 'View guests', 'View folios', 'Receive payments', 'View finance reports', 'Use POS', 'View POS reports', 'Manage POS menu', 'Manage hotel settings', 'View stock', 'View attendance', 'Manage staff & shifts', 'Run attendance kiosk', 'View audit log', 'View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Report maintenance issues', 'Manage maintenance', 'View visitors', 'Manage visitors', 'View incidents', 'Report incidents', 'Manage incidents', 'Manage lost & found', 'Request purchases', 'Approve purchases', 'Manage supplier invoices', 'Pay suppliers'])
                         <li class="menu-title"><i class="ri-more-fill"></i> <span>HOTEL OPERATIONS</span></li>
                     @endcanany
-                    @canany(['View reservations', 'View guests', 'View company accounts', 'View events', 'Manage events', 'Run night audit', 'View night audit reports', 'Manage rates'])
+                    @canany(['View reservations', 'View guests', 'View company accounts', 'View events', 'Manage events', 'Run night audit', 'View night audit reports', 'Manage rates', 'View room calendars', 'Manage room calendars'])
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarFrontDesk" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarFrontDesk">
                                 <i class="ph-calendar-check"></i> <span>Front Desk</span>
@@ -560,6 +560,9 @@
                                     @can('Manage rates')
                                         <li class="nav-item"><a href="{{ route('rates.index') }}" class="nav-link">Rates &amp; Seasons</a></li>
                                     @endcan
+                                    @canany(['View room calendars', 'Manage room calendars'])
+                                        <li class="nav-item"><a href="{{ route('channels.index') }}" class="nav-link">Room Calendars</a></li>
+                                    @endcanany
                                 </ul>
                             </div>
                         </li>
@@ -798,6 +801,7 @@
                             <div class="collapse menu-dropdown" id="sidebarSettings">
                                 <ul class="nav nav-sm flex-column">
                                     <li class="nav-item"><a href="{{ route('settings.hotel.index') }}" class="nav-link">Hotel Settings</a></li>
+                                    @can('Manage hotels')<li class="nav-item"><a href="{{ route('settings.hotels.index') }}" class="nav-link">Hotels</a></li>@endcan
                                     <li class="nav-item"><a href="{{ route('settings.bank-accounts.index') }}" class="nav-link">Bank Accounts</a></li>
                                 </ul>
                             </div>
@@ -874,6 +878,27 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-1">
+                    <!-- Hotel switcher (multi-hotel) -->
+                    @if (\App\Support\Tenancy\CurrentHotel::multi() && auth()->check())
+                        @php $myHotels = auth()->user()->accessibleHotels(); $hereHotel = \App\Support\Tenancy\CurrentHotel::get()->hotel(); @endphp
+                        <div class="dropdown header-item">
+                            <button type="button" class="btn btn-sm btn-light d-flex align-items-center gap-2 px-3" data-bs-toggle="dropdown" aria-expanded="false" title="The hotel you are working in" @disabled($myHotels->count() < 2)>
+                                <i class="ri-hotel-line"></i><span class="d-none d-sm-inline fw-semibold text-truncate" style="max-width:180px">{{ $hereHotel?->name }}</span>@if ($myHotels->count() > 1)<i class="ri-arrow-down-s-line"></i>@endif
+                            </button>
+                            @if ($myHotels->count() > 1)
+                                <div class="dropdown-menu dropdown-menu-end p-1" style="min-width:240px">
+                                    @if (auth()->user()->seesAllHotels())<a class="dropdown-item rounded-2" href="{{ route('group.index') }}"><i class="ri-community-line me-1"></i> Group overview</a><a class="dropdown-item rounded-2" href="{{ route('group.commission') }}"><i class="ri-percent-line me-1"></i> Commission</a><a class="dropdown-item rounded-2" href="{{ route('group.reports') }}"><i class="ri-bar-chart-grouped-line me-1"></i> Group reports</a><div class="dropdown-divider"></div>@endif
+                                    <div class="px-3 py-2 small text-muted">Work in</div>
+                                    @foreach ($myHotels as $h)
+                                        <form method="POST" action="{{ route('hotels.switch') }}">@csrf<input type="hidden" name="hotel_id" value="{{ $h->id }}">
+                                            <button class="dropdown-item d-flex justify-content-between align-items-center rounded-2 {{ $h->id === $hereHotel?->id ? 'active' : '' }}"><span>{{ $h->name }}@if ($h->location)<small class="d-block text-muted">{{ $h->location }}</small>@endif</span>@if ($h->id === $hereHotel?->id)<i class="ri-check-line"></i>@endif</button>
+                                        </form>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     <!-- Notifications bell -->
 
                     <!-- Theme Toggle -->
@@ -1446,6 +1471,7 @@
         @can('Manage rates'){title:'Rates & Seasons',                       url:'{{ route("rates.index") }}',                                icon:'mdi-tag-multiple-outline',    category:'Front Desk',          keywords:['rates','prices','season','promo','discount','rate plan','calendar','peak']},@endcan
         @can('View company accounts'){title:'Company Accounts',             url:'{{ route("companies.index") }}',                            icon:'mdi-domain',                  category:'Front Desk',          keywords:['company','corporate','city ledger','account','statement','invoice','credit']},@endcan
         @canany(['View events', 'Manage events']){title:'Events & Halls',   url:'{{ route("events.index") }}',                               icon:'mdi-party-popper',            category:'Front Desk',          keywords:['event','hall','conference','wedding','banquet','meeting']},@endcanany
+        @canany(['View room calendars', 'Manage room calendars']){title:'Room Calendars', url:'{{ route("channels.index") }}',           icon:'mdi-calendar-sync',           category:'Front Desk',          keywords:['room calendars','airbnb','vrbo','ical','calendar sync']},@endcanany
         @canany(['Run night audit', 'View night audit reports']){title:'Night Audit', url:'{{ route("night-audit.index") }}',                 icon:'mdi-weather-night',           category:'Front Desk',          keywords:['night audit','close day','end of day','daily report','business date']},@endcanany
         {title:'Guest Messages',                        url:'{{ route("messages.index") }}',                             icon:'mdi-message-text-outline',    category:'Front Desk',          keywords:['sms','whatsapp','text','message','reply','guest']},
         {title:'Guest Requests',                        url:'{{ route("guest-requests.index") }}',                       icon:'mdi-bell-ring-outline',       category:'Front Desk',          keywords:['guest','request','towels','room service','complaint']},

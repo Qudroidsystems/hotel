@@ -205,6 +205,14 @@ class HotelSettings
                     'night_audit.report_emails'  => ['type' => 'email_list', 'label' => 'Email the daily report to', 'help' => 'One address per line: the owner, the GM, the accountant…', 'max_items' => 10],
                 ],
             ],
+            'channels' => [
+                'title' => 'Room Calendars', 'icon' => 'ri-calendar-2-line',
+                'intro' => 'iCal calendars for rooms you also list on Airbnb, Vrbo and similar sites. Add them under Front Desk → Room Calendars.',
+                'fields' => [
+                    'channels.ical.enabled'       => ['type' => 'bool', 'label' => 'Read the sites\' calendars and book in their bookings'],
+                    'channels.ical.every_minutes' => ['type' => 'int', 'label' => 'Read each calendar every (minutes)', 'min' => 5, 'max' => 240],
+                ],
+            ],
             'sms_accounts' => [
                 'title' => 'SMS & WhatsApp Accounts', 'icon' => 'ri-chat-settings-line',
                 'intro' => 'The Twilio or Termii account guest messages are sent from (choose which one under Guest Messages). Keys are stored encrypted and never shown again; leave a key empty to keep the one saved.',
@@ -347,15 +355,47 @@ class HotelSettings
         return str_replace('.', '__', $key);
     }
 
-    /** Saved values: key => value. Cached until a setting changes. */
-    public static function stored(): array
+    /**
+     * Saved values for a hotel (default: the current one): key => value. Rows with no hotel are the group's
+     * own (shared) settings; a hotel's own rows win. Cached until a setting changes.
+     */
+    public static function stored(?int $hotelId = null): array
     {
-        return Cache::rememberForever(self::CACHE_KEY, fn () => HotelSetting::pluck('value', 'key')->all());
+        $hotelId ??= \App\Support\Tenancy\CurrentHotel::get()->id();
+
+        return Cache::rememberForever(self::CACHE_KEY . ':' . ($hotelId ?? 0), function () use ($hotelId) {
+            $rows = HotelSetting::withoutGlobalScope('hotel')
+                ->where(fn ($q) => $q->whereNull('hotel_id')->when($hotelId, fn ($w) => $w->orWhere('hotel_id', $hotelId)))
+                ->get(['hotel_id', 'key', 'value']);
+
+            return $rows->sortBy(fn ($r) => $r->hotel_id === null ? 0 : 1)->pluck('value', 'key')->all();
+        });
+    }
+
+    /** Group-wide saved values (no hotel): the hotel mode and the group booking site. */
+    public static function group(): array
+    {
+        return Cache::rememberForever(self::CACHE_KEY . ':group', fn () => HotelSetting::withoutGlobalScope('hotel')->whereNull('hotel_id')->pluck('value', 'key')->all());
     }
 
     public static function forget(): void
     {
+        foreach (\App\Models\Hotel::pluck('id')->push(0) as $id) {
+            Cache::forget(self::CACHE_KEY . ':' . $id);
+        }
+        Cache::forget(self::CACHE_KEY . ':group');
         Cache::forget(self::CACHE_KEY);
+    }
+
+    /** Save a group-wide (shared) setting. */
+    public static function putGroup(string $key, mixed $value, ?int $by = null): void
+    {
+        $row = HotelSetting::withoutGlobalScope('hotel')->whereNull('hotel_id')->where('key', $key)->first()
+            ?? new HotelSetting(['key' => $key]);
+        $row->hotel_id = null;
+        $row->fill(['value' => $value, 'updated_by' => $by]);
+        \App\Support\Tenancy\CurrentHotel::get()->across(fn () => $row->save());   // not given the current hotel
+        self::forget();
     }
 
     /** The config/.env value for a setting, ignoring anything saved. */
@@ -381,10 +421,17 @@ class HotelSettings
      */
     public static function apply(): void
     {
+        self::applyFor(null);
+    }
+
+    /** Lay a hotel's saved values over config (after the hotel for a request is known). */
+    public static function applyFor(?int $hotelId): void
+    {
         self::$defaults ??= config('hotel', []);
 
         try {
-            $stored = self::stored();
+            $stored = self::stored($hotelId);
+            $group = self::group();
         } catch (Throwable $e) {
             if (! app()->runningInConsole()) {
                 Log::warning('Hotel settings not loaded, using config defaults: ' . $e->getMessage());
@@ -397,8 +444,11 @@ class HotelSettings
         $fields = self::fields();
         $outside = [];
         foreach ($fields as $key => $field) {
-            if (isset($field['config']) && ! array_key_exists($key, self::$outside)) {
-                self::$outside[$key] = config($field['config']);
+            if (isset($field['config'])) {
+                if (! array_key_exists($key, self::$outside)) {
+                    self::$outside[$key] = config($field['config']);
+                }
+                $outside[$field['config']] = self::$outside[$key];   // start from .env, not another hotel's value
             }
         }
         foreach ($stored as $key => $value) {
@@ -419,6 +469,23 @@ class HotelSettings
             }
         }
         $config['taxes'] = self::taxes($config['tax_rates'] ?? []);
+        // Group-wide: single or multi-hotel.
+        if (array_key_exists('multi_hotel', $group)) {
+            $config['multi_hotel'] = (bool) $group['multi_hotel'];
+        }
+        if (! empty($group['group_name'])) {
+            $config['group_name'] = (string) $group['group_name'];
+        }
+        if (array_key_exists('commission_percent', $group)) {
+            $config['commission_percent'] = (float) $group['commission_percent'];
+        }
+        // The hotel's own name and contact details come from its hotel record when set there.
+        try {
+            if ($hotelId && ! array_key_exists('name', $stored) && ($hotel = \App\Models\Hotel::find($hotelId))) {
+                $config['name'] = $hotel->name;
+            }
+        } catch (Throwable) {
+        }
 
         config(['hotel' => $config] + $outside);
     }

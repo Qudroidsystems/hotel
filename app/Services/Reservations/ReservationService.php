@@ -31,7 +31,9 @@ class ReservationService
 
     /**
      * @param  array  $data  check_in_date, check_out_date, adults, children, source, status,
-     *                       expected_arrival_time, special_requests, notes, rate_plan_id, promo_code, company_id
+     *                       expected_arrival_time, special_requests, notes, rate_plan_id, promo_code, company_id,
+     *                       channel, channel_reference, channel_booking_id; from_channel => true for a booking a
+     *                       channel already sold (taken even when it overbooks, past arrival allowed, plan rules skipped)
      * @param  array  $lines [['room_type_id' => 1, 'room_id' => null|5, 'adults' => 2, 'children' => 0], …]
      */
     public function create(Guest $guest, array $data, array $lines): Reservation
@@ -42,7 +44,8 @@ class ReservationService
         if ($out->lte($in)) {
             throw new BookingException('Check-out must be after check-in.');
         }
-        if ($in->lt(today())) {
+        $fromChannel = ! empty($data['from_channel']);
+        if ($in->lt(today()) && ! $fromChannel) {
             throw new BookingException('Check-in date cannot be in the past.');
         }
         if (empty($lines)) {
@@ -56,7 +59,7 @@ class ReservationService
         }
         $channel = ($data['source'] ?? null) === BookingSource::Website->value ? RateService::ONLINE : RateService::FRONT_DESK;
 
-        return DB::transaction(function () use ($guest, $data, $lines, $in, $out, $plan, $channel) {
+        return DB::transaction(function () use ($guest, $data, $lines, $in, $out, $plan, $channel, $fromChannel) {
             // Serialise bookings for the same room types so two clerks can't sell the last room twice.
             $typeIds = collect($lines)->pluck('room_type_id')->unique()->all();
             $types = RoomType::whereIn('id', $typeIds)->lockForUpdate()->get()->keyBy('id');
@@ -69,14 +72,14 @@ class ReservationService
             foreach ($byType as $typeId => $group) {
                 $type = $types[$typeId] ?? throw new BookingException('Unknown room type.');
                 $available = $this->availability->availableForType($type->id, $in, $out);
-                if ($group->count() > $available) {
+                if ($group->count() > $available && ! $fromChannel) {
                     throw new BookingException("Only {$available} {$type->name} room(s) left for these dates.");
                 }
             }
 
             $this->assertRoomsFree($lines, $in, $out);
 
-            if ($plan) {
+            if ($plan && ! $fromChannel) {
                 foreach ($types->only(collect($lines)->pluck('room_type_id')->unique()->all()) as $type) {
                     app(RateService::class)->check($plan, $type, $in, $out, $channel, $data['promo_code'] ?? null, $data['company_id'] ?? null);
                 }
@@ -101,6 +104,9 @@ class ReservationService
                 'rate_plan_name'        => $plan?->name,
                 'promo_code'            => $plan?->promo_code ? strtoupper($plan->promo_code) : null,
                 'company_id'            => $data['company_id'] ?? null,
+                'channel'               => $data['channel'] ?? null,
+                'channel_reference'     => $data['channel_reference'] ?? null,
+                'channel_booking_id'    => $data['channel_booking_id'] ?? null,
                 'created_by'            => auth()->id(),
             ]);
             if ($status === ReservationStatus::Confirmed) {

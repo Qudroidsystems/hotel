@@ -2,6 +2,7 @@
 
 namespace App\Models\Finance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\CashShift;
 use App\Models\HotelBankAccount;
 use App\Models\Inventory\Supplier;
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Expense extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'pending'  => ['Waiting for approval', 'st-warning'],
         'approved' => ['Approved, not paid', 'st-info'],

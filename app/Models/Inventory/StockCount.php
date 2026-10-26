@@ -2,6 +2,7 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A stocktake of one store. */
 class StockCount extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['location_id', 'category_id', 'status', 'notes', 'started_by'];
 
     protected $casts = ['posted_at' => 'datetime', 'variance_value' => 'decimal:2'];

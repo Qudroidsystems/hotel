@@ -2,11 +2,14 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockLevel extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['item_id', 'location_id', 'quantity'];
 
     protected $casts = ['quantity' => 'decimal:3'];

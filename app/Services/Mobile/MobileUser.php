@@ -15,6 +15,10 @@ class MobileUser
         'rooms'      => ['View rooms', 'Manage housekeeping', 'Check in guests'],
         'report'     => ['Report maintenance issues', 'Manage maintenance'],
         'today'      => ['View management reports', 'View finance reports', 'Manage hotel settings', 'Check in guests', 'Manage housekeeping'],
+        'night_audit' => ['Run night audit', 'View night audit reports'],
+        'events'     => ['View events', 'Manage events'],
+        'bill_company' => ['Bill to company'],
+        'group'      => ['Access all hotels'],   // several hotels only
     ];
 
     public static function toArray(User $user): array
@@ -39,11 +43,18 @@ class MobileUser
             'modules'              => self::features($user),
             'must_change_password' => (bool) $user->must_change_password,
             'business_unit'        => ['name' => config('hotel.name')],
+            // Multi-hotel: the hotels this person works at; the app sends the chosen one as the X-Hotel header.
+            'multi_hotel'          => \App\Support\Tenancy\CurrentHotel::multi(),
+            'hotel'                => ($h = \App\Support\Tenancy\CurrentHotel::get()->hotel()) ? ['id' => $h->id, 'name' => $h->name, 'city' => $h->city] : null,
+            'hotels'               => \App\Support\Tenancy\CurrentHotel::multi()
+                ? $user->accessibleHotels()->map(fn ($h) => ['id' => $h->id, 'name' => $h->name, 'city' => $h->city])->values()
+                : [],
         ];
     }
 
     public static function features(User $user): array
     {
-        return collect(self::FEATURES)->filter(fn ($perms) => $user->canAny($perms))->keys()->values()->all();
+        return collect(self::FEATURES)->filter(fn ($perms) => $user->canAny($perms))->keys()
+            ->reject(fn ($k) => $k === 'group' && ! \App\Support\Tenancy\CurrentHotel::multi())->values()->all();
     }
 }

@@ -2,12 +2,15 @@
 
 namespace App\Models\It;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** A piece of IT equipment: router, switch, access point, server… (spec §11.1 device inventory). */
 class ItAsset extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'router'       => ['Router', 'ri-router-line'],
         'switch'       => ['Network switch', 'ri-git-merge-line'],

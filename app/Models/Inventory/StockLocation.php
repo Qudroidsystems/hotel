@@ -2,12 +2,15 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\Pos\PosOutlet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockLocation extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = ['store' => 'Main store', 'bar' => 'Bar', 'kitchen' => 'Kitchen', 'housekeeping' => 'Housekeeping', 'other' => 'Other'];
 
     protected $fillable = ['name', 'code', 'type', 'is_active', 'sort_order'];

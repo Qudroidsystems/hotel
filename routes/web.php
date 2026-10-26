@@ -88,6 +88,9 @@ Route::get('/refresh-csrf', function () {
 
 // ── Public: online booking and the guest's own booking page (spec §4, §5) ──
 Route::middleware('throttle:booking-pages')->group(function () {
+    // Group booking site (multi-hotel): every hotel, searched together
+    Route::get('/hotels', [\App\Http\Controllers\Booking\MarketplaceController::class, 'index'])->name('hotels.public');
+    Route::get('/hotels/{hotelSlug}', [\App\Http\Controllers\Booking\MarketplaceController::class, 'show'])->where('hotelSlug', '[a-z0-9-]+')->name('hotels.public.show');
     Route::get('/book', [BookingController::class, 'index'])->name('book.index');
     Route::get('/book/search', [BookingController::class, 'search'])->name('book.search');
     Route::get('/book/details', [BookingController::class, 'details'])->name('book.details');
@@ -105,6 +108,9 @@ Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middlew
 // Twilio: delivery reports and guests' replies to texts (checked by signature).
 Route::post('/twilio/status', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'status'])->middleware('throttle:twilio-webhook')->name('twilio.status');
 Route::post('/twilio/inbound', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'inbound'])->middleware('throttle:twilio-webhook')->name('twilio.inbound');
+// Room calendars, public: each room's calendar for Airbnb, Vrbo ...
+Route::get('/ical/{token}.ics', [\App\Http\Controllers\Channels\ChannelController::class, 'export'])->middleware('throttle:60,1')->name('channels.ical.export');
+
 // Termii: delivery reports and replies (Termii dashboard → Webhook URL: https://<your site>/termii/events).
 Route::post('/termii/events', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'termii'])->middleware('throttle:twilio-webhook')->name('termii.events');
 
@@ -460,6 +466,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/{audit}', 'show')->name('show');
     });
 
+    // Room calendars (iCal) for Airbnb, Vrbo and similar sites
+    Route::prefix('channels')->name('channels.')->controller(\App\Http\Controllers\Channels\ChannelController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/pull', 'pull')->middleware('throttle:10,1')->name('pull');
+        Route::post('/calendars', 'storeFeed')->name('ical.store');
+        Route::put('/calendars/{feed}', 'updateFeed')->name('ical.update');
+        Route::delete('/calendars/{feed}', 'destroyFeed')->name('ical.destroy');
+        Route::post('/calendars/{feed}/sync', 'syncFeed')->middleware('throttle:10,1')->name('ical.sync');
+    });
+
     // Events & halls
     Route::prefix('events')->name('events.')->group(function () {
         Route::controller(\App\Http\Controllers\Events\HallController::class)->group(function () {
@@ -541,11 +557,26 @@ Route::middleware('auth')->group(function () {
         Route::post('/tickets/{ticket}/triage', [ItTicketController::class, 'triage'])->name('tickets.triage');
     });
 
+    // Group overview (multi-hotel)
+    Route::get('/group', [\App\Http\Controllers\Settings\GroupController::class, 'index'])->name('group.index');
+    Route::get('/group/reports', [\App\Http\Controllers\Settings\GroupController::class, 'reports'])->name('group.reports');
+    Route::get('/group/commission', [\App\Http\Controllers\Settings\GroupController::class, 'commission'])->name('group.commission');
+    Route::get('/group/commission/{hotel}', [\App\Http\Controllers\Settings\GroupController::class, 'statement'])->name('group.statement');
+    Route::post('/group/commission/payments', [\App\Http\Controllers\Settings\GroupController::class, 'recordPayment'])->name('group.commission.pay');
+
+    // Work in another hotel (multi-hotel top-bar switcher)
+    Route::post('/hotels/switch', [\App\Http\Controllers\Settings\HotelController::class, 'switch'])->name('hotels.switch');
+
     // Hotel settings
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/hotel', [HotelSettingsController::class, 'index'])->name('hotel.index');
         Route::put('/hotel/{group}', [HotelSettingsController::class, 'update'])->where('group', '[a-z_]+')->name('hotel.update');
         Route::post('/hotel/reset', [HotelSettingsController::class, 'reset'])->name('hotel.reset');
+        // Hotels: one or several, and who works where
+        Route::get('/hotels', [\App\Http\Controllers\Settings\HotelController::class, 'index'])->name('hotels.index');
+        Route::post('/hotels/mode', [\App\Http\Controllers\Settings\HotelController::class, 'mode'])->name('hotels.mode');
+        Route::post('/hotels', [\App\Http\Controllers\Settings\HotelController::class, 'store'])->name('hotels.store');
+        Route::put('/hotels/{hotel}', [\App\Http\Controllers\Settings\HotelController::class, 'update'])->name('hotels.update');
         Route::get('/bank-accounts', [BankAccountController::class, 'index'])->name('bank-accounts.index');
         Route::post('/bank-accounts', [BankAccountController::class, 'store'])->name('bank-accounts.store');
         Route::put('/bank-accounts/{account}', [BankAccountController::class, 'update'])->name('bank-accounts.update');

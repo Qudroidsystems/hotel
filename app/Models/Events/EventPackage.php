@@ -2,11 +2,14 @@
 
 namespace App\Models\Events;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 
 /** Per-person catering or day-delegate package, e.g. "Full day: tea break, lunch, water". */
 class EventPackage extends Model
 {
+    use BelongsToHotel;
+
     protected $attributes = ['is_active' => true];
 
     protected $fillable = ['name', 'price_per_person', 'description', 'is_active'];

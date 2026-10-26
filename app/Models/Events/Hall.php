@@ -2,11 +2,14 @@
 
 namespace App\Models\Events;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Hall extends Model
 {
+    use BelongsToHotel;
+
     /** Room layouts and the capacity column for each. */
     public const SETUPS = [
         'theatre'   => ['Theatre (rows of chairs)', 'capacity_theatre'],

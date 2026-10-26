@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A room to clean (see HousekeepingService for the lifecycle). */
 class HousekeepingTask extends Model
 {
+    use BelongsToHotel;
+
     public const PENDING = 'pending';
     public const IN_PROGRESS = 'in_progress';
     public const DONE = 'done';            // cleaned, waiting for a supervisor

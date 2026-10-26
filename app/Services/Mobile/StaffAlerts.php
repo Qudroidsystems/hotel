@@ -172,8 +172,16 @@ class StaffAlerts
         try {
             $except = array_filter([...$except, auth()->id()]);
 
-            return User::permission($permission)->where('is_disabled', false)
+            $users = User::permission($permission)->where('is_disabled', false)
                 ->when($except, fn ($q) => $q->whereNotIn('users.id', $except))->get();
+            // Multi-hotel: only the staff of the hotel it happened in (and those who look after every hotel).
+            $hotel = \App\Support\Tenancy\CurrentHotel::get()->id();
+            if ($hotel && \App\Support\Tenancy\CurrentHotel::multi()) {
+                $here = \Illuminate\Support\Facades\DB::table('hotel_user')->where('hotel_id', $hotel)->pluck('user_id')->all();
+                $users = $users->filter(fn (User $u) => in_array($u->id, $here, true) || $u->seesAllHotels())->values();
+            }
+
+            return $users;
         } catch (\Throwable) {
             return collect();   // permission not set up on this install yet
         }

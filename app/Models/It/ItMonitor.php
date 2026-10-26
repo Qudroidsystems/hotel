@@ -2,6 +2,7 @@
 
 namespace App\Models\It;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class ItMonitor extends Model
 {
+    use BelongsToHotel;
+
     /** type => [label, icon, what "target" means, what "threshold" means, default threshold] */
     public const TYPES = [
         'http'     => ['Website / API', 'ri-global-line', 'URL, e.g. https://smarthotel.com/up', 'Slow above (ms)', 3000],

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AppController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\GuestBookingController;
 use App\Http\Controllers\Api\V1\GuestStayController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\WorkController;
@@ -23,7 +24,11 @@ Route::prefix('guest')->group(function () {
     Route::post('/find', [GuestStayController::class, 'find'])->middleware('throttle:booking-lookup');
     Route::middleware('throttle:mobile-public')->group(function () {
         Route::get('/stays/{token}', [GuestStayController::class, 'show']);
+        Route::get('/hotels', [GuestBookingController::class, 'hotels']);
+        Route::get('/booking', [GuestBookingController::class, 'options']);
+        Route::get('/search', [GuestBookingController::class, 'search']);
     });
+    Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
     Route::middleware('throttle:stay-actions')->group(function () {
         Route::post('/stays/{token}/requests', [GuestStayController::class, 'request']);
         Route::post('/stays/{token}/cancel', [GuestStayController::class, 'cancel']);
@@ -67,6 +72,19 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         ->whereNumber('id')->where('action', '[a-z_]+');
     Route::get('/report/options', [WorkController::class, 'reportOptions']);
     Route::post('/report', [WorkController::class, 'report']);
+
+    // Night audit, events, company billing
+    Route::controller(\App\Http\Controllers\Api\V1\OperationsController::class)->group(function () {
+        Route::get('/night-audit', 'nightAudit');
+        Route::post('/night-audit/close', 'closeDay')->middleware('throttle:6,1');
+        Route::get('/night-audit/{audit}', 'auditReport')->whereNumber('audit');
+        Route::get('/events', 'events');
+        Route::get('/events/{event}', 'event')->whereNumber('event');
+        Route::post('/events/{event}/status', 'eventStatus')->whereNumber('event');
+        Route::get('/companies', 'companies');
+        Route::get('/group', 'group');
+        Route::post('/folios/{folio}/to-company', 'billToCompany')->whereNumber('folio')->middleware('throttle:30,1');
+    });
 
     // Alerts
     Route::prefix('notifications')->controller(NotificationController::class)->group(function () {

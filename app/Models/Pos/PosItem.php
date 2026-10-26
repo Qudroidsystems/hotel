@@ -2,6 +2,7 @@
 
 namespace App\Models\Pos;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\ChargeType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class PosItem extends Model
 {
+    use BelongsToHotel;
+
     /** How a sold item shows on a guest's bill when charged to the room. */
     public const CHARGE_TYPES = [ChargeType::Food, ChargeType::Beverage, ChargeType::Minibar, ChargeType::Service, ChargeType::Other];
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['folio_id', 'idempotency_key', 'kind', 'method', 'amount', 'reference', 'bank_account_id', 'notes', 'received_by', 'received_at'];
 
     protected $casts = [

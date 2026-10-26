@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Storage;
 /** A reported incident and what was done about it (spec §10.2). */
 class Incident extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'security'        => ['Security / intrusion', 'ri-shield-flash-line'],
         'theft'           => ['Theft / loss', 'ri-spy-line'],

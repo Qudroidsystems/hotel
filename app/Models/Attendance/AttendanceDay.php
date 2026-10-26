@@ -2,6 +2,7 @@
 
 namespace App\Models\Attendance;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Support\Carbon;
 
 class AttendanceDay extends Model
 {
+    use BelongsToHotel;
+
     public const STATUSES = [
         'present'     => ['On time', 'st-success'],
         'late'        => ['Late', 'st-warning'],

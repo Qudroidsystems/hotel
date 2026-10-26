@@ -135,6 +135,14 @@ class EventService
                 'cancel_reason' => $status === 'cancelled' ? $reason : null,
             ])->save();
             Audit::record('events.status', "Event {$event->number} {$event->title}: " . Event::STATUSES[$old][0] . ' → ' . Event::STATUSES[$status][0] . ($reason ? ". {$reason}" : ''), $event, ['status' => $old], ['status' => $status], $reason);
+            // The kitchen, setup crew and front desk hear about confirmed and cancelled events.
+            if (in_array($status, ['confirmed', 'cancelled'], true)) {
+                app(\App\Services\Mobile\StaffAlerts::class)->notify('View events', [
+                    'title' => ($status === 'confirmed' ? 'Event confirmed: ' : 'Event cancelled: ') . $event->title,
+                    'body'  => $event->hall?->name . ' · ' . $event->when . ' · ' . $event->guests_expected . ' guests',
+                    'url'   => route('events.show', $event), 'thread' => "event:{$event->id}", 'level' => $status === 'cancelled' ? 'high' : 'normal',
+                ]);
+            }
         });
     }
 

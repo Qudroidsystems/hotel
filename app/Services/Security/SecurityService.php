@@ -249,7 +249,7 @@ class SecurityService
     {
         do {
             $code = 'V' . Str::upper(Str::random(9));
-        } while (Visitor::where('pass_code', $code)->exists());
+        } while (Visitor::withoutGlobalScope('hotel')->where('pass_code', $code)->exists());
 
         return $code;
     }

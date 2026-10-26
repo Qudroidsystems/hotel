@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Paystack, Twilio and Termii post without a CSRF token; they are checked by signature instead.
         $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound', 'termii/events']);
 
+        // Multi-hotel: pick the hotel before route models are loaded (so they come from that hotel only).
+        $middleware->web(append: [\App\Http\Middleware\SetCurrentHotel::class]);
+        $middleware->api(append: [\App\Http\Middleware\SetCurrentHotel::class]);
+        $middleware->prependToPriorityList(before: \Illuminate\Routing\Middleware\SubstituteBindings::class, prepend: \App\Http\Middleware\SetCurrentHotel::class);
+
         // Signed-in users go to the dashboard instead of the login page.
         $middleware->redirectUsersTo('/dashboard');
     })

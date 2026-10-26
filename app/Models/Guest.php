@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\ReservationStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Guest extends Model
 {
+    use BelongsToHotel;
+
     public const ID_TYPES = ['National ID (NIN)', 'International passport', "Driver's licence", "Voter's card", 'Other'];
 
     protected $fillable = [

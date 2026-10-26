@@ -94,6 +94,8 @@ class BookingController extends Controller
         ], ['accept.accepted' => 'Please accept the hotel policies to continue.', 'phone.regex' => 'Enter a valid phone number.']);
 
         try {
+            // Came from the group booking site's list of hotels?
+            $data['via_group'] = $request->session()->get('book_via_group') === \App\Support\Tenancy\CurrentHotel::get()->hotel()?->slug;
             $r = $this->booking->book($data);
         } catch (BookingException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -114,7 +116,8 @@ class BookingController extends Controller
     /** "Pay now" from the guest's booking page. */
     public function pay(string $token)
     {
-        $r = Reservation::where('guest_token', $token)->firstOrFail();
+        $r = Reservation::withoutGlobalScope('hotel')->where('guest_token', $token)->firstOrFail();
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($r);
         try {
             return redirect()->away($this->booking->startPayment($r, route('book.paystack.callback')));
         } catch (BookingException $e) {
@@ -126,8 +129,10 @@ class BookingController extends Controller
     public function callback(Request $request)
     {
         $reference = (string) $request->query('reference', $request->query('trxref', ''));
-        $op = OnlinePayment::with('reservation')->where('reference', $reference)->first();
+        $op = OnlinePayment::withoutGlobalScope('hotel')->where('reference', $reference)->first();
         abort_unless($op, 404);
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($op);
+        $op->load('reservation');
         try {
             $op = $this->booking->settle($reference);
         } catch (Throwable $e) {
@@ -151,7 +156,9 @@ class BookingController extends Controller
         }
         $event = $request->json('event');
         $reference = (string) $request->json('data.reference');
-        if ($event === 'charge.success' && OnlinePayment::where('reference', $reference)->exists()) {
+        $known = OnlinePayment::withoutGlobalScope('hotel')->where('reference', $reference)->first();
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($known);
+        if ($event === 'charge.success' && $known) {
             try {
                 $this->booking->settle($reference);
             } catch (Throwable $e) {

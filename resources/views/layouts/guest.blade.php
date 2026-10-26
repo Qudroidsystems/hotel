@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>{{ isset($title) ? $title . ' — ' : '' }}{{ config('hotel.name') }}</title>
+    <title>{{ isset($title) ? $title . ' — ' : '' }}{{ $brand ?? config('hotel.name') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="Book a room at {{ config('hotel.name') }}{{ config('hotel.booking.address') ? ', ' . config('hotel.booking.address') : '' }}. {{ config('hotel.booking.welcome') }}">
     <meta name="theme-color" content="#14213d">
@@ -87,8 +87,11 @@
 <body>
     <header class="topbar">
         <div class="wrap">
-            <a href="{{ route('book.index') }}" class="brand">{{ config('hotel.name') }}</a>
-            <nav><a href="{{ route('stay.find') }}"><i class="ri-key-2-line"></i> My booking</a></nav>
+            <a href="{{ isset($brand) ? route('hotels.public') : route('book.index') }}" class="brand">{{ $brand ?? config('hotel.name') }}</a>
+            <nav style="display:flex;gap:18px">
+                @if (\App\Support\Tenancy\CurrentHotel::multi() && ! isset($brand))<a href="{{ route('hotels.public') }}"><i class="ri-hotel-line"></i> All hotels</a>@endif
+                <a href="{{ route('stay.find') }}"><i class="ri-key-2-line"></i> My booking</a>
+            </nav>
         </div>
     </header>
 
@@ -98,6 +101,11 @@
 
     <footer class="site">
         <div class="wrap">
+            @isset($brand)
+                {{-- The group booking site: no single hotel's details --}}
+                <div><strong style="color:var(--ink)">{{ $brand }}</strong></div>
+                <div class="w-100" style="flex-basis:100%;text-align:center;margin-top:8px">@include('partials.qlouds-credit')</div>
+            @else
             <div><strong style="color:var(--ink)">{{ config('hotel.name') }}</strong>@if (config('hotel.booking.address'))<br>{{ config('hotel.booking.address') }}@endif</div>
             <div>
                 @if (config('hotel.booking.contact_phone'))<div><i class="ri-phone-line"></i> <a href="tel:{{ preg_replace('/[^0-9+]/', '', config('hotel.booking.contact_phone')) }}">{{ config('hotel.booking.contact_phone') }}</a></div>@endif
@@ -105,6 +113,7 @@
             </div>
             <div class="w-100" style="flex-basis:100%;text-align:center;margin-top:8px">@include('partials.qlouds-credit')</div>
             <div>Check-in from {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_in_time', '14:00'))->format('g:i A') }}, check-out by {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_out_time', '12:00'))->format('g:i A') }}</div>
+            @endisset
         </div>
     </footer>
     <script>

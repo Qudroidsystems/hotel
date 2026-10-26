@@ -2,6 +2,7 @@
 
 namespace App\Models\It;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** An IT support request from staff (spec §11.4 service desk). */
 class ItTicket extends Model
 {
+    use BelongsToHotel;
+
     public const CATEGORIES = [
         'internet' => ['Internet / network', 'ri-global-line'],
         'wifi'     => ['Wi-Fi', 'ri-wifi-line'],

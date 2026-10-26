@@ -1,5 +1,6 @@
 {{-- Search box. $q: check_in, check_out, adults, children, rooms. $compact: smaller version on results. --}}
 <form method="GET" action="{{ route('book.search') }}" class="search {{ ($compact ?? false) ? 'compact' : '' }}" aria-label="Check availability">
+    @if (\App\Support\Tenancy\CurrentHotel::multi())<input type="hidden" name="hotel" value="{{ \App\Support\Tenancy\CurrentHotel::get()->hotel()?->slug }}">@endif
     <div class="field"><label for="s_in">Check-in</label><input type="date" id="s_in" name="check_in" value="{{ $q['check_in'] }}" min="{{ today()->toDateString() }}" max="{{ today()->addDays((int) config('hotel.booking.advance_days', 365))->toDateString() }}" required></div>
     <div class="field"><label for="s_out">Check-out</label><input type="date" id="s_out" name="check_out" value="{{ $q['check_out'] }}" min="{{ today()->addDay()->toDateString() }}" required></div>
     <div class="field"><label for="s_ad">Adults</label><select id="s_ad" name="adults">@for ($i = 1; $i <= 12; $i++)<option value="{{ $i }}" @selected($q['adults'] == $i)>{{ $i }}</option>@endfor</select></div>

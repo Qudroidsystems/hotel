@@ -81,6 +81,6 @@ test('every hotel setting in config/hotel.php can be changed on the settings pag
     };
     $walk(require config_path('hotel.php'), '');
     // Built from other settings, or Qudroid's own credit.
-    $fixed = ['taxes', 'vendor', 'vendor_url'];
+    $fixed = ['taxes', 'vendor', 'vendor_url', 'multi_hotel', 'group_name', 'commission_percent'];   // multi_hotel: Settings → Hotels
     expect(array_values(array_diff($leaves, $editable, $fixed)))->toBe([]);
 });

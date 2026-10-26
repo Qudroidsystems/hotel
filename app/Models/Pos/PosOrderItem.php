@@ -2,11 +2,14 @@
 
 namespace App\Models\Pos;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PosOrderItem extends Model
 {
+    use BelongsToHotel;
+
     public $timestamps = false;
 
     protected $fillable = ['order_id', 'item_id', 'name', 'charge_type', 'quantity', 'unit_price', 'total', 'note'];

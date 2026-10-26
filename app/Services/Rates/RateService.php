@@ -196,14 +196,14 @@ class RateService
     }
 
     /** Rate calendar entries for a room type, keyed by date. */
-    private function days(int $roomTypeId, string $from, string $to): Collection
+    public function days(int $roomTypeId, string $from, string $to): Collection
     {
         return RateDay::where('room_type_id', $roomTypeId)
             ->where('date', '>=', $from)->where('date', '<=', $to . ' 23:59:59')->get()
             ->keyBy(fn (RateDay $d) => $d->date->toDateString());
     }
 
-    private function seasons(string $from, string $to): Collection
+    public function seasons(string $from, string $to): Collection
     {
         return RateSeason::active()
             ->where('starts_on', '<=', $to . ' 23:59:59')->where('ends_on', '>=', $from)->get();

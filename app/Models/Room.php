@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Enums\RoomStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 class Room extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = [
         'number', 'building_id', 'floor_id', 'room_type_id', 'status',
         'rate_override', 'features', 'notes', 'is_active',

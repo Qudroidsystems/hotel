@@ -155,6 +155,14 @@ class PermissionTableSeeder extends Seeder
             'Manage events',
             'Manage halls',
         ],
+        'Hotels' => [
+            'Manage hotels',
+            'Access all hotels',
+        ],
+        'Room Calendars' => [
+            'View room calendars',
+            'Manage room calendars',
+        ],
         'Guest Management' => [
             'View guests',
             'Manage guests',

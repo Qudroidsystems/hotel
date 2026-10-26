@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /** One line on a company's account: an invoice (+), a payment or credit (−), or an adjustment (±). */
 class CompanyLedgerEntry extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'invoice'    => ['Invoice', 'st-info'],
         'payment'    => ['Payment', 'st-success'],

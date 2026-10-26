@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RoomTypePhoto extends Model
 {
+    use BelongsToHotel;
+
     public const DIR = 'room-types';
 
     protected $fillable = ['room_type_id', 'path', 'caption', 'sort_order'];

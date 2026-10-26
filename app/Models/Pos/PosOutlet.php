@@ -2,12 +2,15 @@
 
 namespace App\Models\Pos;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PosOutlet extends Model
 {
+    use BelongsToHotel;
+
     public const TYPES = [
         'bar'          => 'Bar',
         'restaurant'   => 'Restaurant',

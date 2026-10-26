@@ -2,11 +2,14 @@
 
 namespace App\Models\Inventory;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockCategory extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['name', 'sort_order'];
 
     public function items(): HasMany

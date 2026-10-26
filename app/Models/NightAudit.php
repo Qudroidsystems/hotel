@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Tenancy\BelongsToHotel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /** A closed business day and its report. */
 class NightAudit extends Model
 {
+    use BelongsToHotel;
+
     protected $fillable = ['business_date', 'status', 'report', 'actions', 'notes', 'automatic', 'closed_by', 'closed_at'];
 
     protected $casts = [

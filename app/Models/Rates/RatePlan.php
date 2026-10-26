@@ -2,6 +2,7 @@
 
 namespace App\Models\Rates;
 
+use App\Support\Tenancy\BelongsToHotel;
 use App\Models\RoomType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class RatePlan extends Model
 {
+    use BelongsToHotel;
+
     public const DAYS = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 0 => 'Sun'];
 
     protected $attributes = [
