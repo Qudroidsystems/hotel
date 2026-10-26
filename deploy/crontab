@@ -1,0 +1,5 @@
+# Install for the web user:  sudo crontab -u www-data deploy/crontab
+# Every timed job (night audit, booking holds, room calendars, reminders …) runs from the first line.
+* * * * * cd /var/www/hotel && php artisan schedule:run >> /dev/null 2>&1
+# Nightly backup of the database and uploaded files
+30 2 * * * /var/www/hotel/deploy/backup.sh >> /var/www/hotel/storage/logs/backup.log 2>&1
