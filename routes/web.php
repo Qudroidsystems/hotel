@@ -88,6 +88,10 @@ Route::get('/refresh-csrf', function () {
 
 // ── Public: online booking and the guest's own booking page (spec §4, §5) ──
 Route::middleware('throttle:booking-pages')->group(function () {
+    // Privacy policy and booking terms (linked from the booking pages and the app store listings)
+    Route::view('/privacy', 'legal.privacy', ['title' => 'Privacy policy'])->name('legal.privacy');
+    Route::view('/terms', 'legal.terms', ['title' => 'Booking terms'])->name('legal.terms');
+
     // Group booking site (multi-hotel): every hotel, searched together
     Route::get('/hotels', [\App\Http\Controllers\Booking\MarketplaceController::class, 'index'])->name('hotels.public');
     Route::get('/hotels/{hotelSlug}', [\App\Http\Controllers\Booking\MarketplaceController::class, 'show'])->where('hotelSlug', '[a-z0-9-]+')->name('hotels.public.show');

@@ -1021,6 +1021,9 @@
 
 <!-- Theme Settings Offcanvas -->
 <div class="offcanvas offcanvas-end border-0" tabindex="-1" id="theme-settings-offcanvas">
+    {{-- The theme's script shows or hides these customizer sections; they were trimmed from this customizer,
+         so empty stand-ins stop it failing (and stopping the rest of the page's set-up) on every page. --}}
+    <div class="d-none" aria-hidden="true"><div id="sidebar-size"></div><div id="sidebar-view"></div><div id="layout-width"></div><div id="layout-position"></div></div>
     <div class="d-flex align-items-center bg-primary bg-gradient p-3 offcanvas-header">
         <div class="me-2">
             <h5 class="mb-1 text-white">Theme Customizer</h5>

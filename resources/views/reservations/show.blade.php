@@ -124,7 +124,7 @@
                                     <td data-label="Guests" class="small">{{ $line->adults }} adult{{ $line->adults === 1 ? '' : 's' }}{{ $line->children ? ', ' . $line->children . ' child' . ($line->children === 1 ? '' : 'ren') : '' }}</td>
                                     <td data-label="Charge" class="num">
                                         <div class="fw-semibold">@money($line->amount)</div>
-                                        <details class="small text-muted"><summary>per night</summary>
+                                        <details class="small text-muted">@php $n = count($line->nightly_rates ?? []); @endphp<summary>{{ $n }} {{ $n === 1 ? 'night' : 'nights' }}, night by night</summary>
                                             @foreach ($line->nightly_rates as $night => $rate)
                                                 <div class="d-flex justify-content-between gap-3"><span>{{ \Carbon\Carbon::parse($night)->format('D j M') }}</span><span>@money($rate)</span></div>
                                             @endforeach

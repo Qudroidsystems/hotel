@@ -104,6 +104,7 @@
             @isset($brand)
                 {{-- The group booking site: no single hotel's details --}}
                 <div><strong style="color:var(--ink)">{{ $brand }}</strong></div>
+                <div><a href="{{ route('legal.terms') }}">Booking terms</a> · <a href="{{ route('legal.privacy') }}">Privacy</a></div>
                 <div class="w-100" style="flex-basis:100%;text-align:center;margin-top:8px">@include('partials.qlouds-credit')</div>
             @else
             <div><strong style="color:var(--ink)">{{ config('hotel.name') }}</strong>@if (config('hotel.booking.address'))<br>{{ config('hotel.booking.address') }}@endif</div>
@@ -112,6 +113,7 @@
                 @if (config('hotel.booking.contact_email'))<div><i class="ri-mail-line"></i> <a href="mailto:{{ config('hotel.booking.contact_email') }}">{{ config('hotel.booking.contact_email') }}</a></div>@endif
             </div>
             <div class="w-100" style="flex-basis:100%;text-align:center;margin-top:8px">@include('partials.qlouds-credit')</div>
+            <div><a href="{{ route('legal.terms') }}">Booking terms</a> · <a href="{{ route('legal.privacy') }}">Privacy</a></div>
             <div>Check-in from {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_in_time', '14:00'))->format('g:i A') }}, check-out by {{ \Illuminate\Support\Carbon::createFromFormat('H:i', config('hotel.booking.check_out_time', '12:00'))->format('g:i A') }}</div>
             @endisset
         </div>
