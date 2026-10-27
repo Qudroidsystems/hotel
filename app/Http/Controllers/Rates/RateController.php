@@ -129,6 +129,7 @@ class RateController extends Controller
             'min_nights'       => 'nullable|integer|min:1|max:365',
             'max_nights'       => 'nullable|integer|min:1|max:365|gte:min_nights',
             'min_advance_days' => 'nullable|integer|min:1|max:730',
+            'max_advance_days' => 'nullable|integer|min:0|max:60',
             'valid_from'       => 'nullable|date',
             'valid_to'         => 'nullable|date|after_or_equal:valid_from',
             'arrival_days'     => 'nullable|array',
@@ -154,6 +155,7 @@ class RateController extends Controller
             'min_nights'       => $data['min_nights'] ?? null,
             'max_nights'       => $data['max_nights'] ?? null,
             'min_advance_days' => $data['min_advance_days'] ?? null,
+            'max_advance_days' => $data['max_advance_days'] ?? null,
             'valid_from'       => $data['valid_from'] ?? null,
             'valid_to'         => $data['valid_to'] ?? null,
             'arrival_days'     => ! empty($data['arrival_days']) && count($data['arrival_days']) < 7 ? array_map('intval', $data['arrival_days']) : null,
@@ -276,6 +278,9 @@ class RateController extends Controller
                         continue;
                     }
                     $day->updated_by = auth()->id();
+                    if (in_array($data['action'], ['price', 'clear_price', 'clear_all'], true)) {
+                        $day->source = null;   // set by hand: price suggestions leave it alone
+                    }
                     if ($day->isDirty()) {
                         $day->save();
                         $changed++;

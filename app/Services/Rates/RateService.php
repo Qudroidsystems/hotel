@@ -31,13 +31,14 @@ class RateService
     public const ONLINE = 'online';
 
     /** Nightly prices for a stay: {"2026-12-24": 65000.0, …}. */
-    public function quote(RoomType $type, $in, $out, ?Room $room = null, ?RatePlan $plan = null): array
+    public function quote(RoomType $type, $in, $out, ?Room $room = null, ?RatePlan $plan = null, bool $calendar = true): array
     {
         $nights = Reservation::nightsBetween($in, $out);
         if (! $nights) {
             return [];
         }
-        $days = $this->days($type->id, $nights[0], end($nights));
+        // $calendar false: the price before any night set in the rate calendar (price suggestions build on it).
+        $days = $calendar ? $this->days($type->id, $nights[0], end($nights)) : collect();
         $seasons = $this->seasons($nights[0], end($nights));
 
         $rates = [];
@@ -118,6 +119,11 @@ class RateService
         }
         if ($plan->min_advance_days && today()->diffInDays($in, false) < $plan->min_advance_days) {
             $p[] = "The {$plan->name} rate must be booked at least {$plan->min_advance_days} days ahead.";
+        }
+        if ($plan->max_advance_days !== null && today()->diffInDays($in, false) > $plan->max_advance_days) {
+            $p[] = $plan->max_advance_days === 0
+                ? "The {$plan->name} rate is for arrivals today only."
+                : "The {$plan->name} rate is for arrivals within {$plan->max_advance_days} days.";
         }
 
         return $p;

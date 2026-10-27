@@ -11,7 +11,7 @@ class RateDay extends Model
 {
     use BelongsToHotel;
 
-    protected $fillable = ['room_type_id', 'date', 'price', 'closed', 'min_nights', 'note', 'updated_by'];
+    protected $fillable = ['room_type_id', 'date', 'price', 'closed', 'min_nights', 'note', 'source', 'updated_by'];
 
     protected $casts = [
         'date'   => 'date',

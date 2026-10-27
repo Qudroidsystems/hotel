@@ -20,12 +20,39 @@ class PosOutlet extends Model
         'other'        => 'Other',
     ];
 
-    protected $fillable = ['name', 'code', 'type', 'stock_location_id', 'color', 'allow_room_charge', 'receipt_footer', 'is_active', 'sort_order'];
+    protected $fillable = ['name', 'code', 'type', 'stock_location_id', 'color', 'allow_room_charge', 'guest_orders', 'guest_hours', 'delivery_minutes', 'receipt_footer', 'is_active', 'sort_order'];
 
     protected $casts = [
         'allow_room_charge' => 'boolean',
+        'guest_orders'      => 'boolean',
         'is_active'         => 'boolean',
     ];
+
+    /** Whether guests can order from it right now (its hours, if it has any; they may run past midnight). */
+    public function openForGuests(?\Illuminate\Support\Carbon $at = null): bool
+    {
+        if (! $this->guest_orders || ! $this->is_active || ! $this->allow_room_charge) {
+            return false;
+        }
+        if (! $this->guest_hours || ! preg_match('/^(\d{2}:\d{2})-(\d{2}:\d{2})$/', $this->guest_hours, $m)) {
+            return true;
+        }
+        $now = ($at ?? now())->format('H:i');
+
+        return $m[1] <= $m[2] ? ($now >= $m[1] && $now < $m[2]) : ($now >= $m[1] || $now < $m[2]);
+    }
+
+    /** "7:00 AM – 11:00 PM", or null when always open. */
+    public function getGuestHoursLabelAttribute(): ?string
+    {
+        if (! $this->guest_hours || ! str_contains($this->guest_hours, '-')) {
+            return null;
+        }
+        [$a, $b] = explode('-', $this->guest_hours);
+        $f = fn ($t) => \Illuminate\Support\Carbon::createFromFormat('H:i', $t)->format('g:i A');
+
+        return $f($a) . ' – ' . $f($b);
+    }
 
     public function items(): BelongsToMany
     {

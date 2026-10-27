@@ -176,8 +176,16 @@ class PosMenuController extends Controller
             'receipt_footer' => 'nullable|string|max:255',
             'sort_order'     => 'nullable|integer|min:0|max:999',
         ], ['code.unique' => 'Another outlet already uses that code.']);
+        $extra = $request->validate([
+            'guest_from'       => 'nullable|date_format:H:i|required_with:guest_to',
+            'guest_to'         => 'nullable|date_format:H:i|required_with:guest_from|different:guest_from',
+            'delivery_minutes' => 'nullable|integer|min:5|max:240',
+        ], ['guest_to.different' => 'The closing time must differ from the opening time.']);
         $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
         $data['allow_room_charge'] = $request->boolean('allow_room_charge');
+        $data['guest_orders'] = $request->boolean('guest_orders') && $data['allow_room_charge'];
+        $data['guest_hours'] = ! empty($extra['guest_from']) ? $extra['guest_from'] . '-' . $extra['guest_to'] : null;
+        $data['delivery_minutes'] = $extra['delivery_minutes'] ?? null;
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;

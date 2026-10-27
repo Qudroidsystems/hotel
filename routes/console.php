@@ -49,6 +49,18 @@ Artisan::command('it:prune', $eachHotel(function (\App\Services\It\MonitorServic
 }))->purpose('Remove IT check history older than the retention period');
 
 // Online bookings waiting for a deposit are released when their hold runs out.
+Artisan::command('rates:auto-price {--force : Even when automatic pricing is off}', $eachHotel(function (\App\Services\Rates\RevenueService $revenue) {
+    if (! $this->option('force') && ! $revenue->rules()['auto']) {
+        return;
+    }
+    $this->info($revenue->apply(null, null, true) . ' night price(s) set from the suggestions.');
+}))->purpose('Apply the price suggestions to nights not priced by hand (Hotel Settings → Price Suggestions → automatic)');
+
+Artisan::command('arrivals:expire', $eachHotel(function (\App\Services\Booking\ArrivalService $arrivals) {
+    $n = $arrivals->expire();
+    $this->info("{$n} arrival share(s) stopped.");
+}))->purpose('Stop arrival sharing that has gone quiet or run too long, and forget the position');
+
 Artisan::command('bookings:expire-holds', $eachHotel(function (\App\Services\Booking\OnlineBookingService $booking) {
     $this->info($booking->expireHolds() . ' unpaid online booking(s) released.');
 }))->purpose('Cancel online bookings whose deposit was not paid in time');
@@ -150,6 +162,8 @@ Schedule::command('events:tomorrow')->dailyAt('16:00');
 Schedule::command('channels:sync')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('bookings:expire-holds')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('arrivals:expire')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('rates:auto-price')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('it:prune')->dailyAt('03:30');

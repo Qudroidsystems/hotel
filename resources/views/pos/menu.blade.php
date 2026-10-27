@@ -112,10 +112,11 @@
                                     @if ($o->receipt_footer)<div class="small text-muted">{{ $o->receipt_footer }}</div>@endif</td>
                                 <td data-label="Code"><span class="rs-ref">{{ $o->code }}</span></td>
                                 <td data-label="Type">{{ $o->type_label }}</td>
-                                <td data-label="Room charges">{!! $o->allow_room_charge ? '<span class="status-pill st-success">Allowed</span>' : '<span class="status-pill st-muted">No</span>' !!}</td>
+                                <td data-label="Room charges">{!! $o->allow_room_charge ? '<span class="status-pill st-success">Allowed</span>' : '<span class="status-pill st-muted">No</span>' !!}
+                                    @if ($o->guest_orders)<div class="small text-muted mt-1"><i class="ri-restaurant-line"></i> Room orders{{ $o->guest_hours_label ? ', ' . $o->guest_hours_label : '' }}</div>@endif</td>
                                 <td data-label="Items" class="num">{{ $o->items_count }}</td>
                                 <td class="text-end text-nowrap">
-                                    <button type="button" class="action-btn btn-more" data-edit-outlet="{{ json_encode($o->only(['id', 'name', 'code', 'type', 'color', 'allow_room_charge', 'receipt_footer', 'is_active', 'sort_order'])) }}"><i class="ri-pencil-line"></i> Edit</button>
+                                    <button type="button" class="action-btn btn-more" data-edit-outlet="{{ json_encode($o->only(['id', 'name', 'code', 'type', 'color', 'allow_room_charge', 'guest_orders', 'delivery_minutes', 'receipt_footer', 'is_active', 'sort_order']) + ['guest_from' => $o->guest_hours ? explode('-', $o->guest_hours)[0] : '', 'guest_to' => $o->guest_hours ? explode('-', $o->guest_hours)[1] : '']) }}"><i class="ri-pencil-line"></i> Edit</button>
                                     <form method="POST" action="{{ route('pos.outlets.destroy', $o) }}" class="d-inline" onsubmit="return confirm('Remove {{ addslashes($o->name) }}?');">@csrf @method('DELETE')
                                         <button class="action-btn btn-danger-soft" type="submit" title="Remove"><i class="ri-delete-bin-line"></i></button></form>
                                 </td>
@@ -198,6 +199,11 @@
                     <label class="form-check mb-0"><input type="checkbox" class="form-check-input" name="allow_room_charge" value="1" id="o_allow_room_charge" checked> <span class="form-check-label">Guests can charge to their room</span></label>
                     <label class="form-check mb-0"><input type="checkbox" class="form-check-input" name="is_active" value="1" id="o_is_active" checked> <span class="form-check-label">Open</span></label>
                 </div>
+                <div class="col-12"><label class="form-check mb-0"><input type="checkbox" class="form-check-input" name="guest_orders" value="1" id="o_guest_orders"> <span class="form-check-label"><strong>Guests can order to their room</strong> from the guest app and the QR card in the room (needs room charges on)</span></label></div>
+                <div class="col-4"><label for="o_guest_from">Room orders from</label><input type="time" name="guest_from" id="o_guest_from" class="form-control"></div>
+                <div class="col-4"><label for="o_guest_to">until</label><input type="time" name="guest_to" id="o_guest_to" class="form-control"></div>
+                <div class="col-4"><label for="o_delivery_minutes">Usual wait (min)</label><input type="number" name="delivery_minutes" id="o_delivery_minutes" class="form-control" min="5" max="240" placeholder="30"></div>
+                <div class="col-12 small text-muted mt-1">Leave the hours empty to take orders at any time. New orders appear under Bar &amp; Restaurant → Room Orders and on the staff app.</div>
                 <div class="col-12 small text-muted">The code starts every order number from this outlet, e.g. <span class="rs-ref">POOL-K7Q2-0042</span>.</div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>

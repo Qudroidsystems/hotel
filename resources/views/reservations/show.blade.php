@@ -60,6 +60,12 @@
     </x-cb.hero>
 
     @include('rooms.partials.flash')
+    @php $coming = app(\App\Services\Booking\ArrivalService::class)->forStaff($r); @endphp
+    @if ($coming)
+        <div class="cb-banner {{ $coming['state'] === 'here' ? 'success' : 'info' }}"><i class="{{ $coming['state'] === 'here' ? 'ri-map-pin-user-fill' : 'ri-navigation-line' }}"></i>
+            <div>@if ($coming['state'] === 'here')<strong>The guest is at the hotel</strong> (since {{ $coming['since'] }}) — they shared their arrival from the guest app.
+                @else<strong>The guest is on the way</strong> — about {{ str_replace('On the way · ', '', $coming['label']) }} ({{ $coming['distance'] }}), updated {{ $coming['updated'] }}. Have the room ready.@endif</div></div>
+    @endif
 
     @if ($canCheckIn && ! $r->allRoomsAssigned())
         <div class="cb-banner warning"><i class="ri-door-line"></i><div>Assign a room to every line below before checking the guest in.</div></div>

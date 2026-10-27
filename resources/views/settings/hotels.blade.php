@@ -105,6 +105,15 @@
                             <div class="col-3"><label class="form-label small">Stars</label><input name="stars" type="number" min="1" max="5" class="form-control" value="{{ old('stars', $form?->stars) }}"></div>
                             <div class="col-3"><label class="form-label small">Order</label><input name="sort_order" type="number" min="0" class="form-control" value="{{ old('sort_order', $form?->sort_order ?? 0) }}"></div>
                         </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Where it is on the map <span class="text-muted">(guest directions and arrival alerts)</span></label>
+                            <div class="row g-2">
+                                <div class="col-5"><input name="latitude" id="ht-lat" class="form-control" inputmode="decimal" placeholder="Latitude, e.g. 6.4281" value="{{ old('latitude', $form?->latitude) }}"></div>
+                                <div class="col-5"><input name="longitude" id="ht-lng" class="form-control" inputmode="decimal" placeholder="Longitude, e.g. 3.4219" value="{{ old('longitude', $form?->longitude) }}"></div>
+                                <div class="col-2"><button type="button" class="action-btn btn-more w-100 h-100" id="ht-here" title="Use where I am now (when you're at the hotel)"><i class="ri-map-pin-user-line"></i></button></div>
+                            </div>
+                            <div class="form-text">At the hotel? Press the pin. Otherwise, in Google Maps right-click the hotel's entrance and click the numbers to copy them.</div>
+                        </div>
                         @if ($multi)<div class="mb-2"><label class="form-label small">Commission on group-site bookings (%)</label><input name="commission_percent" type="number" step="0.5" min="0" max="50" class="form-control" style="max-width:160px" value="{{ old('commission_percent', $form?->commission_percent !== null ? rtrim(rtrim((string) $form->commission_percent, '0'), '.') : '') }}" placeholder="{{ rtrim(rtrim(number_format((float) config('hotel.commission_percent', 0), 2), '0'), '.') }} (usual)"></div>@endif
                         <div class="mb-2"><label class="form-label small">About the hotel <span class="text-muted">(booking site)</span></label><textarea name="description" class="form-control" rows="3" maxlength="3000">{{ old('description', $form?->description) }}</textarea></div>
                         <div class="row g-2 mb-2">
@@ -140,4 +149,15 @@
 </div>
 </div>
 </div>
+<script>
+document.getElementById('ht-here')?.addEventListener('click', function () {
+    if (!navigator.geolocation) { alert('This browser cannot tell where you are.'); return; }
+    this.disabled = true;
+    navigator.geolocation.getCurrentPosition(p => {
+        document.getElementById('ht-lat').value = p.coords.latitude.toFixed(7);
+        document.getElementById('ht-lng').value = p.coords.longitude.toFixed(7);
+        this.disabled = false;
+    }, () => { this.disabled = false; alert('Allow location for this page, or type the numbers in.'); }, { enableHighAccuracy: true, timeout: 15000 });
+});
+</script>
 @endsection

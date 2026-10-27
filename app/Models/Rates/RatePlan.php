@@ -25,11 +25,12 @@ class RatePlan extends Model
 
     protected $fillable = [
         'name', 'code', 'description', 'inclusions', 'discount_percent', 'nightly_extra', 'fixed_prices',
-        'min_nights', 'max_nights', 'min_advance_days', 'valid_from', 'valid_to', 'arrival_days', 'room_type_ids',
+        'min_nights', 'max_nights', 'min_advance_days', 'max_advance_days', 'valid_from', 'valid_to', 'arrival_days', 'room_type_ids',
         'promo_code', 'online', 'front_desk', 'non_refundable', 'is_active', 'sort_order', 'created_by', 'company_id',
     ];
 
     protected $casts = [
+        'max_advance_days' => 'integer',
         'discount_percent' => 'decimal:2',
         'nightly_extra'    => 'decimal:2',
         'fixed_prices'     => 'array',

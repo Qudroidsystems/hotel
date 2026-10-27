@@ -9,7 +9,7 @@ class MobileUser
 {
     /** App features and the permissions that open them. */
     public const FEATURES = [
-        'work'       => ['Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Manage maintenance', 'Handle guest requests', 'Manage IT tickets'],
+        'work'       => ['Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Manage maintenance', 'Handle guest requests', 'Manage IT tickets', 'Charge to room', 'Drive guests', 'Manage transport'],
         'approvals'  => ['Approve expenses', 'Approve purchases', 'Review cash shifts', 'Post stock counts'],
         'front_desk' => ['View reservations', 'Check in guests'],
         'rooms'      => ['View rooms', 'Manage housekeeping', 'Check in guests'],
@@ -19,6 +19,9 @@ class MobileUser
         'events'     => ['View events', 'Manage events'],
         'bill_company' => ['Bill to company'],
         'group'      => ['Access all hotels'],   // several hotels only
+        'owner'      => ['View management reports', 'View finance reports'],
+        'driver'     => ['Drive guests'],
+        'transport'  => ['Manage transport'],
     ];
 
     public static function toArray(User $user): array

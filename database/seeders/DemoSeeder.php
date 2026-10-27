@@ -14,6 +14,8 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        // The demo hotel's place on the map (Victoria Island, Lagos), for guest directions and arrival sharing.
+        \App\Models\Hotel::whereNull('latitude')->orderBy('id')->limit(1)->update(['latitude' => 6.4281, 'longitude' => 3.4219]);
         $this->call([
             DatabaseSeeder::class,          // permissions, roles, the admin account, expense categories
             RoomDemoSeeder::class,          // buildings, floors, room types, rooms
@@ -26,6 +28,7 @@ class DemoSeeder extends Seeder
             OperationsDemoSeeder::class,    // housekeeping, repairs, security, IT tickets
             GuestServicesDemoSeeder::class, // loyalty, guest requests, messages
             CommercialDemoSeeder::class,    // rates & seasons, company accounts, halls & events
+            TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
         ]);
     }
 }

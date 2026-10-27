@@ -74,6 +74,8 @@ class HotelSettings
                     'booking.address'         => ['type' => 'text', 'label' => 'Hotel address', 'rules' => ['nullable', 'string', 'max:255']],
                     'booking.policies'        => ['type' => 'list', 'label' => 'Hotel policies shown to guests', 'help' => 'One per line.', 'max_items' => 15],
                     'booking.guest_requests'  => ['type' => 'bool', 'label' => 'Guests can send requests (towels, cleaning, repairs…) from their booking page during their stay'],
+                    'booking.arrival_sharing' => ['type' => 'bool', 'label' => 'Guests on their way can share their arrival from the guest app: they get directions, and reception and housekeeping see how far away they are (set the hotel\'s map position under Settings → Hotels)'],
+                    'booking.guest_ordering'  => ['type' => 'bool', 'label' => 'Guests can order food and drinks to their room (guest app and the QR card in the room). Choose which outlets take orders in Menu & Prices → Outlets'],
                 ],
             ],
             'messaging' => [
@@ -112,6 +114,35 @@ class HotelSettings
                     'loyalty.gold_nights'     => ['type' => 'int', 'label' => 'Gold: nights in the last 12 months', 'min' => 1, 'max' => 365],
                     'loyalty.silver_discount' => ['type' => 'percent', 'label' => 'Silver discount on rooms booked online', 'max' => 50],
                     'loyalty.gold_discount'   => ['type' => 'percent', 'label' => 'Gold discount on rooms booked online', 'max' => 50],
+                ],
+            ],
+            'transport' => [
+                'title' => 'Car Service', 'icon' => 'ri-taxi-line',
+                'intro' => 'Guests book the hotel\'s cars from the guest app or their booking page: picked up anywhere and brought to the hotel, or taken out. Places with a set fare (the airport …) are kept under Car Service → Places; anywhere else is priced by distance from the hotel.',
+                'fields' => [
+                    'transport.enabled'            => ['type' => 'bool', 'label' => 'Guests can book the hotel\'s cars'],
+                    'transport.base_fare'          => ['type' => 'money', 'label' => 'Fare: starting charge'],
+                    'transport.per_km'             => ['type' => 'money', 'label' => 'Fare: per kilometre'],
+                    'transport.minimum_fare'       => ['type' => 'money', 'label' => 'Fare: never less than'],
+                    'transport.round_to'           => ['type' => 'int', 'label' => 'Round fares to the nearest', 'min' => 1, 'max' => 100000],
+                    'transport.min_notice_minutes' => ['type' => 'int', 'label' => 'Minutes\' notice for a booked time', 'min' => 0, 'max' => 1440, 'help' => 'A time sooner than this is treated as "as soon as possible".'],
+                    'transport.max_km'             => ['type' => 'int', 'label' => 'Furthest the cars go (km)', 'min' => 1, 'max' => 2000],
+                ],
+            ],
+            'revenue' => [
+                'title' => 'Price Suggestions', 'icon' => 'ri-line-chart-line',
+                'intro' => 'How Rates → Revenue suggests room prices from what is already booked: dearer when a night is filling up, cheaper close in when it is empty. Suggestions only change nights you have not priced by hand.',
+                'fields' => [
+                    'revenue.high_occupancy' => ['type' => 'percent', 'label' => 'A night is busy from this much booked', 'max' => 100],
+                    'revenue.high_change'    => ['type' => 'percent', 'label' => 'Busy nights: raise the price by', 'max' => 100],
+                    'revenue.mid_occupancy'  => ['type' => 'percent', 'label' => 'A night is filling up from this much booked', 'max' => 100],
+                    'revenue.mid_change'     => ['type' => 'percent', 'label' => 'Filling-up nights: raise the price by', 'max' => 100],
+                    'revenue.low_days'       => ['type' => 'int', 'label' => 'Close in: nights this many days away or fewer', 'min' => 0, 'max' => 60],
+                    'revenue.low_occupancy'  => ['type' => 'percent', 'label' => 'Close in and booked under', 'max' => 100],
+                    'revenue.low_change'     => ['type' => 'percent', 'label' => 'Close-in empty nights: lower the price by', 'max' => 90],
+                    'revenue.max_change'     => ['type' => 'percent', 'label' => 'Never move a price more than', 'max' => 100],
+                    'revenue.round_to'       => ['type' => 'int', 'label' => 'Round prices to the nearest', 'min' => 1, 'max' => 100000],
+                    'revenue.auto'           => ['type' => 'bool', 'label' => 'Apply suggestions automatically every night (only to nights not priced by hand)'],
                 ],
             ],
             'money' => [
@@ -226,6 +257,15 @@ class HotelSettings
                     'accounts.termii.sender_id'     => ['type' => 'text', 'config' => 'services.termii.sender_id', 'label' => 'Termii sender ID', 'rules' => ['nullable', 'string', 'max:11'], 'help' => 'An approved sender ID, up to 11 characters.'],
                     'accounts.termii.whatsapp_from' => ['type' => 'text', 'config' => 'services.termii.whatsapp_from', 'label' => 'Termii WhatsApp device ID', 'rules' => ['nullable', 'string', 'max:64']],
                     'accounts.termii.base_url'      => ['type' => 'text', 'config' => 'services.termii.base_url', 'label' => 'Termii base URL', 'rules' => ['nullable', 'url', 'max:120'], 'help' => 'Shown on your Termii dashboard. Usually https://api.ng.termii.com.'],
+                ],
+            ],
+            'maps' => [
+                'title' => 'Maps & Directions', 'icon' => 'ri-map-2-line',
+                'intro' => 'The maps guests and drivers see, and how travel times are worked out (arrival sharing, the car service). OpenStreetMap is free and needs nothing. Google Maps gives real road routes, live traffic times and address search: create a key in Google Cloud with the Directions, Distance Matrix, Places, Geocoding and Map Tiles APIs switched on.',
+                'fields' => [
+                    'maps.provider'                  => ['type' => 'select', 'label' => 'Maps from', 'options' => ['osm' => 'OpenStreetMap (free, estimates travel times)', 'google' => 'Google Maps (needs a key: road routes, traffic, address search)']],
+                    'accounts.google_maps.server_key' => ['type' => 'secret', 'config' => 'services.google_maps.server_key', 'label' => 'Google Maps server key', 'prefix' => '/^AIza/', 'help' => 'Used only by this server (routes, travel times, address search). In Google Cloud, restrict it to this server\'s IP address.'],
+                    'accounts.google_maps.map_key'    => ['type' => 'text', 'config' => 'services.google_maps.map_key', 'label' => 'Google Maps key for map pictures', 'rules' => ['nullable', 'string', 'max:60', 'regex:/^AIza/'], 'help' => 'Shown to browsers and the apps to draw the map, so restrict it to your website address and the two apps. Leave empty to draw maps from OpenStreetMap and still use Google for routes.'],
                 ],
             ],
             'payments' => [

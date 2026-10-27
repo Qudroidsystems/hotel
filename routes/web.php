@@ -106,6 +106,15 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
     Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
+    Route::post('/stay/{token}/arrival', [GuestPortalController::class, 'arrival'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:arrival')->name('stay.arrival');
+    Route::post('/stay/{token}/rides', [GuestPortalController::class, 'bookRide'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.book');
+    Route::post('/stay/{token}/rides/{ride}/cancel', [GuestPortalController::class, 'cancelRide'])->whereNumber('ride')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.cancel');
+    Route::get('/stay/{token}/order', [GuestPortalController::class, 'order'])->name('stay.order');
+    Route::post('/stay/{token}/order', [GuestPortalController::class, 'placeOrder'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.place');
+    Route::post('/stay/{token}/orders/{order}/cancel', [GuestPortalController::class, 'cancelOrder'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.cancel');
+    // The QR card in each room: the guest confirms their surname once, then orders / opens their booking.
+    Route::get('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'show'])->name('room.card');
+    Route::post('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'verify'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('room.card.verify');
     Route::post('/stay/{token}/cancel', [GuestPortalController::class, 'cancel'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.cancel');
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
@@ -151,6 +160,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Rooms & property
+    Route::get('/rooms/qr-cards', [\App\Http\Controllers\Booking\RoomCardController::class, 'cards'])->name('rooms.qr-cards');
     Route::get('/rooms/bulk/create', [RoomController::class, 'bulkCreate'])->name('rooms.bulk.create');
     Route::post('/rooms/bulk', [RoomController::class, 'bulkStore'])->name('rooms.bulk.store');
     Route::post('/rooms/bulk-status', [RoomController::class, 'bulkStatus'])->name('rooms.bulk-status');
@@ -276,6 +286,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/ping', [PosTerminalController::class, 'ping'])->name('ping');
         Route::post('/sync', [PosTerminalController::class, 'sync'])->middleware('throttle:120,1')->name('sync');
 
+        Route::get('/room-orders', [\App\Http\Controllers\Pos\RoomOrderController::class, 'index'])->name('room-orders');
+        Route::post('/room-orders/{order}/{action}', [\App\Http\Controllers\Pos\RoomOrderController::class, 'act'])->whereIn('action', ['accept', 'send', 'deliver', 'decline'])->name('room-orders.act');
         Route::get('/orders', [PosOrderController::class, 'index'])->name('orders');
         Route::get('/orders/{order}/receipt', [PosOrderController::class, 'receipt'])->name('orders.receipt');
         Route::post('/orders/{order}/void', [PosOrderController::class, 'void'])->name('orders.void');
@@ -447,6 +459,24 @@ Route::middleware('auth')->group(function () {
         Route::put('/seasons/{season}', 'updateSeason')->name('seasons.update');
         Route::delete('/seasons/{season}', 'destroySeason')->name('seasons.destroy');
         Route::post('/calendar', 'updateCalendar')->name('calendar.update');
+    });
+    Route::get('/rates/revenue', [\App\Http\Controllers\Rates\RevenueController::class, 'index'])->name('rates.revenue');
+    Route::post('/rates/revenue/apply', [\App\Http\Controllers\Rates\RevenueController::class, 'apply'])->name('rates.revenue.apply');
+
+    // Car service: dispatch board, cars, drivers, set-fare places
+    Route::prefix('transport')->name('transport.')->controller(\App\Http\Controllers\Transport\TransportController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/rides', 'storeRide')->name('rides.store');
+        Route::post('/rides/{ride}/assign', 'assign')->name('rides.assign');
+        Route::post('/rides/{ride}/auto', 'auto')->name('rides.auto');
+        Route::post('/rides/{ride}/cancel', 'cancel')->name('rides.cancel');
+        Route::post('/rides/{ride}/status/{action}', 'status')->name('rides.status');
+        Route::post('/cars', 'saveVehicle')->name('cars.store');
+        Route::put('/cars/{vehicle}', 'saveVehicle')->name('cars.update');
+        Route::post('/drivers', 'saveDriver')->name('drivers.store');
+        Route::put('/drivers/{driver}', 'saveDriver')->name('drivers.update');
+        Route::post('/places', 'savePlace')->name('places.store');
+        Route::put('/places/{place}', 'savePlace')->name('places.update');
     });
 
     // Company accounts (city ledger)

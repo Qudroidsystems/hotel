@@ -22,16 +22,37 @@ use Illuminate\Support\Facades\Route;
 // Guests: their own booking, opened with the reference + e-mail/phone or the private link (no staff sign-in).
 Route::prefix('guest')->group(function () {
     Route::post('/find', [GuestStayController::class, 'find'])->middleware('throttle:booking-lookup');
+    // Guest accounts: sign in with a code sent to the e-mail / phone they booked with.
+    Route::post('/auth/code', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'code'])->middleware('throttle:booking-lookup');
+    Route::post('/auth/verify', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'verify'])->middleware('throttle:booking-lookup');
+    Route::middleware('throttle:mobile-public')->group(function () {
+        Route::get('/me', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'me']);
+        Route::patch('/me', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'update']);
+        Route::post('/auth/logout', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'logout']);
+    });
     Route::middleware('throttle:mobile-public')->group(function () {
         Route::get('/stays/{token}', [GuestStayController::class, 'show']);
+        Route::get('/stays/{token}/menu', [GuestStayController::class, 'menu']);
+        Route::get('/stays/{token}/rides', [GuestStayController::class, 'rides']);
+        Route::get('/stays/{token}/places', [GuestStayController::class, 'places']);
+        Route::get('/stays/{token}/places/{id}', [GuestStayController::class, 'place'])->where('id', '[A-Za-z0-9_-]{10,300}');
+        Route::post('/stays/{token}/rides/quote', [GuestStayController::class, 'rideQuote']);
         Route::get('/hotels', [GuestBookingController::class, 'hotels']);
         Route::get('/booking', [GuestBookingController::class, 'options']);
         Route::get('/search', [GuestBookingController::class, 'search']);
     });
     Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
+    Route::middleware('throttle:arrival')->group(function () {
+        Route::post('/stays/{token}/arrival', [GuestStayController::class, 'arrival']);
+        Route::post('/stays/{token}/arrival/stop', [GuestStayController::class, 'stopArrival']);
+    });
     Route::middleware('throttle:stay-actions')->group(function () {
         Route::post('/stays/{token}/requests', [GuestStayController::class, 'request']);
         Route::post('/stays/{token}/cancel', [GuestStayController::class, 'cancel']);
+        Route::post('/stays/{token}/orders', [GuestStayController::class, 'order']);
+        Route::post('/stays/{token}/rides', [GuestStayController::class, 'bookRide']);
+        Route::post('/stays/{token}/rides/{ride}/cancel', [GuestStayController::class, 'cancelRide'])->whereNumber('ride');
+        Route::post('/stays/{token}/orders/{order}/cancel', [GuestStayController::class, 'cancelOrder'])->whereNumber('order');
     });
 });
 
@@ -83,6 +104,10 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         Route::post('/events/{event}/status', 'eventStatus')->whereNumber('event');
         Route::get('/companies', 'companies');
         Route::get('/group', 'group');
+        Route::get('/owner', 'owner');
+        Route::get('/driver', 'driver');
+        Route::post('/driver/duty', 'driverDuty');
+        Route::post('/driver/location', 'driverLocation');
         Route::post('/folios/{folio}/to-company', 'billToCompany')->whereNumber('folio')->middleware('throttle:30,1');
     });
 

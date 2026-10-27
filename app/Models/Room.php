@@ -26,6 +26,14 @@ class Room extends Model
         'status_changed_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        // The room's QR card for guests (ordering, the booking page): /room/{guest_code}.
+        static::creating(function (Room $room) {
+            $room->guest_code ??= \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(12));
+        });
+    }
+
     public function building(): BelongsTo
     {
         return $this->belongsTo(Building::class);

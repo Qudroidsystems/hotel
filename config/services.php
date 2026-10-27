@@ -60,6 +60,12 @@ return [
         'key' => env('DEVICE_API_KEY'),
     ],
 
+    // Maps & directions (Hotel Settings → Maps & Directions overrides these).
+    'google_maps' => [
+        'server_key' => env('GOOGLE_MAPS_SERVER_KEY'),
+        'map_key'    => env('GOOGLE_MAPS_MAP_KEY'),
+    ],
+
     'paystack' => [
         'active'          => env('PAYSTACK_ACTIVE', true),
         'mode'            => env('PAYSTACK_MODE', 'sandbox'),

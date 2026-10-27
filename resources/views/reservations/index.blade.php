@@ -95,7 +95,8 @@
                         @foreach ($reservations as $r)
                             <tr>
                                 <td data-label="Guest">
-                                    <div class="rs-guest">{{ $r->guest->full_name }} @if ($r->guest->is_vip)<span class="status-pill st-violet ms-1">VIP</span>@endif</div>
+                                    <div class="rs-guest">{{ $r->guest->full_name }} @if ($r->guest->is_vip)<span class="status-pill st-violet ms-1">VIP</span>@endif
+                                        @if (in_array($r->status->value, ['pending', 'confirmed'], true) && $r->check_in_date->isToday() && ($coming = app(\App\Services\Booking\ArrivalService::class)->forStaff($r)))<span class="status-pill st-info ms-1"><i class="ri-navigation-line"></i> {{ $coming['state'] === 'here' ? 'At the hotel' : str_replace('On the way · ', '', $coming['label']) }}</span>@endif</div>
                                     <div class="small text-muted">{{ $r->guest->phone }}</div>
                                 </td>
                                 <td data-label="Reference"><a href="{{ route('reservations.show', $r) }}" class="rs-ref text-decoration-none">{{ $r->reference }}</a>

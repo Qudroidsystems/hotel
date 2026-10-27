@@ -41,6 +41,8 @@ class AppController extends ApiController
             // Several hotels: the guest app lets guests choose one (GET /guest/hotels).
             'multi_hotel'   => \App\Support\Tenancy\CurrentHotel::multi(),
             'group_name'    => \App\Support\Tenancy\CurrentHotel::multi() ? (config('hotel.group_name') ?: config('app.name')) : null,
+            // How both apps draw maps (OpenStreetMap, or Google with the hotel's map key) and whether address search works.
+            'maps'          => app(\App\Services\Maps\MapsService::class)->tiles() + ['search' => app(\App\Services\Maps\MapsService::class)->google()],
         ]);
     }
 
@@ -92,6 +94,8 @@ class AppController extends ApiController
             'status'    => $r->status instanceof \BackedEnum ? $r->status->value : (string) $r->status,
             'status_label' => $r->status instanceof \BackedEnum && method_exists($r->status, 'label') ? $r->status->label() : ucfirst(str_replace('_', ' ', (string) ($r->status instanceof \BackedEnum ? $r->status->value : $r->status))),
             'arrival_time' => $r->expected_arrival_time,
+            // The guest is sharing their way here from the guest app: "On the way · 12 min" / "At the hotel".
+            'on_the_way' => app(\App\Services\Booking\ArrivalService::class)->forStaff($r),
             'url'       => route('reservations.show', $r),
             // For billing at departure: what is owed and whose account it may go to.
             'folio_id'  => $r->folio?->id,

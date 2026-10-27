@@ -68,6 +68,29 @@ class StaffAppService
                 ]));
         }
 
+        if (app(\App\Services\Pos\GuestOrderService::class)->canHandle($user)) {
+            // Food and drinks ordered to rooms: new ones first, then ones being made or on the way.
+            \App\Models\Pos\GuestOrder::live()->with('outlet:id,name')->get()
+                ->each(fn ($o) => $items->push((object) [
+                    'kind' => 'order', 'model' => $o, 'urgent' => $o->status === 'placed' && $o->created_at->lt(now()->subMinutes(5)),
+                    'at' => $o->created_at, 'rank' => $o->status === 'placed' ? 0 : 2,
+                ]));
+        }
+
+        // Cars: new bookings for whoever dispatches; their own rides for a driver.
+        $driver = $user->can('Drive guests') ? \App\Models\Transport\Driver::where('user_id', $user->id)->where('is_active', true)->first() : null;
+        if ($driver || $user->can('Manage transport')) {
+            \App\Models\Transport\Ride::open()->with(['driver', 'vehicle'])
+                ->where(fn ($q) => $q->when($driver, fn ($w) => $w->orWhere('driver_id', $driver->id))
+                    ->when($user->can('Manage transport'), fn ($w) => $w->orWhere('status', 'requested')))
+                ->get()
+                ->each(fn ($r) => $items->push((object) [
+                    'kind' => 'ride', 'model' => $r,
+                    'urgent' => $r->status === 'requested' && (! $r->pickup_at || $r->pickup_at->lt(now()->addHour())),
+                    'at' => $r->pickup_at ?? $r->created_at, 'rank' => $r->status === 'requested' || in_array($r->status, ['on_the_way', 'arrived', 'on_trip'], true) ? 0 : 1,
+                ]));
+        }
+
         if ($user->can('Manage IT tickets')) {
             ItTicket::active()->with('requester:id,name')
                 ->where(fn ($q) => $q->where('assigned_to', $user->id)->orWhereNull('assigned_to'))

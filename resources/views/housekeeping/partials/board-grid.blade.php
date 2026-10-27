@@ -29,7 +29,7 @@
                     <span class="hb-state">{{ $labels[$t->state] }}@if ($t->state === 'cleaning' && $minutes !== null) · {{ $minutes < 1 ? 'just started' : ($minutes < 60 ? $minutes . ' min' : intdiv($minutes, 60) . ' h ' . ($minutes % 60)) }}@endif</span>
                     <span class="hb-flags">
                         @if ($task?->urgent)<span class="hb-flag"><i class="ri-flashlight-fill"></i> Rush</span>@endif
-                        @if ($t->arriving)<span class="hb-flag"><i class="ri-login-box-line"></i> Arriving{{ $t->arriving->guest?->is_vip ? ' · VIP' : '' }}</span>@endif
+                        @if ($t->arriving)<span class="hb-flag"><i class="ri-login-box-line"></i> {{ $t->coming ? ($t->coming['state'] === 'here' ? 'Guest is here' : 'Guest ' . ($t->coming['eta_minutes'] !== null ? 'in ~' . $t->coming['eta_minutes'] . ' min' : 'on the way')) : 'Arriving' }}{{ $t->arriving->guest?->is_vip ? ' · VIP' : '' }}</span>@endif
                         @if ($t->leaving)<span class="hb-flag"><i class="ri-logout-box-r-line"></i> Due out</span>@endif
                         @if ($task && $task->type !== 'checkout')<span class="hb-flag">{{ $task->type_label }}</span>@endif
                     </span>

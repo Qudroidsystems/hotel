@@ -29,6 +29,7 @@ class StaffAlerts
         $self = new self();
 
         GuestRequest::created(fn (GuestRequest $g) => $self->guestRequest($g));
+        \App\Models\Pos\GuestOrder::created(fn ($o) => $self->guestOrder($o));
         HousekeepingTask::saved(fn (HousekeepingTask $t) => $t->wasChanged('assigned_to') || ($t->wasRecentlyCreated && $t->assigned_to) ? $self->roomAssigned($t) : null);
         MaintenanceOrder::saved(fn (MaintenanceOrder $o) => $self->repair($o));
         ItTicket::saved(fn (ItTicket $t) => $t->wasChanged('assigned_to') || ($t->wasRecentlyCreated && $t->assigned_to) ? $self->ticketAssigned($t) : null);
@@ -47,6 +48,17 @@ class StaffAlerts
             'title' => 'Room ' . ($g->room?->number ?? '—') . ': ' . $g->type_label . ($vip ? ' · VIP' : ''),
             'body'  => $g->details ?: ($g->reservation?->guest?->full_name ?? 'A guest') . ' asked from their booking page.',
             'group' => 'guests', 'level' => $vip ? 'urgent' : 'normal', 'url' => 'work', 'thread' => "guest:{$g->id}", 'kind' => 'guest', 'item_id' => $g->id,
+        ]);
+    }
+
+    private function guestOrder(\App\Models\Pos\GuestOrder $o): void
+    {
+        $o = $o->fresh(['outlet', 'reservation.guest']) ?? $o;
+        $staff = $this->staffWith('Charge to room')->filter(fn (User $u) => $u->can('Use POS'))->values();
+        $this->send($staff, [
+            'title' => 'Room ' . ($o->room_number ?? '—') . ' ordered: ' . config('hotel.currency_symbol') . number_format((float) $o->total, 2) . ((bool) $o->reservation?->guest?->is_vip ? ' · VIP' : ''),
+            'body'  => $o->outlet?->name . ': ' . $o->summary,
+            'group' => 'guests', 'level' => 'urgent', 'url' => 'work', 'thread' => "order:{$o->id}", 'kind' => 'order', 'item_id' => $o->id,
         ]);
     }
 

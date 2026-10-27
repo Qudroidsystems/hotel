@@ -53,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
         // and actions on an existing booking are limited per booking instead.
         RateLimiter::for('booking-actions', fn (Request $r) => Limit::perMinute(30)->by('ba|' . $r->ip()));
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
+        RateLimiter::for('arrival', fn (Request $r) => Limit::perMinute(20)->by('ar|' . $r->route('token')));
         RateLimiter::for('booking-lookup', fn (Request $r) => Limit::perMinute(6)->by('bl|' . $r->ip()));
         RateLimiter::for('paystack-webhook', fn (Request $r) => Limit::perMinute(300)->by('pw|' . $r->ip()));
         RateLimiter::for('twilio-webhook', fn (Request $r) => Limit::perMinute(600)->by('tw|' . $r->ip()));
@@ -67,6 +68,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Alerts for the staff app and phones when work is assigned or something needs approving.
         \App\Services\Mobile\StaffAlerts::register();
+        // Arrival sharing stops once the guest is checked in (or the booking ends another way).
+        \App\Models\Reservation::updated(function (\App\Models\Reservation $r) {
+            if ($r->wasChanged('status') && in_array($r->status, [\App\Enums\ReservationStatus::CheckedIn, \App\Enums\ReservationStatus::Cancelled, \App\Enums\ReservationStatus::NoShow], true)
+                && \Illuminate\Support\Facades\Schema::hasTable('guest_arrivals')) {
+                app(\App\Services\Booking\ArrivalService::class)->stopFor($r, $r->status === \App\Enums\ReservationStatus::CheckedIn ? 'checked_in' : 'cancelled');
+            }
+        });
 
         // Texts to guests (Hotel Settings → Guest Messages): confirmation, deposit link, thank you, request updates.
         \App\Services\Messaging\MessagingHooks::register();

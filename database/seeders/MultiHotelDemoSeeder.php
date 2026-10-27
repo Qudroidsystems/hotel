@@ -28,7 +28,7 @@ class MultiHotelDemoSeeder extends Seeder
             'description' => $lagos->description ?: 'Our flagship on Victoria Island: rooftop pool, three restaurants and the Grand Ballroom.']);
 
         $abuja = Hotel::firstOrCreate(['slug' => 'b-luxury-abuja'], [
-            'name' => 'B Luxury Abuja', 'city' => 'Abuja', 'state' => 'FCT', 'country' => 'Nigeria', 'stars' => 4,
+            'name' => 'B Luxury Abuja', 'city' => 'Abuja', 'state' => 'FCT', 'country' => 'Nigeria', 'stars' => 4, 'latitude' => 9.0579, 'longitude' => 7.4951,
             'address' => 'Plot 12, Central Business District, Abuja', 'phone' => '+234 809 000 1122', 'email' => 'abuja@bluxury.test',
             'description' => 'Minutes from the Central Business District, with meeting rooms and an airport shuttle.',
         ]);

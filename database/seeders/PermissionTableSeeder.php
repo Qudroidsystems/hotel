@@ -121,6 +121,10 @@ class PermissionTableSeeder extends Seeder
             'Handle guest requests',
             'Message guests',
         ],
+        'Transport' => [
+            'Drive guests',        // drivers: their rides in the staff app
+            'Manage transport',    // dispatch, cars, drivers, fares
+        ],
         'Expenses' => [
             'Record expenses',
             'View expenses',

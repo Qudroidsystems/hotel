@@ -160,6 +160,65 @@ class OperationsController extends ApiController
     // ── Group (several hotels) ────────────────────────────────────────
 
     /** GET /group — every hotel today, for owners and group managers. */
+    // ── Driver mode ───────────────────────────────────────────────────
+
+    /** GET /driver — the driver's car, duty, the ride under way and the ones coming up. */
+    public function driver(Request $request, \App\Services\Transport\RideService $rides)
+    {
+        $d = $rides->driverFor($request->user());
+        abort_unless($d, 403, 'You are not set up as a driver. Ask the front desk.');
+
+        return $this->ok($this->driverJson($d, $rides));
+    }
+
+    /** POST /driver/duty {on} */
+    public function driverDuty(Request $request, \App\Services\Transport\RideService $rides)
+    {
+        $d = $rides->driverFor($request->user());
+        abort_unless($d, 403);
+        $on = $request->boolean('on');
+        $d->forceFill(['on_duty' => $on] + ($on ? [] : ['latitude' => null, 'longitude' => null]))->save();
+
+        return $this->ok($this->driverJson($d->fresh(), $rides), $on ? 'You’re on duty: new rides can come to you.' : 'Off duty. Your location is no longer shared.');
+    }
+
+    /** POST /driver/location {lat, lng} — every 30–60 s while on duty. */
+    public function driverLocation(Request $request, \App\Services\Transport\RideService $rides)
+    {
+        $d = $rides->driverFor($request->user());
+        abort_unless($d, 403);
+        $data = $request->validate(['lat' => 'required|numeric|between:-90,90', 'lng' => 'required|numeric|between:-180,180']);
+        if (! $d->on_duty && ! $d->activeRide()) {
+            return $this->ok(['on_duty' => false]);
+        }
+        $rides->driverLocation($d, (float) $data['lat'], (float) $data['lng']);
+
+        return $this->ok(['on_duty' => (bool) $d->on_duty]);
+    }
+
+    private function driverJson(\App\Models\Transport\Driver $d, \App\Services\Transport\RideService $rides): array
+    {
+        $active = $d->activeRide();
+        $row = fn (\App\Models\Transport\Ride $r) => $rides->rideJson($r) + ['nav' => $rides->navUrl($r), 'guest' => $r->guest_name, 'guest_phone' => $r->guest_phone, 'room' => $r->reservation?->rooms()->with('room')->get()->pluck('room.number')->filter()->implode(', ')];
+
+        return [
+            'id' => $d->id, 'name' => $d->name, 'on_duty' => (bool) $d->on_duty,
+            'car' => $d->vehicle ? ['name' => $d->vehicle->name, 'plate' => $d->vehicle->plate, 'label' => $d->vehicle->label] : null,
+            'licence_warning' => $d->licenceExpired() ? 'Your licence on file has expired. Tell the front desk.' : null,
+            'ride' => $active ? $row($active) : null,
+            'upcoming' => $d->rides()->where('status', \App\Models\Transport\Ride::ASSIGNED)->when($active, fn ($q) => $q->whereKeyNot($active->id))->orderBy('pickup_at')->limit(10)->get()->map($row)->values(),
+            'ping_seconds' => 45,
+        ];
+    }
+
+    /** GET /owner?scope=group — the owner's dashboard: this hotel, or every hotel together. */
+    public function owner(Request $request, \App\Services\Reports\OwnerDashboardService $dash)
+    {
+        abort_unless($request->user()->canAny(['View management reports', 'View finance reports']), 403);
+
+        return $this->ok($dash->build($request->user(), $request->query('scope') === 'group'));
+    }
+
     public function group(Request $request, \App\Services\Staff\StaffAppService $app)
     {
         abort_unless(\App\Support\Tenancy\CurrentHotel::multi() && $request->user()->can('Access all hotels'), 403);

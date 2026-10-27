@@ -33,7 +33,10 @@ class PosDemoSeeder extends Seeder
             ['Pool Bar', 'POOL', 'bar', '#0ea5e9', 'Happy hour 5–7pm daily'],
             ['Main Restaurant', 'REST', 'restaurant', '#ea580c', 'Thank you for dining with us'],
             ['Room Service', 'RMSV', 'room_service', '#7c3aed', 'Dial 0 for room service'],
-        ])->mapWithKeys(fn ($o, $i) => [$o[1] => PosOutlet::create(['name' => $o[0], 'code' => $o[1], 'type' => $o[2], 'color' => $o[3], 'receipt_footer' => $o[4], 'sort_order' => $i])]);
+        ])->mapWithKeys(fn ($o, $i) => [$o[1] => PosOutlet::create(['name' => $o[0], 'code' => $o[1], 'type' => $o[2], 'color' => $o[3], 'receipt_footer' => $o[4], 'sort_order' => $i]
+            // Room service takes orders from guests' rooms (guest app / room QR card), 6am to midnight.
+            + ($o[1] === 'RMSV' ? ['guest_orders' => true, 'guest_hours' => '06:00-00:00', 'delivery_minutes' => 30] : [])
+        )]);
 
         $menu = [
             // category, colour, charge type, outlets, items [name, price, sku]
@@ -89,6 +92,15 @@ class PosDemoSeeder extends Seeder
         // One mistake, voided by a supervisor.
         $mistake = PosOrder::where('method', 'cash')->latest('id')->first();
         $pos->void($mistake, 'Rung up twice', $admin);
+
+        // A guest has just ordered from their room: it waits on Room Orders for the kitchen to accept.
+        if (($r = $guests->last()) && $outlets['RMSV']->fresh()->openForGuests()) {
+            try {
+                app(\App\Services\Pos\GuestOrderService::class)->place($r, $outlets['RMSV']->id,
+                    [['item_id' => $items['MN-JOLL']->id, 'quantity' => 1], ['item_id' => $items['SD-WATR']->id, 'quantity' => 2]], 'Less pepper please', 'room');
+            } catch (\App\Exceptions\BookingException) {
+            }
+        }
 
         $this->command?->info(PosItem::count() . ' menu items in ' . $outlets->count() . ' outlets, ' . PosOrder::count() . ' demo sales.');
     }

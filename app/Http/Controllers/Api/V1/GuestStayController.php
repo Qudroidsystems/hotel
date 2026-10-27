@@ -10,6 +10,9 @@ use App\Services\Booking\GuestRequestService;
 use App\Services\Booking\OnlineBookingService;
 use App\Services\Booking\PaystackService;
 use App\Services\Loyalty\LoyaltyService;
+use App\Services\Pos\GuestOrderService;
+use App\Services\Booking\ArrivalService;
+use App\Services\Transport\RideService;
 use App\Support\Audit;
 use Illuminate\Http\Request;
 
@@ -61,6 +64,159 @@ class GuestStayController extends ApiController
         return $this->ok($this->stay($r->fresh()), "Thanks — your request for “{$req->type_label}” has been sent.", status: 201);
     }
 
+    /** GET /guest/stays/{token}/menu — what the guest can order to their room. */
+    public function menu(string $token, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+
+        return $this->ok([
+            'can_order' => $orders->canOrder($r),
+            'blocker'   => $orders->blocker($r),
+            'outlets'   => $orders->menu(),
+            'currency'  => config('hotel.currency_symbol'),
+        ]);
+    }
+
+    /** POST /guest/stays/{token}/orders  {outlet_id, lines: [{item_id, quantity, note}], note} */
+    public function order(Request $request, string $token, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate([
+            'outlet_id'        => 'required|integer',
+            'lines'            => 'required|array|min:1|max:' . GuestOrderService::MAX_LINES,
+            'lines.*.item_id'  => 'required|integer',
+            'lines.*.quantity' => 'required|integer|min:1|max:' . GuestOrderService::MAX_QUANTITY,
+            'lines.*.note'     => 'nullable|string|max:120',
+            'note'             => 'nullable|string|max:300',
+        ]);
+        try {
+            $order = $orders->place($r, (int) $data['outlet_id'], $data['lines'], $data['note'] ?? null, 'app');
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($this->stay($r->fresh()), "Order {$order->number} sent. We’ll let you know here when the kitchen has it.", status: 201);
+    }
+
+    /** POST /guest/stays/{token}/orders/{order}/cancel — only while the kitchen hasn't accepted it. */
+    public function cancelOrder(string $token, int $order, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+        $o = \App\Models\Pos\GuestOrder::where('reservation_id', $r->id)->findOrFail($order);
+        try {
+            $orders->cancelByGuest($o);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($this->stay($r->fresh()), "Order {$o->number} cancelled.");
+    }
+
+    /** POST /guest/stays/{token}/arrival {lat, lng, accuracy, speed} — start sharing, or where the guest is now. */
+    public function arrival(Request $request, string $token, ArrivalService $arrivals)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(['lat' => 'required|numeric|between:-90,90', 'lng' => 'required|numeric|between:-180,180', 'accuracy' => 'nullable|numeric|min:0', 'speed' => 'nullable|numeric|min:0|max:120']);
+        $was = $arrivals->current($r)?->isSharing();
+        try {
+            $arrivals->update($r, (float) $data['lat'], (float) $data['lng'], isset($data['accuracy']) ? (float) $data['accuracy'] : null, isset($data['speed']) ? (float) $data['speed'] : null);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok(['arrival' => $arrivals->forGuest($r->fresh())], $was ? null : 'We’ve let the hotel know you’re on your way.');
+    }
+
+    /** POST /guest/stays/{token}/arrival/stop */
+    public function stopArrival(string $token, ArrivalService $arrivals)
+    {
+        $r = $this->reservation($token);
+        $arrivals->stopFor($r);
+
+        return $this->ok(['arrival' => $arrivals->forGuest($r)], 'Stopped sharing. The hotel can no longer see where you are.');
+    }
+
+    /** GET /guest/stays/{token}/rides — the car service: places with set fares, and this stay's rides. */
+    public function rides(string $token, RideService $rides)
+    {
+        $r = $this->reservation($token);
+
+        return $this->ok($rides->forGuest($r) + [
+            'places' => $rides->places()->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'kind' => $p->kind, 'fare_label' => $p->fare !== null ? $rides->money((float) $p->fare) : null])->values(),
+            'priced_by_distance' => $rides->settings()['per_km'] > 0,
+            'min_notice' => $rides->settings()['min_notice'],
+            'phone' => $r->guest?->phone,
+            'search' => app(\App\Services\Maps\MapsService::class)->google(),   // address search (Google) is on
+        ]);
+    }
+
+    /** GET /guest/stays/{token}/places?q=&lat=&lng=&session= — address search for a pick-up (Google only). */
+    public function places(Request $request, string $token, \App\Services\Maps\MapsService $maps)
+    {
+        $this->reservation($token);
+        $d = $request->validate(['q' => 'required|string|max:120', 'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180', 'session' => 'nullable|string|max:64']);
+
+        return $this->ok($maps->search($d['q'], isset($d['lat']) ? (float) $d['lat'] : null, isset($d['lng']) ? (float) $d['lng'] : null, $d['session'] ?? null));
+    }
+
+    /** GET /guest/stays/{token}/places/{id} — a search result's position, for the price. */
+    public function place(Request $request, string $token, string $id, \App\Services\Maps\MapsService $maps)
+    {
+        $this->reservation($token);
+        $p = $maps->place($id, $request->query('session'));
+        abort_unless($p, 404, 'That place couldn’t be found. Try another search.');
+
+        return $this->ok(['lat' => $p[0], 'lng' => $p[1], 'label' => $p[2]]);
+    }
+
+    /** POST /guest/stays/{token}/rides/quote {place_id | lat, lng} */
+    public function rideQuote(Request $request, string $token, RideService $rides)
+    {
+        $this->reservation($token);
+        $d = $request->validate(['place_id' => 'nullable|integer', 'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180']);
+        try {
+            [$fare, $km] = $rides->quote(! empty($d['place_id']) ? \App\Models\Transport\RidePlace::find($d['place_id']) : null, $d['lat'] ?? null, $d['lng'] ?? null);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok(['fare' => $fare, 'fare_label' => $fare !== null ? $rides->money($fare) : 'The hotel will confirm the price', 'km' => $km]);
+    }
+
+    /** POST /guest/stays/{token}/rides */
+    public function bookRide(Request $request, string $token, RideService $rides)
+    {
+        $r = $this->reservation($token);
+        $d = $request->validate([
+            'direction' => 'required|in:to_hotel,from_hotel', 'place_id' => 'nullable|integer', 'label' => 'nullable|string|max:255',
+            'lat' => 'nullable|numeric|between:-90,90', 'lng' => 'nullable|numeric|between:-180,180', 'pickup_at' => 'nullable|date',
+            'passengers' => 'nullable|integer|min:1|max:20', 'bags' => 'nullable|integer|min:0|max:30', 'flight' => 'nullable|string|max:20',
+            'notes' => 'nullable|string|max:300', 'payment' => 'nullable|in:room,cash,card', 'phone' => 'nullable|string|max:30',
+            'google_place_id' => 'nullable|string|max:300', 'session' => 'nullable|string|max:64',
+        ]);
+        try {
+            $ride = $rides->book($r, $d, 'app');
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($this->stay($r->fresh()), "Car {$ride->number} booked. We’ll show your driver here as soon as one is assigned.", status: 201);
+    }
+
+    /** POST /guest/stays/{token}/rides/{ride}/cancel */
+    public function cancelRide(string $token, int $ride, RideService $rides)
+    {
+        $r = $this->reservation($token);
+        $x = \App\Models\Transport\Ride::where('reservation_id', $r->id)->findOrFail($ride);
+        try {
+            $rides->cancelByGuest($x);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($this->stay($r->fresh()), "Car {$x->number} cancelled.");
+    }
+
     /** POST /guest/stays/{token}/cancel */
     public function cancel(string $token)
     {
@@ -94,6 +250,7 @@ class GuestStayController extends ApiController
         $money = fn ($v) => $sym . number_format((float) $v, 2);
         $paystack = app(PaystackService::class);
         $loyalty = app(LoyaltyService::class);
+        $orderSvc = app(GuestOrderService::class);
         $g = $r->guest;
 
         $depositDue = $this->booking->depositDue($r);
@@ -157,6 +314,11 @@ class GuestStayController extends ApiController
             'receipt_url'  => $r->folio && in_array($r->status, [S::CheckedIn, S::CheckedOut], true) ? route('stay.receipt', $r->guest_token) : null,   // the bill, to print or save as PDF
             'can_request'  => $canRequest,
             'request_types' => $canRequest ? collect(GuestRequest::TYPES)->map(fn ($t, $k) => ['key' => $k, 'label' => $t[0]])->values() : [],
+            'arrival'      => app(ArrivalService::class)->forGuest($r),
+            'cars'         => app(RideService::class)->forGuest($r),
+            'can_order'    => $orderSvc->canOrder($r),
+            'order_note'   => $r->status === S::CheckedIn && ! $orderSvc->canOrder($r) && $orderSvc->outlets()->isNotEmpty() ? $orderSvc->blocker($r) : null,
+            'orders'       => $orderSvc->forGuest($r),
             'requests'     => $r->guestRequests->map(fn (GuestRequest $q) => [
                 'id'           => $q->id,
                 'type'         => $q->type,
@@ -169,6 +331,8 @@ class GuestStayController extends ApiController
             ])->values(),
             'hotel' => [
                 'name'      => config('hotel.name'),
+                'latitude'  => app(ArrivalService::class)->hotelPoint()[0] ?? null,
+                'longitude' => app(ArrivalService::class)->hotelPoint()[1] ?? null,
                 'phone'     => config('hotel.booking.contact_phone'),
                 'email'     => config('hotel.booking.contact_email'),
                 'address'   => config('hotel.booking.address'),

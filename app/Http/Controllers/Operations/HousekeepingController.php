@@ -90,9 +90,12 @@ class HousekeepingController extends Controller
                     default                                          => 'ready',
                 };
 
+                $guest = $arriving->get($room->id);
+
                 return (object) [
                     'room' => $room, 'task' => $task, 'state' => $state,
-                    'arriving' => $arriving->get($room->id), 'leaving' => $leaving->has($room->id),
+                    'arriving' => $guest, 'leaving' => $leaving->has($room->id),
+                    'coming' => $guest ? app(\App\Services\Booking\ArrivalService::class)->forStaff($guest) : null,
                     'mine' => $task && (int) $task->assigned_to === (int) $user->id,
                 ];
             })

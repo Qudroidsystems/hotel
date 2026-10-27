@@ -42,6 +42,81 @@
                 </div>
             @endif
 
+            @if ($arrival['available'] || $arrival['note'])
+                <div class="panel arrive" id="arrive" data-url="{{ route('stay.arrival', $r->guest_token) }}">
+                    <h2><i class="ri-navigation-line"></i> On your way?</h2>
+                    @if ($arrival['available'])
+                        <p class="muted small">Get directions to the hotel. You can also share your arrival: we’ll see roughly how far away you are, so your room is ready and someone meets you. Sharing stops when you arrive, when you check in, or when you turn it off.</p>
+                        <div class="arrive-live" id="arriveLive" @unless ($arrival['sharing']) hidden @endunless>
+                            <span class="dot" aria-hidden="true"></span>
+                            <div><strong id="arriveEta">{{ $arrival['eta_label'] ? 'About ' . $arrival['eta_label'] . ' away' : 'Sharing your arrival' }}</strong>
+                                <div class="small muted" id="arriveDist">{{ $arrival['distance_label'] }}</div></div>
+                        </div>
+                        <div class="arrive-btns">
+                            <a class="btn" href="{{ $arrival['directions']['google'] }}" target="_blank" rel="noopener" id="arriveDir"><i class="ri-route-line"></i> Directions</a>
+                            <button type="button" class="btn quiet" id="arriveToggle" data-on="{{ $arrival['sharing'] ? 1 : 0 }}">{{ $arrival['sharing'] ? 'Stop sharing' : 'Share my arrival' }}</button>
+                        </div>
+                        <p class="small muted" id="arriveMsg" role="status"></p>
+                    @else
+                        <p class="muted small">{{ $arrival['note'] }}</p>
+                        @if ($arrival['directions'])<a class="btn quiet" href="{{ $arrival['directions']['google'] }}" target="_blank" rel="noopener"><i class="ri-route-line"></i> Directions to the hotel</a>@endif
+                    @endif
+                </div>
+            @endif
+
+            @if ($cars['available'] || count($cars['rides']))
+                <div class="panel cars" id="cars">
+                    <h2><i class="ri-taxi-line"></i> The hotel's car</h2>
+                    @foreach ($cars['rides'] as $c)
+                        <div class="reqrow">
+                            <i class="ri-car-line"></i>
+                            <div class="grow"><strong>{{ $c['route'] }}</strong>
+                                <div class="small muted">{{ $c['number'] }} · {{ $c['when'] }} · {{ $c['fare_label'] }}</div>
+                                @if ($c['driver'])<div class="small">{{ $c['driver']['name'] }}{{ $c['car'] ? ' · ' . $c['car']['label'] : '' }}@if ($c['driver']['phone']) · <a href="tel:{{ $c['driver']['phone'] }}">{{ $c['driver']['phone'] }}</a>@endif</div>@endif
+                                @if ($c['eta_minutes'] !== null && in_array($c['status'], ['on_the_way'], true))<div class="small"><strong>About {{ $c['eta_minutes'] }} min away</strong></div>@endif
+                                @if ($c['cancel_reason'])<div class="small muted">{{ $c['cancel_reason'] }}</div>@endif
+                            </div>
+                            <div style="text-align:right">
+                                <span class="pill {{ ['requested' => 'warn', 'cancelled' => 'bad', 'completed' => 'grey'][$c['status']] ?? '' }}">{{ $c['status_label'] }}</span>
+                                @if ($c['can_cancel'])<form method="POST" action="{{ route('stay.rides.cancel', [$r->guest_token, $c['id']]) }}" onsubmit="return confirm('Cancel this car?')">@csrf<button class="btn quiet" style="min-height:34px;padding:0 10px;margin-top:6px;font-size:13px">Cancel</button></form>@endif
+                            </div>
+                        </div>
+                    @endforeach
+                    @if ($cars['available'])
+                        <details class="car-form" @if ($errors->any() && old('direction')) open @endif>
+                            <summary class="btn quiet" style="margin-top:10px"><i class="ri-add-line"></i> Book a car</summary>
+                            <form method="POST" action="{{ route('stay.rides.book', $r->guest_token) }}" class="req" style="margin-top:12px">@csrf
+                                <div class="chips">
+                                    <label class="chip"><input type="radio" name="direction" value="to_hotel" @checked(old('direction', $r->status->value === 'checked_in' ? 'from_hotel' : 'to_hotel') === 'to_hotel')><span><i class="ri-login-box-line"></i> Pick me up</span></label>
+                                    <label class="chip"><input type="radio" name="direction" value="from_hotel" @checked(old('direction', $r->status->value === 'checked_in' ? 'from_hotel' : 'to_hotel') === 'from_hotel')><span><i class="ri-logout-box-r-line"></i> From the hotel</span></label>
+                                </div>
+                                @if ($carPlaces->isNotEmpty())
+                                    <div class="field"><label for="place_id">Where</label><select id="place_id" name="place_id"><option value="">Another address (type it below)</option>@foreach ($carPlaces as $p)<option value="{{ $p->id }}" @selected(old('place_id') == $p->id)>{{ $p->name }}{{ $p->fare !== null ? ' — ' . config('hotel.currency_symbol') . number_format((float) $p->fare) : '' }}</option>@endforeach</select></div>
+                                @endif
+                                <div class="field"><label for="label">Address</label><input id="label" name="label" maxlength="255" value="{{ old('label') }}" placeholder="Street, area, landmark"></div>
+                                <div class="field"><label for="pickup_at">When (leave empty for as soon as possible)</label><input id="pickup_at" type="datetime-local" name="pickup_at" value="{{ old('pickup_at') }}"></div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+                                    <div class="field"><label for="passengers">People</label><input id="passengers" type="number" name="passengers" min="1" max="20" value="{{ old('passengers', $r->adults) }}"></div>
+                                    <div class="field"><label for="bags">Bags</label><input id="bags" type="number" name="bags" min="0" max="30" value="{{ old('bags', 1) }}"></div>
+                                    <div class="field"><label for="flight">Flight</label><input id="flight" name="flight" maxlength="20" value="{{ old('flight') }}" placeholder="e.g. P47130"></div>
+                                </div>
+                                <div class="field"><label for="notes">For the driver (optional)</label><input id="notes" name="notes" maxlength="300" value="{{ old('notes') }}"></div>
+                                <button class="btn" type="submit"><i class="ri-taxi-line"></i> Book the car</button>
+                                <p class="small muted">The fare goes on your room bill. Places listed have a set fare; other addresses are priced by distance or confirmed by the hotel.</p>
+                            </form>
+                        </details>
+                    @endif
+                </div>
+            @endif
+
+            @if ($canOrder)
+                <a class="panel order-cta" href="{{ route('stay.order', $r->guest_token) }}">
+                    <i class="ri-restaurant-line" aria-hidden="true"></i>
+                    <div class="grow"><h2>Order to your room</h2><p class="muted small">Food and drinks from the menu, added to your bill.</p></div>
+                    <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                </a>
+            @endif
+
             @if ($canRequest)
                 <div class="panel">
                     <h2>Need something?</h2>
@@ -171,6 +246,19 @@
     .reqrow:first-of-type { border-top: 0; }
     .reqrow > i { font-size: 20px; color: var(--lagoon); margin-top: 2px; } .grow { flex: 1; }
     .bill summary { cursor: pointer; list-style: none; }
+    .arrive h2 i, .cars h2 i { color: var(--lagoon); }
+    .car-form summary { list-style: none; display: inline-flex; }
+    @media (max-width: 520px) { .cars .reqrow { flex-wrap: wrap; } .cars .reqrow > div:last-child { width: 100%; text-align: left !important; display: flex; gap: 10px; align-items: center; } .cars .reqrow > div:last-child form button { margin-top: 0 !important; } }
+    .car-form summary::-webkit-details-marker { display: none; }
+    .arrive-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .arrive-live[hidden] { display: none; }
+    .arrive-live { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--lagoon-l); margin: 8px 0; }
+    .arrive-live .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--lagoon); box-shadow: 0 0 0 0 rgba(15,118,110,.5); animation: pulse 1.8s infinite; flex: 0 0 auto; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,118,110,.45); } 70% { box-shadow: 0 0 0 12px rgba(15,118,110,0); } 100% { box-shadow: 0 0 0 0 rgba(15,118,110,0); } }
+    @media (prefers-reduced-motion: reduce) { .arrive-live .dot { animation: none; } }
+    .order-cta { display: flex; gap: 14px; align-items: center; text-decoration: none; color: var(--ink); border-color: var(--lagoon); }
+    .order-cta > i { font-size: 28px; color: var(--lagoon); }
+    .order-cta h2 { margin: 0; } .order-cta p { margin: 2px 0 0; }
     .keep { margin-top: 26px; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .stay h1 { font-size: 28px; } }
     @media (max-width: 480px) { .qrbox { flex-direction: column; text-align: center; } }
@@ -184,6 +272,53 @@
 <script>
     if (window.QRCode) new QRCode(document.getElementById('qr'), { text: @json(route('reservations.qr', $r->qr_token)), width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
     else document.getElementById('qr').innerHTML = '<div style="width:150px;padding:20px 6px;text-align:center;font-weight:700">{{ $r->reference }}</div>';
+</script>
+@endpush
+@endif
+
+@if ($arrival['available'])
+@push('scripts')
+<script>
+(() => {
+    const box = document.getElementById('arrive');
+    const btn = document.getElementById('arriveToggle'), live = document.getElementById('arriveLive');
+    const msg = document.getElementById('arriveMsg'), eta = document.getElementById('arriveEta'), dist = document.getElementById('arriveDist');
+    const csrf = document.querySelector('meta[name=csrf-token]')?.content || @json(csrf_token());
+    // Apple devices open Apple Maps; everyone else Google Maps.
+    if (/iPhone|iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) document.getElementById('arriveDir').href = @json($arrival['directions']['apple']);
+    let watch = null, last = 0, on = btn.dataset.on === '1';
+    const post = async (body) => {
+        const res = await fetch(box.dataset.url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify(body) });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.message || 'Could not reach the hotel.');
+        return json.arrival;
+    };
+    const show = (a) => {
+        on = !!(a && a.sharing);
+        live.hidden = !on;
+        btn.textContent = on ? 'Stop sharing' : 'Share my arrival';
+        if (a && a.sharing) { eta.textContent = a.eta_label ? 'About ' + a.eta_label + ' away' : 'Sharing your arrival'; dist.textContent = a.distance_label || ''; }
+        if (a && a.arrived) { msg.textContent = 'Welcome! We can see you’ve arrived.'; stop(false); }
+    };
+    function start() {
+        if (!navigator.geolocation) { msg.textContent = 'This browser can’t share your location. Use the Directions button instead.'; return; }
+        msg.textContent = 'Asking your phone where you are…';
+        watch = navigator.geolocation.watchPosition(async (p) => {
+            if (Date.now() - last < 45000 && on) return;   // about once a minute
+            last = Date.now();
+            try { show(await post({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed })); msg.textContent = 'The hotel can see you’re on the way. Keep this page open while you travel.'; }
+            catch (e) { msg.textContent = e.message; stop(false); }
+        }, () => { msg.textContent = 'Location is off for this page. Allow it in your browser, or use Directions.'; stop(false); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
+    }
+    async function stop(tell = true) {
+        if (watch !== null) navigator.geolocation.clearWatch(watch);
+        watch = null;
+        if (tell) { try { show(await post({ stop: 1 })); msg.textContent = 'Stopped. The hotel can no longer see where you are.'; } catch (e) {} }
+        else { live.hidden = true; btn.textContent = 'Share my arrival'; on = false; }
+    }
+    btn.addEventListener('click', () => on || watch !== null ? stop(true) : start());
+    if (on) start();   // still sharing from earlier: carry on while the page is open
+})();
 </script>
 @endpush
 @endif

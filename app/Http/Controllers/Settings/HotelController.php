@@ -118,6 +118,8 @@ class HotelController extends Controller
             'stars'       => 'nullable|integer|min:1|max:5',
             'sort_order'  => 'nullable|integer|min:0|max:999',
             'commission_percent' => 'nullable|numeric|min:0|max:50',
+            'latitude'    => 'nullable|numeric|between:-90,90|required_with:longitude',
+            'longitude'   => 'nullable|numeric|between:-180,180|required_with:latitude',
             'logo_file'   => 'nullable|image|max:2048',
             'cover_file'  => 'nullable|image|max:5120',
         ]);

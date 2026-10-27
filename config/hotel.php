@@ -141,6 +141,8 @@ return [
             'Smoking is not allowed in rooms.',
         ],
         'guest_requests'  => true,
+        'guest_ordering'  => true,
+        'arrival_sharing' => true,   // guests on the way can share their arrival (needs the hotel's map position)   // room orders from the guest app / room QR card (outlets choose in Menu & Prices)
     ],
 
     /*
@@ -179,6 +181,29 @@ return [
     | bill, and tiers from nights stayed in the last 12 months. Members of a
     | tier get its discount on room rates booked online.
     */
+    'maps' => [
+        'provider' => env('MAPS_PROVIDER', 'osm'),   // osm or google
+    ],
+
+    'transport' => [
+        'enabled'            => true,   // guests can book the hotel's cars (once there is a driver)
+        'base_fare'          => 2000,
+        'per_km'             => 400,
+        'minimum_fare'       => 3000,
+        'round_to'           => 500,
+        'min_notice_minutes' => 30,     // a booked time sooner than this counts as "as soon as possible"
+        'max_km'             => 150,
+    ],
+
+    'revenue' => [
+        'high_occupancy' => 80, 'high_change' => 15,
+        'mid_occupancy'  => 60, 'mid_change'  => 5,
+        'low_days'       => 7,  'low_occupancy' => 35, 'low_change' => 10,
+        'max_change'     => 25,
+        'round_to'       => 500,
+        'auto'           => false,
+    ],
+
     'loyalty' => [
         'enabled'         => (bool) env('HOTEL_LOYALTY_ENABLED', true),
         'prefix'          => 'SH',      // member numbers: SH000123

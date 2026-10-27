@@ -2,6 +2,10 @@
 
 namespace App\Services\Mobile;
 
+use App\Models\Pos\GuestOrder;
+use App\Models\Transport\Ride;
+use App\Services\Transport\RideService;
+use App\Services\Pos\GuestOrderService;
 use App\Exceptions\BookingException;
 use App\Models\Booking\GuestRequest;
 use App\Models\CashShift;
@@ -34,10 +38,12 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffActions
 {
-    public const WORK_KINDS = ['guest', 'housekeeping', 'maintenance', 'ticket'];
+    public const WORK_KINDS = ['ride', 'order', 'guest', 'housekeeping', 'maintenance', 'ticket'];
     public const APPROVAL_KINDS = ['expense', 'po', 'pr', 'shift', 'count'];
 
     private const GROUPS = [
+        'ride'         => 'Cars',
+        'order'        => 'Room orders',
         'guest'        => 'Guest requests',
         'housekeeping' => 'Rooms to clean',
         'maintenance'  => 'Repairs',
@@ -116,6 +122,8 @@ class StaffActions
             'housekeeping' => $this->housekeeping($user, $model, $action, $input),
             'maintenance'  => $this->maintenance($user, $model, $action, $input),
             'guest'        => $this->guest($user, $model, $action, $input),
+            'order'        => $this->order($user, $model, $action, $input),
+            'ride'         => $this->ride($user, $model, $action, $input),
             'expense'      => $this->expense($user, $model, $action, $input),
             'po'           => $this->po($user, $model, $action, $input),
             'pr'           => $this->pr($user, $model, $action, $input),
@@ -159,6 +167,29 @@ class StaffActions
             'progress'    => tap('Marked as on it — the guest can see that.', fn () => $svc->update($g, $user, 'in_progress', $note)),
             'done'        => tap('Done — the guest can see that.', fn () => $svc->update($g, $user, 'done', $note)),
             'maintenance' => $svc->toMaintenance($g, $user)->number . ' raised for maintenance.',
+        };
+    }
+
+    private function ride(User $user, Ride $r, string $action, ?string $input): string
+    {
+        $svc = app(RideService::class);
+
+        return match ($action) {
+            'auto'   => ($d = $svc->autoAssign($r, $user)) ? "{$r->number} given to {$d->name}." : throw new BookingException('No driver is free with a car. Assign one on the website.'),
+            'cancel' => tap("{$r->number} cancelled.", fn () => $svc->cancel($r, (string) $input, $user)),
+            default  => $svc->driverAction($r, $user, $action, $input),
+        };
+    }
+
+    private function order(User $user, GuestOrder $o, string $action, ?string $input): string
+    {
+        $svc = app(GuestOrderService::class);
+
+        return match ($action) {
+            'accept'  => tap("{$o->number} accepted — on room {$o->room_number}'s bill.", fn () => $svc->accept($o, $user, $input)),
+            'send'    => tap("{$o->number} on its way — the guest can see that.", fn () => $svc->send($o, $user)),
+            'deliver' => tap("{$o->number} delivered.", fn () => $svc->deliver($o, $user)),
+            'decline' => tap("{$o->number} declined — the guest sees your reason.", fn () => $svc->decline($o, $user, (string) $input)),
         };
     }
 
@@ -241,6 +272,32 @@ class StaffActions
                         ? $b('maintenance', 'Send to maintenance', '', null, false, 'Raise a work order for this room?') : null,
                 ]));
 
+            case 'ride':
+                $mine = $m->driver_id && ($d = app(RideService::class)->driverFor($user)) && $d->id === $m->driver_id;
+                $desk = $user->can('Manage transport');
+
+                return array_values(array_filter([
+                    $desk && $m->status === Ride::REQUESTED ? $b('auto', 'Give to nearest free driver', 'primary') : null,
+                    $mine && $m->status === Ride::ASSIGNED ? $b('start', 'On my way', 'primary') : null,
+                    $mine && in_array($m->status, [Ride::ASSIGNED, Ride::ON_THE_WAY], true) ? $b('arrived', 'I\'m at the pick-up', $m->status === Ride::ON_THE_WAY ? 'primary' : '') : null,
+                    $mine && in_array($m->status, [Ride::ARRIVED, Ride::ON_THE_WAY], true) ? $b('picked_up', 'Guest picked up', $m->status === Ride::ARRIVED ? 'primary' : '') : null,
+                    $mine && $m->status === Ride::ON_TRIP ? $b('complete', 'Dropped off', 'primary') : null,
+                    $mine && $m->status === Ride::ASSIGNED ? $b('decline', 'Can\'t do it', 'destructive', 'Why? (the front desk sees it)', true) : null,
+                    $desk && in_array($m->status, [Ride::REQUESTED, Ride::ASSIGNED], true) ? $b('cancel', 'Cancel ride', 'destructive', 'Reason (the guest sees it)', true) : null,
+                ]));
+
+            case 'order':
+                if (! app(GuestOrderService::class)->canHandle($user)) {
+                    return [];
+                }
+
+                return array_values(array_filter([
+                    $m->status === GuestOrder::PLACED ? $b('accept', 'Accept — add to bill', 'primary', 'Message to the guest (optional)') : null,
+                    $m->status === GuestOrder::PLACED ? $b('decline', 'Decline', 'destructive', 'Reason (the guest sees it)', true) : null,
+                    $m->status === GuestOrder::ACCEPTED ? $b('send', 'On the way', 'primary') : null,
+                    in_array($m->status, [GuestOrder::ACCEPTED, GuestOrder::ON_THE_WAY], true) ? $b('deliver', 'Delivered', $m->status === GuestOrder::ON_THE_WAY ? 'primary' : '') : null,
+                ]));
+
             case 'expense':
                 return $user->can('Approve expenses') && $m->status === 'pending' && $m->recorded_by !== $user->id
                     ? [$b('approve', 'Approve', 'primary', null, false, "Approve {$m->number}?"), $b('reject', 'Reject', 'destructive', 'Reason', true)] : [];
@@ -267,6 +324,8 @@ class StaffActions
             'housekeeping' => $user->canAny(['Do housekeeping tasks', 'Manage housekeeping']),
             'maintenance'  => $user->canAny(['View maintenance', 'Manage maintenance']),
             'guest'        => $user->can('Handle guest requests'),
+            'order'        => app(GuestOrderService::class)->canHandle($user),
+            'ride'         => $user->canAny(['Manage transport', 'Drive guests']),
             'ticket'       => $user->can('Manage IT tickets'),
             'expense'      => $user->can('Approve expenses'),
             'po', 'pr'     => $user->can('Approve purchases'),
@@ -291,6 +350,26 @@ class StaffActions
                 'detail'       => $m->details ? '“' . $m->details . '”' : null,
                 'status'       => $m->status, 'status_label' => $m->status_label, 'tone' => $this->tone($m->status_pill),
                 'url'          => route('guest-requests.index'),
+            ],
+            'ride' => [
+                'badge'        => $m->pickup_at ? $m->pickup_at->format('H:i') : 'NOW',
+                'title'        => $m->toHotel() ? 'Pick up: ' . $m->place_label : 'To: ' . $m->place_label,
+                'subtitle'     => trim(($m->guest_name ?? 'Guest') . ' · ' . $m->passengers . ' pax' . ($m->bags ? ', ' . $m->bags . ' bags' : '') . ($m->flight ? ' · flight ' . $m->flight : '')),
+                'detail'       => trim($m->when_label . ($m->notes ? ' — “' . $m->notes . '”' : '')),
+                'meta'         => $m->driver ? $m->driver->name . ' · ' . $m->vehicle?->label : 'No driver yet' . ($m->fare !== null ? ' · ' . config('hotel.currency_symbol') . number_format((float) $m->fare, 0) : ''),
+                'status'       => $m->status, 'status_label' => $m->staff_label, 'tone' => $this->tone($m->status_pill),
+                'url'          => route('transport.index'),
+                'nav'          => app(RideService::class)->navUrl($m),
+                'phone'        => $m->guest_phone,
+            ],
+            'order' => [
+                'badge'        => $m->room_number,
+                'title'        => $m->outlet?->name . ' · ' . $m->number,
+                'subtitle'     => ($m->guest_name ?? 'Guest') . ' · ' . config('hotel.currency_symbol') . number_format((float) $m->total, 2),
+                'detail'       => $m->summary . ($m->note ? ' — “' . $m->note . '”' : ''),
+                'meta'         => collect($m->lines)->filter(fn ($l) => ! empty($l['note']))->map(fn ($l) => $l['name'] . ': ' . $l['note'])->implode(' · ') ?: null,
+                'status'       => $m->status, 'status_label' => $m->staff_label, 'tone' => $this->tone($m->status_pill),
+                'url'          => route('pos.room-orders'),
             ],
             'housekeeping' => [
                 'badge'        => $m->room?->number,
@@ -377,6 +456,8 @@ class StaffActions
             'housekeeping' => HousekeepingTask::class,
             'maintenance'  => MaintenanceOrder::class,
             'guest'        => GuestRequest::class,
+            'order'        => GuestOrder::class,
+            'ride'         => Ride::class,
             'ticket'       => ItTicket::class,
             'expense'      => Expense::class,
             'po'           => PurchaseOrder::class,

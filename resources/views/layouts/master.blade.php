@@ -559,6 +559,10 @@
                                     @endcanany
                                     @can('Manage rates')
                                         <li class="nav-item"><a href="{{ route('rates.index') }}" class="nav-link">Rates &amp; Seasons</a></li>
+                                        <li class="nav-item"><a href="{{ route('rates.revenue') }}" class="nav-link">Revenue &amp; Pricing</a></li>
+                                    @endcan
+                                    @can('Manage transport')
+                                        <li class="nav-item"><a href="{{ route('transport.index') }}" class="nav-link">Car Service</a></li>
                                     @endcan
                                     @canany(['View room calendars', 'Manage room calendars'])
                                         <li class="nav-item"><a href="{{ route('channels.index') }}" class="nav-link">Room Calendars</a></li>
@@ -616,6 +620,9 @@
                                     @can('Use POS')
                                         <li class="nav-item"><a href="{{ route('pos.terminal') }}" class="nav-link">Open Till (POS)</a></li>
                                     @endcan
+                                    @if (auth()->user()->can('Use POS') && auth()->user()->can('Charge to room'))
+                                        <li class="nav-item"><a href="{{ route('pos.room-orders') }}" class="nav-link">Room Orders</a></li>
+                                    @endif
                                     @canany(['View POS reports', 'Use POS'])
                                         <li class="nav-item"><a href="{{ route('pos.orders') }}" class="nav-link">@can('View POS reports')Sales @else My Sales @endcan</a></li>
                                     @endcanany
@@ -1419,6 +1426,7 @@
         {title:'Open Till (POS)',                       url:'{{ route("pos.terminal") }}',                                   icon:'mdi-cash-register',           category:'Bar & Restaurant',    keywords:['pos','till','bar','restaurant','sell','order','drinks','food']},
         @endcan
         @canany(['View POS reports', 'Use POS'])
+        {title:'Room Orders',                           url:'{{ route("pos.room-orders") }}',                                icon:'mdi-room-service',            category:'Bar & Restaurant',    keywords:['room service','orders','guest app','qr','food','drinks','kitchen']},
         {title:'Bar & Restaurant Sales',                url:'{{ route("pos.orders") }}',                                     icon:'mdi-receipt-text',            category:'Bar & Restaurant',    keywords:['pos','sales','orders','bar','restaurant','void','report']},
         @endcanany
         @can('Manage POS menu')
@@ -1472,6 +1480,8 @@
         {title:'Expense Categories & Budgets',          url:'{{ route("expenses.categories.index") }}',                  icon:'mdi-folder-cog-outline',      category:'Finance',             keywords:['budget','expense category']},
         @endcan
         @can('Handle guest requests')
+        @can('Manage transport'){title:'Car Service',                         url:'{{ route("transport.index") }}',                            icon:'mdi-car',                     category:'Front Desk',          keywords:['car','taxi','driver','pickup','airport','transfer','ride','fleet','uber']},@endcan
+        @can('Manage rates'){title:'Revenue & Pricing',                     url:'{{ route("rates.revenue") }}',                              icon:'mdi-chart-line',              category:'Front Desk',          keywords:['revenue','pricing','suggested','occupancy','pickup','yield','dynamic pricing']},@endcan
         @can('Manage rates'){title:'Rates & Seasons',                       url:'{{ route("rates.index") }}',                                icon:'mdi-tag-multiple-outline',    category:'Front Desk',          keywords:['rates','prices','season','promo','discount','rate plan','calendar','peak']},@endcan
         @can('View company accounts'){title:'Company Accounts',             url:'{{ route("companies.index") }}',                            icon:'mdi-domain',                  category:'Front Desk',          keywords:['company','corporate','city ledger','account','statement','invoice','credit']},@endcan
         @canany(['View events', 'Manage events']){title:'Events & Halls',   url:'{{ route("events.index") }}',                               icon:'mdi-party-popper',            category:'Front Desk',          keywords:['event','hall','conference','wedding','banquet','meeting']},@endcanany

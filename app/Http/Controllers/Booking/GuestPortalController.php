@@ -11,6 +11,7 @@ use App\Models\Reservation;
 use App\Services\Booking\GuestRequestService;
 use App\Services\Booking\OnlineBookingService;
 use App\Services\Booking\PaystackService;
+use App\Services\Pos\GuestOrderService;
 use App\Support\Audit;
 use Illuminate\Http\Request;
 
@@ -62,9 +63,112 @@ class GuestPortalController extends Controller
             'testMode'   => $paystack->isTestMode(),
             'accounts'   => HotelBankAccount::ordered()->where('is_active', true)->where('show_on_invoice', true)->get(),
             'canRequest' => config('hotel.booking.guest_requests', true) && $r->status === ReservationStatus::CheckedIn,
+            'canOrder'   => app(GuestOrderService::class)->canOrder($r),
+            'arrival'    => app(\App\Services\Booking\ArrivalService::class)->forGuest($r),
+            'cars'       => app(\App\Services\Transport\RideService::class)->forGuest($r),
+            'carPlaces'  => app(\App\Services\Transport\RideService::class)->places(),
         ];
 
         return view('booking.stay', $data);
+    }
+
+    /** The booking page's "Share my arrival" (while the page is open): JSON. */
+    public function arrival(Request $request, string $token, \App\Services\Booking\ArrivalService $arrivals)
+    {
+        $r = $this->reservation($token);
+        if ($request->boolean('stop')) {
+            $arrivals->stopFor($r);
+
+            return response()->json(['arrival' => $arrivals->forGuest($r)]);
+        }
+        $data = $request->validate(['lat' => 'required|numeric|between:-90,90', 'lng' => 'required|numeric|between:-180,180', 'accuracy' => 'nullable|numeric|min:0', 'speed' => 'nullable|numeric|min:0|max:120']);
+        try {
+            $arrivals->update($r, (float) $data['lat'], (float) $data['lng'], $data['accuracy'] ?? null, $data['speed'] ?? null);
+        } catch (BookingException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['arrival' => $arrivals->forGuest($r->fresh())]);
+    }
+
+    /** Book one of the hotel's cars from the booking page. */
+    public function bookRide(Request $request, string $token, \App\Services\Transport\RideService $rides)
+    {
+        $r = $this->reservation($token);
+        $d = $request->validate([
+            'direction' => 'required|in:to_hotel,from_hotel', 'place_id' => 'nullable|integer', 'label' => 'nullable|string|max:255',
+            'pickup_at' => 'nullable|date', 'passengers' => 'nullable|integer|min:1|max:20', 'bags' => 'nullable|integer|min:0|max:30',
+            'flight' => 'nullable|string|max:20', 'notes' => 'nullable|string|max:300',
+        ]);
+        try {
+            $ride = $rides->book($r, $d, 'web');
+        } catch (BookingException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->to(route('stay.show', $token) . '#cars')->with('success', "Car {$ride->number} booked. Your driver’s name and car show here once one is assigned.");
+    }
+
+    public function cancelRide(string $token, int $ride, \App\Services\Transport\RideService $rides)
+    {
+        $r = $this->reservation($token);
+        $x = \App\Models\Transport\Ride::where('reservation_id', $r->id)->findOrFail($ride);
+        try {
+            $rides->cancelByGuest($x);
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Car {$x->number} cancelled.");
+    }
+
+    /** Order food and drinks to the room (checked-in guests). */
+    public function order(string $token, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+        $r->load('guest', 'rooms.room');
+
+        return view('booking.order', [
+            'r'       => $r,
+            'blocker' => $orders->blocker($r),
+            'menu'    => $orders->menu(),
+            'orders'  => $orders->forGuest($r),
+        ]);
+    }
+
+    public function placeOrder(Request $request, string $token, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate([
+            'outlet_id' => 'required|integer',
+            'qty'       => 'required|array',
+            'qty.*'     => 'nullable|integer|min:0|max:' . GuestOrderService::MAX_QUANTITY,
+            'item_note' => 'nullable|array',
+            'item_note.*' => 'nullable|string|max:120',
+            'note'      => 'nullable|string|max:300',
+        ]);
+        $lines = collect($data['qty'])->filter(fn ($q) => (int) $q > 0)
+            ->map(fn ($q, $id) => ['item_id' => (int) $id, 'quantity' => (int) $q, 'note' => $data['item_note'][$id] ?? null])->values()->all();
+        try {
+            $order = $orders->place($r, (int) $data['outlet_id'], $lines, $data['note'] ?? null, session('room_qr_last') === $token ? 'room' : 'web');
+        } catch (BookingException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('stay.order', $token)->with('success', "Order {$order->number} sent to the kitchen. This page shows when it’s accepted and on its way.");
+    }
+
+    public function cancelOrder(string $token, int $order, GuestOrderService $orders)
+    {
+        $r = $this->reservation($token);
+        $o = \App\Models\Pos\GuestOrder::where('reservation_id', $r->id)->findOrFail($order);
+        try {
+            $orders->cancelByGuest($o);
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Order {$o->number} cancelled.");
     }
 
     /** The guest's copy of their bill: every charge and payment, to print or save as PDF. */

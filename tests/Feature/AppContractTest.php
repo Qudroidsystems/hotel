@@ -54,6 +54,13 @@ test('the staff app finds every field it reads', function () {
     $check('home (HomeData)', $home, ['approvals', 'attendance', 'counts', 'date', 'features', 'greeting', 'today', 'work']);
     $check('home.today (TodayFigures)', $home['today'] ?? null, ['arrivals', 'arrived', 'collected_label', 'departures', 'dirty', 'in_house', 'it_down', 'maintenance', 'occupancy', 'occupied', 'room_status', 'rooms']);
 
+    $own = ($this->api)('owner')->json('data');
+    $check('owner (OwnerDashboard)', $own, ['alerts', 'ahead', 'can_group', 'daily', 'headline', 'hotels', 'month', 'period', 'scope', 'title', 'today']);
+    $check('owner figure (OwnerFigure)', $own['headline'][1], ['delta', 'delta_unit', 'hint', 'key', 'label', 'value_label']);
+    $check('owner day (OwnerDay)', $own['daily'][0], ['collected', 'date', 'label', 'occupancy', 'revenue']);
+    $check('owner ahead (OwnerDay)', $own['ahead'][0], ['date', 'label', 'occupancy', 'rooms', 'sold']);
+    $check('owner month', $own['month'], ['collected_label', 'compare', 'label', 'occupancy', 'occupancy_delta', 'revenue_delta', 'revenue_label']);
+    $check('owner today', $own['today'], ['arrivals', 'arrived', 'collected_label', 'departures', 'in_house', 'occupancy', 'occupied', 'pos_label', 'rooms']);
     // amount / amount_label are only on approvals (money to approve); the app reads them as optional.
     $work = ($this->api)('work')->json('data');
     if ($work) {
@@ -62,7 +69,7 @@ test('the staff app finds every field it reads', function () {
     $desk = ($this->api)('front-desk')->json('data');
     $row = ($desk['arrivals'][0] ?? null) ?? ($desk['departures'][0] ?? null);
     if ($row) {
-        $check('front-desk (DeskBooking)', $row, ['adults', 'arrival_time', 'balance', 'company', 'folio_id', 'guest', 'id', 'nights', 'phone', 'reference', 'rooms', 'status', 'status_label', 'url', 'vip']);
+        $check('front-desk (DeskBooking)', $row, ['adults', 'arrival_time', 'balance', 'company', 'folio_id', 'guest', 'id', 'nights', 'on_the_way', 'phone', 'reference', 'rooms', 'status', 'status_label', 'url', 'vip']);
     }
     $check('rooms[0] (RoomInfo)', ($this->api)('rooms')->json('data.0'), ['floor', 'id', 'number', 'status', 'status_label', 'type']);
     $check('me/preferences', ($this->api)('me/preferences')->json('data'), ['push_available', 'push_enabled', 'reminder_minutes', 'reminders_enabled']);
@@ -80,6 +87,25 @@ test('the staff app finds every field it reads', function () {
     $companies = ($this->api)('companies')->json('data');
     if ($companies) {
         $check('companies[0] (CompanyAccount)', $companies[0], ['account_number', 'available', 'credit_limit', 'id', 'name', 'owes']);
+    }
+
+    // Driver mode, as the demo driver (a ride assigned to him).
+    $musa = User::where('email', 'driver.musa@smarthotel.com')->first();
+    if ($musa) {
+        $musa->forceFill(['must_change_password' => false])->save();
+        $driver = \App\Models\Transport\Driver::where('user_id', $musa->id)->first();
+        $open = \App\Models\Transport\Ride::where('status', 'requested')->first();
+        if ($driver && $open && ! $driver->activeRide()) {
+            app(\App\Services\Transport\RideService::class)->assign($open, $driver, $driver->vehicle, $this->admin);
+        }
+        app('auth')->forgetGuards();
+        \Laravel\Sanctum\Sanctum::actingAs($musa->fresh(), ['*']);
+        $drv = $this->getJson('/api/v1/driver')->assertOk()->json('data');
+        $check('driver (DriverHome)', $drv, ['car', 'licence_warning', 'name', 'on_duty', 'ping_seconds', 'ride', 'upcoming']);
+        $ride = $drv['ride'] ?? ($drv['upcoming'][0] ?? null);
+        $check('driver ride (DriverRide)', $ride, ['bags', 'direction', 'eta_minutes', 'fare_label', 'flight', 'guest', 'guest_phone', 'id', 'nav', 'notes', 'number', 'passengers', 'payment', 'place', 'room', 'route', 'status', 'when']);
+    } else {
+        $miss[] = 'no demo driver';
     }
 
     expect($miss)->toBe([]);
@@ -100,7 +126,7 @@ test('the guest app finds every field it reads', function () {
     auth()->logout();
     $get = fn ($p) => $this->getJson('/api/v1/' . $p)->assertOk();
 
-    $check('app/config (Branding)', $get('app/config')->json('data'), ['group_name', 'logo_url', 'multi_hotel', 'name', 'primary_color', 'support_email', 'support_phone', 'tagline', 'website']);
+    $check('app/config (Branding)', $get('app/config')->json('data'), ['group_name', 'logo_url', 'maps', 'multi_hotel', 'name', 'primary_color', 'support_email', 'support_phone', 'tagline', 'website']);
     $rules = $get('guest/booking')->json('data');
     $check('guest/booking (BookingRules)', $rules, ['advance_days', 'check_in_time', 'check_out_time', 'deposit_percent', 'enabled', 'hold_hours', 'max_nights', 'max_rooms', 'pay_online', 'policies', 'room_types']);
     $search = $get('guest/search?check_in=' . today()->addDays(40)->toDateString() . '&check_out=' . today()->addDays(42)->toDateString())->json('data');
@@ -111,9 +137,60 @@ test('the guest app finds every field it reads', function () {
     $r = \App\Models\Reservation::whereIn('status', ['confirmed', 'checked_in'])->first();
     $token = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($r);
     $stay = $get('guest/stays/' . $token)->json('data');
-    $check('guest/stays (GuestStay)', $stay, ['can_cancel', 'can_request', 'cancel_until', 'check_in', 'check_in_label', 'check_out', 'check_out_label', 'guest', 'guests_label', 'hold_until', 'hotel', 'money', 'nights', 'page_url', 'pay_url', 'qr', 'receipt_url', 'reference', 'request_types', 'requests', 'room_types', 'rooms', 'special_requests', 'state', 'status', 'status_label', 'token']);
+    $check('guest/stays (GuestStay)', $stay, ['arrival', 'can_cancel', 'can_order', 'can_request', 'cancel_until', 'check_in', 'check_in_label', 'check_out', 'check_out_label', 'guest', 'guests_label', 'hold_until', 'hotel', 'money', 'nights', 'order_note', 'orders', 'page_url', 'pay_url', 'qr', 'receipt_url', 'reference', 'request_types', 'requests', 'room_types', 'rooms', 'special_requests', 'state', 'status', 'status_label', 'token']);
     if ($stay['guest']['loyalty'] ?? null) {
-        $check('guest loyalty', $stay['guest']['loyalty'], ['discount_percent', 'number', 'points', 'tier', 'tier_label', 'value_label']);
+        $check('guest loyalty', $stay['guest']['loyalty'], ['discount_percent', 'group', 'number', 'points', 'tier', 'tier_label', 'value_label']);
+    }
+
+    $check('stay arrival (ArrivalInfo)', $stay['arrival'] ?? null, ['arrived', 'available', 'directions', 'distance_label', 'eta_label', 'eta_minutes', 'hotel_lat', 'hotel_lng', 'note', 'ping_seconds', 'progress', 'sharing']);
+
+    // Guest account (signed in with a code).
+    \Illuminate\Support\Facades\Mail::shouldReceive('raw')->andReturnUsing(function ($text) use (&$mailed) { $mailed = $text; });
+    $email = $r->guest->email ?: 'contract@example.com';
+    $r->guest->forceFill(['email' => $email])->save();
+    $this->postJson('/api/v1/guest/auth/code', ['contact' => $email])->assertOk();
+    preg_match('/^(\d{6})/', (string) $mailed, $mm);
+    $acct = $this->postJson('/api/v1/guest/auth/verify', ['contact' => $email, 'code' => $mm[1] ?? ''])->assertOk()->json('data');
+    $check('guest/auth/verify', $acct, ['account', 'expires_at', 'token']);
+    $me = $this->getJson('/api/v1/guest/me', ['X-Guest-Token' => $acct['token']])->assertOk()->json('data');
+    $check('guest/me (GuestAccount)', $me, ['contact', 'counts', 'email', 'first_name', 'last_name', 'marketing_opt_in', 'memberships', 'name', 'nationality', 'phone', 'points_history', 'stays']);
+    $check('guest/me stay (summary)', $me['stays'][0] ?? null, ['check_in', 'check_in_label', 'check_out', 'hotel', 'nights', 'reference', 'room_types', 'state', 'status', 'status_label', 'token']);
+    if ($me['memberships']) {
+        $check('membership', $me['memberships'][0], ['hotel', 'number', 'points', 'tier', 'tier_label', 'value_label']);
+    }
+    if ($me['points_history']) {
+        $check('points line', $me['points_history'][0], ['date_label', 'hotel', 'note', 'points']);
+    }
+
+    // The car service and arrival sharing on a stay.
+    $rideStay = \App\Models\Transport\Ride::whereNotNull('reservation_id')->latest('id')->first()?->reservation;
+    if ($rideStay) {
+        $rt = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($rideStay);
+        $cars = $get("guest/stays/{$rt}/rides")->json('data');
+        $check('rides (CarService)', $cars, ['available', 'min_notice', 'note', 'phone', 'places', 'priced_by_distance', 'search']);
+        $check('ride (RideInfo)', $cars['rides'][0] ?? null, ['bags', 'can_cancel', 'cancel_reason', 'car', 'direction', 'driver', 'eta_minutes', 'fare_label', 'flight', 'hotel_lat', 'hotel_lng', 'id', 'live', 'number', 'open', 'passengers', 'path', 'place', 'place_lat', 'place_lng', 'route', 'status', 'status_label', 'step', 'when']);
+        $st = $get("guest/stays/{$rt}")->json('data');
+        $check('stay arrival (ArrivalInfo)', $st['arrival'] ?? null, ['arrived', 'available', 'directions', 'distance_label', 'eta_label', 'eta_minutes', 'hotel_lat', 'hotel_lng', 'note', 'ping_seconds', 'progress', 'sharing']);
+        $check('stay cars', $st['cars'] ?? null, ['available', 'rides']);
+    } else {
+        $miss[] = 'no demo ride';
+    }
+
+    // Room orders: an in-house guest's menu, and an order on their stay.
+    $in = \App\Models\Reservation::where('status', 'checked_in')->first();
+    $t2 = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($in);
+    $outlet = \App\Models\Pos\PosOutlet::where('guest_orders', true)->first();
+    if ($outlet) {
+        $outlet->update(['guest_hours' => null]);
+        $menu = $get("guest/stays/{$t2}/menu")->json('data');
+        $check('guest menu (RoomMenu)', $menu, ['blocker', 'can_order', 'currency', 'outlets']);
+        $check('menu outlet (MenuOutlet)', $menu['outlets'][0] ?? null, ['categories', 'hours', 'id', 'minutes', 'name', 'open']);
+        $check('menu item (MenuItem)', $menu['outlets'][0]['categories'][0]['items'][0] ?? null, ['description', 'id', 'name', 'price', 'price_label']);
+        $item = $menu['outlets'][0]['categories'][0]['items'][0]['id'];
+        $placed = $this->postJson("/api/v1/guest/stays/{$t2}/orders", ['outlet_id' => $outlet->id, 'lines' => [['item_id' => $item, 'quantity' => 1]]])->assertCreated()->json('data.orders.0');
+        $check('stay order (GuestOrderInfo)', $placed, ['can_cancel', 'eta', 'id', 'live', 'note', 'number', 'outlet', 'status', 'status_label', 'summary', 'time', 'total_label']);
+    } else {
+        $miss[] = 'no outlet takes room orders in the demo data';
     }
 
     expect($miss)->toBe([]);
