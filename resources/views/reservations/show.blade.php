@@ -300,6 +300,12 @@
                     <div class="small fw-bold text-muted text-uppercase mt-3 mb-1">Special requests</div>
                     <div class="small" style="white-space: pre-line">{{ $r->special_requests }}</div>
                 @endif
+                @php $luggage = app(\App\Services\Booking\LuggageService::class)->staffSummary($r); @endphp
+                @if ($luggage)
+                    <div class="small fw-bold text-muted text-uppercase mt-3 mb-1"><i class="ri-suitcase-3-line"></i> Guest's luggage list</div>
+                    <div class="small">{{ $luggage['count'] }} item{{ $luggage['count'] === 1 ? '' : 's' }}@if ($st === ReservationStatus::CheckedIn || $st === ReservationStatus::CheckedOut) · {{ $luggage['left'] ? $luggage['left'] . ' not ticked off as packed' : 'all packed' }}@endif</div>
+                    <div class="small text-muted" style="white-space: normal">{{ $luggage['items']->map(fn ($i) => ($i->isPacked() ? '✓ ' : '') . $i->label)->implode(' · ') }}</div>
+                @endif
                 @if ($r->notes)
                     <div class="small fw-bold text-muted text-uppercase mt-3 mb-1">Internal notes</div>
                     <div class="small" style="white-space: pre-line">{{ $r->notes }}</div>
@@ -407,6 +413,10 @@
         <div class="modal-content rm-form">
             <div class="modal-header"><h5 class="modal-title"><i class="ri-logout-box-r-line me-1"></i> Check out {{ $g->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <div class="modal-body">
+                @php $bags = app(\App\Services\Booking\LuggageService::class)->staffSummary($r); @endphp
+                @if ($bags && $bags['left'])
+                    <div class="cb-banner warning"><i class="ri-suitcase-3-line"></i><div><strong>Luggage list: {{ $bags['left'] }} of {{ $bags['count'] }} item{{ $bags['count'] === 1 ? '' : 's' }} not ticked off.</strong> Ask the guest to check they have everything: {{ $bags['unpacked']->take(8)->map->label->implode(', ') }}{{ $bags['left'] > 8 ? ' …' : '' }}</div></div>
+                @endif
                 @if ($r->check_out_date->gt(today()))
                     <div class="cb-banner warning"><i class="ri-time-line"></i><div>Leaving early — booked until {{ $r->check_out_date->format('D j M') }}. Only nights used so far are charged.</div></div>
                 @endif

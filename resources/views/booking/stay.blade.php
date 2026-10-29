@@ -29,6 +29,10 @@
         <div class="notice warn"><i class="ri-time-line"></i><div>We’re holding your room until <strong>{{ $r->hold_expires_at->format('D j M, g:i A') }}</strong>. Pay the {{ $m($depositDue) }} deposit before then to confirm it — otherwise the room is released.</div></div>
     @endif
 
+    @if ($luggage['check_now'])
+        <a class="notice warn luggage-nudge" href="#luggage"><i class="ri-suitcase-3-line"></i><div>{{ $luggage['note'] }} <strong>Open my luggage list</strong></div></a>
+    @endif
+
     <div class="grid">
         <div class="col">
             @include('booking._keytag', ['in' => $r->check_in_date, 'out' => $r->check_out_date, 'ref' => $r->reference, 'title' => $types,
@@ -146,6 +150,48 @@
                         <div class="field"><label for="details">Details (optional)</label><input id="details" name="details" maxlength="500" value="{{ old('details') }}" placeholder="e.g. 2 extra towels, the AC is dripping"></div>
                         <button class="btn" type="submit"><i class="ri-send-plane-line"></i> Send request</button>
                     </form>
+                </div>
+            @endif
+
+            @if ($luggage['available'])
+                <div class="panel luggage {{ $luggage['check_now'] ? 'due' : '' }}" id="luggage">
+                    <div class="lg-head">
+                        <h2><i class="ri-suitcase-3-line"></i> Your luggage list</h2>
+                        @if ($luggage['count'])<span class="pill {{ $luggage['left'] ? 'warn' : '' }}" id="lgCount">{{ $luggage['packed'] }} of {{ $luggage['count'] }} packed</span>@endif
+                    </div>
+                    <p class="muted small" id="lgNote">{{ $luggage['note'] }}</p>
+                    @if ($luggage['count'])
+                        <ul class="lg-list">
+                            @foreach ($luggage['items'] as $i)
+                                <li class="{{ $i['packed'] ? 'packed' : '' }}">
+                                    <form method="POST" action="{{ route('stay.luggage.update', [$r->guest_token, $i['id']]) }}" class="lg-tick">@csrf
+                                        <input type="hidden" name="packed" value="{{ $i['packed'] ? 0 : 1 }}">
+                                        <button type="submit" role="checkbox" aria-checked="{{ $i['packed'] ? 'true' : 'false' }}" aria-label="Packed: {{ $i['label'] }}"><i class="{{ $i['packed'] ? 'ri-checkbox-circle-fill' : 'ri-checkbox-blank-circle-line' }}"></i></button>
+                                    </form>
+                                    <div class="grow"><span class="lg-name">{{ $i['label'] }}</span>@if ($i['bag'])<span class="small muted"> · {{ $i['bag'] }}</span>@endif</div>
+                                    @if ($luggage['can_edit'])
+                                        <form method="POST" action="{{ route('stay.luggage.remove', [$r->guest_token, $i['id']]) }}">@csrf
+                                            <button type="submit" class="lg-x" aria-label="Remove {{ $i['label'] }}" title="Remove"><i class="ri-close-line"></i></button>
+                                        </form>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    @if ($luggage['can_edit'])
+                        <details class="lg-add" @if (! $luggage['count'] || old('text')) open @endif>
+                            <summary class="btn quiet"><i class="ri-add-line"></i> {{ $luggage['count'] ? 'Add items' : 'Start my list' }}</summary>
+                            <form method="POST" action="{{ route('stay.luggage.store', $r->guest_token) }}" class="req" style="margin-top:12px">@csrf
+                                <div class="field"><label for="lgText">Items, one per line</label><textarea id="lgText" name="text" rows="4" maxlength="5000" required placeholder="Laptop and charger&#10;2 x shirts&#10;Passport">{{ old('text') }}</textarea></div>
+                                <div class="field"><label for="lgBag">In which bag? (optional)</label><input id="lgBag" name="bag" maxlength="60" value="{{ old('bag') }}" placeholder="e.g. Black suitcase" @if ($luggage['bags']->isNotEmpty()) list="lgBags" @endif>
+                                    @if ($luggage['bags']->isNotEmpty())<datalist id="lgBags">@foreach ($luggage['bags'] as $b)<option value="{{ $b }}">@endforeach</datalist>@endif</div>
+                                <button class="btn" type="submit"><i class="ri-add-line"></i> Add to my list</button>
+                            </form>
+                        </details>
+                        @if ($luggage['packed'])
+                            <form method="POST" action="{{ route('stay.luggage.unpack', $r->guest_token) }}" style="display:inline">@csrf<button class="btn quiet" type="submit" style="margin-top:10px">Untick everything</button></form>
+                        @endif
+                    @endif
                 </div>
             @endif
 
@@ -276,6 +322,21 @@
     .order-cta > i { font-size: 28px; color: var(--lagoon); }
     .order-cta h2 { margin: 0; } .order-cta p { margin: 2px 0 0; }
     .keep { margin-top: 26px; }
+    .luggage-nudge { text-decoration: none; color: inherit; }
+    .luggage.due { border-color: #f2b84b; box-shadow: 0 0 0 3px rgba(242,184,75,.18); }
+    .lg-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .lg-head h2 { margin-bottom: 4px; } .lg-head h2 i { color: var(--lagoon); }
+    .lg-list { list-style: none; margin: 8px 0 4px; padding: 0; }
+    .lg-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+    .lg-list li:first-child { border-top: 0; }
+    .lg-list form { margin: 0; }
+    .lg-tick button, .lg-x { background: none; border: 0; padding: 4px; cursor: pointer; line-height: 1; color: var(--muted); min-width: 36px; min-height: 36px; }
+    .lg-tick button i { font-size: 24px; }
+    .lg-list li.packed .lg-tick button { color: var(--lagoon); }
+    .lg-list li.packed .lg-name { text-decoration: line-through; color: var(--muted); }
+    .lg-x i { font-size: 18px; }
+    .lg-add summary { list-style: none; display: inline-flex; margin-top: 8px; }
+    .lg-add summary::-webkit-details-marker { display: none; }
     .wx { min-width: 0; } .col { min-width: 0; }
     .wx h2 i { color: var(--lagoon); }
     .wx-now { display: flex; align-items: center; gap: 14px; }
@@ -389,6 +450,37 @@
     }
     btn.addEventListener('click', () => on || watch !== null ? stop(true) : start());
     if (on) start();   // still sharing from earlier: carry on while the page is open
+})();
+</script>
+@endpush
+@endif
+
+@if ($luggage['count'])
+@push('scripts')
+<script>
+(() => {
+    // Tick items off without reloading the page (the forms still work on their own).
+    const csrf = document.querySelector('meta[name=csrf-token]')?.content || @json(csrf_token());
+    const count = document.getElementById('lgCount'), note = document.getElementById('lgNote');
+    document.querySelectorAll('#luggage .lg-tick').forEach((form) => form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = form.querySelector('[name=packed]'), btn = form.querySelector('button'), li = form.closest('li');
+        btn.disabled = true;
+        try {
+            const res = await fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify({ packed: input.value === '1' }) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.message || 'Could not save that. Try again.');
+            const packed = input.value === '1';
+            li.classList.toggle('packed', packed);
+            btn.setAttribute('aria-checked', packed ? 'true' : 'false');
+            btn.querySelector('i').className = packed ? 'ri-checkbox-circle-fill' : 'ri-checkbox-blank-circle-line';
+            input.value = packed ? '0' : '1';
+            const l = json.luggage;
+            if (l && count) { count.textContent = l.packed + ' of ' + l.count + ' packed'; count.classList.toggle('warn', l.left > 0); }
+            if (l && note && l.note) note.textContent = l.note;
+        } catch (err) { if (note) note.textContent = err.message; }
+        btn.disabled = false;
+    }));
 })();
 </script>
 @endpush

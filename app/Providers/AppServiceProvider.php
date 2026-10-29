@@ -55,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
         // Chat and calls: a live conversation asks often (new messages, call signals), so per booking, generously.
         RateLimiter::for('guest-chat', fn (Request $r) => Limit::perMinute(240)->by('gc|' . ($r->route('token') ?: $r->input('token') ?: $r->ip())));
+        // Luggage list: ticking items off while packing is quick work, so per booking, generously.
+        RateLimiter::for('luggage', fn (Request $r) => Limit::perMinute(90)->by('lg|' . $r->route('token')));
         RateLimiter::for('arrival', fn (Request $r) => Limit::perMinute(20)->by('ar|' . $r->route('token')));
         RateLimiter::for('booking-lookup', fn (Request $r) => Limit::perMinute(6)->by('bl|' . $r->ip()));
         RateLimiter::for('paystack-webhook', fn (Request $r) => Limit::perMinute(300)->by('pw|' . $r->ip()));

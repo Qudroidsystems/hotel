@@ -69,6 +69,7 @@ class GuestPortalController extends Controller
             'arrival'    => app(\App\Services\Booking\ArrivalService::class)->forGuest($r),
             'cars'       => app(\App\Services\Transport\RideService::class)->forGuest($r),
             'carPlaces'  => app(\App\Services\Transport\RideService::class)->places(),
+            'luggage'    => app(\App\Services\Booking\LuggageService::class)->forGuest($r),
             'weatherOn'  => config('hotel.booking.weather', true) && in_array($r->status, [ReservationStatus::Pending, ReservationStatus::Confirmed, ReservationStatus::CheckedIn], true),
         ];
 

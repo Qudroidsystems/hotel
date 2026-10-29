@@ -126,6 +126,7 @@ class GuestMessenger
             'payment_link'      => 'send_payment_link',
             'arrival_reminder'  => 'send_reminder',
             'thank_you'         => 'send_thank_you',
+            'luggage_reminder'  => 'send_luggage_reminder',
             default             => null,
         };
         if (! $this->enabled() || ($toggle && ! config("hotel.messaging.{$toggle}", true))) {

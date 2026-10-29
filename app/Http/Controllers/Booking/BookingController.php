@@ -87,6 +87,7 @@ class BookingController extends Controller
             'phone'            => ['required', 'string', 'max:30', 'regex:/^[0-9+()\-\s]{7,30}$/'],
             'arrival_time'     => 'nullable|date_format:H:i',
             'special_requests' => 'nullable|string|max:1000',
+            'luggage'          => 'nullable|string|max:5000',   // optional luggage list, one item per line
             'accept'           => 'accepted',
             'pay'              => 'nullable|in:online,later',
             'rate_plan_id'     => 'nullable|integer',
@@ -97,6 +98,7 @@ class BookingController extends Controller
             // Came from the group booking site's list of hotels?
             $data['via_group'] = $request->session()->get('book_via_group') === \App\Support\Tenancy\CurrentHotel::get()->hotel()?->slug;
             $r = $this->booking->book($data);
+            $this->addLuggage($r, $data['luggage'] ?? null);
         } catch (BookingException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -181,5 +183,19 @@ class BookingController extends Controller
             'rooms'     => (int) $request->query('rooms', $request->input('rooms', 1)),
             'promo'     => mb_substr(strtoupper(preg_replace('/[^A-Za-z0-9_-]/', '', (string) $request->query('promo', $request->input('promo', '')))), 0, 30),
         ];
+    }
+
+    /** The optional luggage list written on the booking form: never stops the booking. */
+    private function addLuggage(\App\Models\Reservation $r, ?string $text): void
+    {
+        $luggage = app(\App\Services\Booking\LuggageService::class);
+        if (blank($text) || ! $luggage->enabled()) {
+            return;
+        }
+        try {
+            $luggage->add($r, array_slice($luggage->parse($text), 0, \App\Services\Booking\LuggageService::MAX_ITEMS));
+        } catch (\App\Exceptions\BookingException) {
+            // The booking stands; the guest can fix the list on their booking page.
+        }
     }
 }

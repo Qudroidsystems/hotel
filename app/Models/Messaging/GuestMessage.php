@@ -28,6 +28,7 @@ class GuestMessage extends Model
         'payment_link'      => 'Deposit needed',
         'arrival_reminder'  => 'Arrival reminder',
         'thank_you'         => 'Thank you',
+        'luggage_reminder'  => 'Luggage reminder',
         'request_update'    => 'Request update',
         'manual'            => 'Written by staff',
         'reply'             => 'Guest reply',

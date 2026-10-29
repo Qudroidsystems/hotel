@@ -37,6 +37,7 @@ class Reservation extends Model
         'checked_out_at'  => 'datetime',
         'cancelled_at'    => 'datetime',
         'hold_expires_at' => 'datetime',
+        'luggage_reminded_at' => 'datetime',
         'via_group'       => 'boolean',
         'commission_percent' => 'decimal:2',
         'commission_amount'  => 'decimal:2',
@@ -99,6 +100,12 @@ class Reservation extends Model
     public function guestRequests(): HasMany
     {
         return $this->hasMany(\App\Models\Booking\GuestRequest::class);
+    }
+
+    /** The guest's luggage list (optional), ticked off when they pack to leave. */
+    public function luggageItems(): HasMany
+    {
+        return $this->hasMany(\App\Models\Booking\LuggageItem::class)->orderBy('position')->orderBy('id');
     }
 
     public function events(): HasMany

@@ -146,6 +146,9 @@ return [
         'weather'         => true,   // the weather forecast on the booking page and in the guest app
         'weather_fahrenheit' => (bool) env('HOTEL_WEATHER_FAHRENHEIT', false),   // °F and mph instead of °C and km/h
         'guest_chat'      => true,   // guests chat with the hotel's sections (Guest Chat → Sections)
+        'luggage_list'    => true,      // guests can keep a list of what they bring, ticked off when they pack to leave
+        'luggage_reminders' => true,    // and are reminded on check-out day (text and e-mail) when items aren't ticked off
+        'luggage_reminder_time' => '07:30',
         'guest_calls'     => true,   // and call them in the app (needs a TURN relay across mobile networks)   // guests on the way can share their arrival (needs the hotel's map position)   // room orders from the guest app / room QR card (outlets choose in Menu & Prices)
     ],
 
@@ -170,12 +173,14 @@ return [
         'send_reminder'     => true,
         'send_thank_you'    => true,
         'send_request_updates' => false,
+        'send_luggage_reminder' => true,
         'templates' => [
             'booking_confirmed' => 'Hi {first_name}, your stay at {hotel} is confirmed: {check_in} to {check_out}, ref {reference}. Your booking page: {link}',
             'payment_link'      => 'Hi {first_name}, we are holding your room at {hotel} ({check_in}, ref {reference}). Pay the {amount} deposit to confirm: {link}',
             'arrival_reminder'  => 'Hi {first_name}, we look forward to welcoming you to {hotel} tomorrow. Check-in from {check_in_time}. Questions? Call {phone}. Ref {reference}.',
             'thank_you'         => 'Thank you for staying at {hotel}, {first_name}. You have {points} loyalty points. We hope to see you again soon.',
             'request_update'    => '{hotel}: {request} — {status}. {note}',
+            'luggage_reminder'  => 'Hi {first_name}, you check out of {hotel} today by {check_out_time}. Before you go, check your luggage list ({items} item(s) not ticked off yet) so nothing is left behind: {link}',
         ],
     ],
 

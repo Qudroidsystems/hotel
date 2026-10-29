@@ -28,6 +28,13 @@
                 <div class="field"><label for="arrival_time">Arriving around (optional)</label><input type="time" id="arrival_time" name="arrival_time" value="{{ old('arrival_time') }}"></div>
             </div>
             <div class="field"><label for="special_requests">Anything we should know? (optional)</label><textarea id="special_requests" name="special_requests" maxlength="1000" placeholder="e.g. late arrival, high floor, airport pickup">{{ old('special_requests') }}</textarea></div>
+            @if (config('hotel.booking.luggage_list', true))
+                <details class="luggage" @if (old('luggage')) open @endif>
+                    <summary><i class="ri-suitcase-3-line"></i> Make a luggage list <span class="muted small">(optional)</span></summary>
+                    <div class="field"><label for="luggage">What are you bringing? One item per line</label><textarea id="luggage" name="luggage" maxlength="5000" rows="5" placeholder="Laptop and charger&#10;2 x shirts&#10;Backpack: camera, power bank">{{ old('luggage') }}</textarea>
+                        <div class="hint">On check-out day we’ll remind you to go through this list so nothing is left in the room. You can change it any time on your booking page.</div></div>
+                </details>
+            @endif
 
             @if ($deposit > 0)
                 <fieldset class="pay">
@@ -76,6 +83,9 @@
     .form .field { margin-bottom: 14px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
     .hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .luggage { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 12px 16px; margin: 0 0 16px; background: #fff; }
+    .luggage summary { cursor: pointer; font-weight: 600; color: var(--lagoon); }
+    .luggage[open] summary { margin-bottom: 10px; }
     .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
     .pay { border: 1.5px solid var(--line); border-radius: var(--r); padding: 14px 16px 6px; margin: 6px 0 16px; background: #fff; }
     .pay legend { padding: 0 6px; font-size: 15px; }

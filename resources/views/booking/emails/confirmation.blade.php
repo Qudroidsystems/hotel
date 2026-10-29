@@ -17,6 +17,7 @@
 </table>
 <p style="margin:22px 0"><a href="{{ $url }}" style="background:#0f766e;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;display:inline-block">{{ $depositDue > 0 ? 'Pay deposit and view booking' : 'View my booking' }}</a></p>
 <p style="margin:0 0 6px;font-size:14px;color:#66748a;line-height:1.5">Your booking page has your check-in QR code. You can pay, cancel within the policy, and send requests during your stay. Keep the link private.</p>
+@if (config('hotel.booking.luggage_list', true))<p style="margin:10px 0 6px;font-size:14px;color:#66748a;line-height:1.5">Optional: list what you’re packing on your booking page. On check-out day we’ll remind you to go through it, so nothing gets left behind.</p>@endif
 </td></tr>
 <tr><td style="padding:16px 26px;border-top:1px solid #d6e0dc;font-size:13px;color:#66748a">{{ config('hotel.name') }}{{ config('hotel.booking.address') ? ', ' . config('hotel.booking.address') : '' }}{{ config('hotel.booking.contact_phone') ? ' · ' . config('hotel.booking.contact_phone') : '' }}</td></tr>
 </table></td></tr></table>

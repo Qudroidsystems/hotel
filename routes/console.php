@@ -116,6 +116,11 @@ Artisan::command('messages:arrival-reminders', $eachHotel(function (\App\Service
     $this->info("{$sent} arrival reminder(s) sent.");
 }))->purpose('Text guests arriving tomorrow');
 
+// Luggage lists: on check-out day, remind guests to go through what they brought (from the set time, once).
+Artisan::command('luggage:checkout-reminders', $eachHotel(function (\App\Services\Booking\LuggageService $luggage) {
+    $this->info($luggage->sendReminders() . ' luggage reminder(s) sent.');
+}))->purpose('Remind guests leaving today to check their luggage list');
+
 // Night audit: remind staff when a finished day hasn't been closed, and close it by itself when that is switched on.
 Artisan::command('night-audit:auto', $eachHotel(function (\App\Services\NightAudit\NightAuditService $audits) {
     $closed = 0;
@@ -182,4 +187,5 @@ Schedule::command('rooms:prepare-arrivals')->dailyAt('00:05');
 Schedule::command('folios:night-audit')->dailyAt('02:00');
 Schedule::command('security:prune-visitors')->dailyAt('03:00');
 Schedule::command('loyalty:sync')->dailyAt('04:00')->withoutOverlapping();
+Schedule::command('luggage:checkout-reminders')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('messages:arrival-reminders')->dailyAt((string) config('hotel.messaging.reminder_time', '10:00'))->withoutOverlapping();
