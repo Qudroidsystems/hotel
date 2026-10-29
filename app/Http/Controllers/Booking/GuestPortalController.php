@@ -69,9 +69,16 @@ class GuestPortalController extends Controller
             'arrival'    => app(\App\Services\Booking\ArrivalService::class)->forGuest($r),
             'cars'       => app(\App\Services\Transport\RideService::class)->forGuest($r),
             'carPlaces'  => app(\App\Services\Transport\RideService::class)->places(),
+            'weatherOn'  => config('hotel.booking.weather', true) && in_array($r->status, [ReservationStatus::Pending, ReservationStatus::Confirmed, ReservationStatus::CheckedIn], true),
         ];
 
         return view('booking.stay', $data);
+    }
+
+    /** The weather card on the booking page (loaded after the page, so a slow forecast never holds it up). */
+    public function weather(string $token, \App\Services\Weather\WeatherService $weather)
+    {
+        return response()->json(['weather' => $weather->forGuest($this->reservation($token))]);
     }
 
     /** The booking page's "Share my arrival" (while the page is open): JSON. */

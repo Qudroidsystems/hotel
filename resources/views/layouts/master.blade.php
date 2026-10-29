@@ -537,6 +537,12 @@
                     @canany(['View rooms', 'Manage room types', 'Manage buildings', 'View reservations', 'View guests', 'View folios', 'Receive payments', 'View finance reports', 'Use POS', 'View POS reports', 'Manage POS menu', 'Manage hotel settings', 'View stock', 'View attendance', 'Manage staff & shifts', 'Run attendance kiosk', 'View audit log', 'View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Report maintenance issues', 'Manage maintenance', 'View visitors', 'Manage visitors', 'View incidents', 'Report incidents', 'Manage incidents', 'Manage lost & found', 'Request purchases', 'Approve purchases', 'Manage supplier invoices', 'Pay suppliers'])
                         <li class="menu-title"><i class="ri-more-fill"></i> <span>HOTEL OPERATIONS</span></li>
                     @endcanany
+                    {{-- Department tasks: everyone has their own list --}}
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="{{ route('tasks.index') }}">
+                            <i class="ph-list-checks"></i> <span>Tasks</span>
+                        </a>
+                    </li>
                     @canany(['View reservations', 'View guests', 'View company accounts', 'View events', 'Manage events', 'Run night audit', 'View night audit reports', 'Manage rates', 'View room calendars', 'Manage room calendars'])
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarFrontDesk" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarFrontDesk">
@@ -1533,6 +1539,7 @@
         {title:'Hotel Settings',                        url:'{{ route("settings.hotel.index") }}',                           icon:'mdi-cog-outline',             category:'Settings',            keywords:['settings','hotel name','logo','tax','vat','approval limit','tolerance','price jump','branding','currency']},
         {title:'Bank Accounts',                         url:'{{ route("settings.bank-accounts.index") }}',                   icon:'mdi-bank',                    category:'Billing',             keywords:['bank','account','transfer','invoice','settings']},
         @endcan
+        {title:'Tasks',                                 url:'{{ route("tasks.index") }}',                                    icon:'mdi-clipboard-check-outline', category:'Operations',          keywords:['task','todo','to do','job','assign','department','overdue','checklist','duty']},
         @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping'])
         {title:'Housekeeping Tablet Board',             url:'{{ route("housekeeping.board") }}',                             icon:'mdi-tablet',                  category:'Rooms',               keywords:['housekeeping','tablet','board','full screen','cleaners']},
         {title:'Housekeeping Board',                    url:'{{ route("housekeeping.index") }}',                             icon:'mdi-broom',                   category:'Rooms',               keywords:['housekeeping','clean','dirty','inspection','turnaround','stay-over','maid']},

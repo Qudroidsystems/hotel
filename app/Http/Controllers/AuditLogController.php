@@ -97,6 +97,7 @@ class AuditLogController extends Controller
             (new PurchaseOrder)->getMorphClass()   => $user->can('View stock') ? route('inventory.po.show', $log->subject_id) : null,
             (new PurchaseRequest)->getMorphClass() => $user->canAny(['Approve purchases', 'Manage purchase orders']) ? route('inventory.requests.show', $log->subject_id) : null,
             (new SupplierInvoice)->getMorphClass() => $user->canAny(['Manage supplier invoices', 'Pay suppliers']) ? route('inventory.invoices.show', $log->subject_id) : null,
+            (new \App\Models\StaffTask)->getMorphClass() => route('tasks.show', $log->subject_id),
             default                            => null,
         };
     }

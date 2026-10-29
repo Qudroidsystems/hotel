@@ -109,6 +109,7 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
     Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
+    Route::get('/stay/{token}/weather', [GuestPortalController::class, 'weather'])->name('stay.weather');
     Route::post('/stay/{token}/arrival', [GuestPortalController::class, 'arrival'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:arrival')->name('stay.arrival');
     Route::post('/stay/{token}/rides', [GuestPortalController::class, 'bookRide'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.book');
     Route::post('/stay/{token}/rides/{ride}/cancel', [GuestPortalController::class, 'cancelRide'])->whereNumber('ride')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.cancel');
@@ -227,6 +228,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/{order}/hold', 'hold')->name('hold');
         Route::post('/{order}/complete', 'complete')->name('complete');
         Route::post('/{order}/cancel', 'cancel')->name('cancel');
+    });
+
+    // Department tasks (any member of staff sees their own and their department's)
+    Route::prefix('tasks')->name('tasks.')->controller(\App\Http\Controllers\Operations\TaskController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{task}', 'show')->name('show');
+        Route::post('/{task}/take', 'take')->name('take');
+        Route::post('/{task}/start', 'start')->name('start');
+        Route::post('/{task}/finish', 'finish')->name('finish');
+        Route::post('/{task}/check', 'check')->name('check');
+        Route::post('/{task}/change', 'change')->name('change');
+        Route::post('/{task}/cancel', 'cancel')->name('cancel');
+        Route::post('/{task}/comment', 'comment')->name('comment');
     });
 
     // Security: visitor register + passes, incidents, lost & found

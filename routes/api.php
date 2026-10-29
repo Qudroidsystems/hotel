@@ -47,6 +47,7 @@ Route::prefix('guest')->group(function () {
         Route::get('/stays/{token}', [GuestStayController::class, 'show']);
         Route::get('/stays/{token}/menu', [GuestStayController::class, 'menu']);
         Route::get('/stays/{token}/rides', [GuestStayController::class, 'rides']);
+        Route::get('/stays/{token}/weather', [GuestStayController::class, 'weather']);
         Route::get('/stays/{token}/places', [GuestStayController::class, 'places']);
         Route::get('/stays/{token}/places/{id}', [GuestStayController::class, 'place'])->where('id', '[A-Za-z0-9_-]{10,300}');
         Route::post('/stays/{token}/rides/quote', [GuestStayController::class, 'rideQuote']);

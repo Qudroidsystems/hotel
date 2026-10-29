@@ -44,6 +44,10 @@ Artisan::command('it:escalate', $eachHotel(function (\App\Services\It\ServiceDes
     $this->info($desk->escalateOverdue() . ' overdue IT ticket(s) escalated.');
 }))->purpose('Escalate IT tickets that missed their response or fix target');
 
+Artisan::command('tasks:escalate', $eachHotel(function (\App\Services\Operations\TaskService $tasks) {
+    $this->info($tasks->escalate() . ' overdue task reminder(s) sent.');
+}))->purpose('Remind and escalate department tasks that are past their due time');
+
 Artisan::command('it:prune', $eachHotel(function (\App\Services\It\MonitorService $monitors) {
     $this->info($monitors->prune() . ' old check result(s) removed.');
 }))->purpose('Remove IT check history older than the retention period');
@@ -172,6 +176,7 @@ Schedule::command('calls:expire')->everyMinute()->withoutOverlapping();
 Schedule::command('rates:auto-price')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('tasks:escalate')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('it:prune')->dailyAt('03:30');
 Schedule::command('rooms:prepare-arrivals')->dailyAt('00:05');
 Schedule::command('folios:night-audit')->dailyAt('02:00');

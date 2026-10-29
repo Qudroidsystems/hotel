@@ -117,6 +117,11 @@ class PermissionTableSeeder extends Seeder
         'Audit & Security' => [
             'View audit log',
         ],
+        'Tasks' => [
+            'Give tasks',          // give tasks to a department or person (everyone sees their own tasks)
+            'View all tasks',
+            'Manage tasks',        // change, check and cancel any task; told when tasks are escalated
+        ],
         'Guest Services' => [
             'Handle guest requests',
             'Message guests',

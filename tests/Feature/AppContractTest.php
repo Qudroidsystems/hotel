@@ -161,6 +161,24 @@ test('the guest app finds every field it reads', function () {
 
     $check('stay arrival (ArrivalInfo)', $stay['arrival'] ?? null, ['arrived', 'available', 'directions', 'distance_label', 'eta_label', 'eta_minutes', 'hotel_lat', 'hotel_lng', 'note', 'ping_seconds', 'progress', 'sharing']);
 
+    // The weather at the hotel (Open-Meteo, faked here).
+    \App\Models\Hotel::query()->update(['latitude' => 6.4281, 'longitude' => 3.4219]);
+    $tz = 'Africa/Lagos';
+    $day = now($tz)->toDateString();
+    $hour = now($tz)->format('Y-m-d\\TH:00');
+    \Illuminate\Support\Facades\Http::fake(['api.open-meteo.com/*' => \Illuminate\Support\Facades\Http::response([
+        'timezone' => $tz,
+        'current' => ['time' => $hour, 'temperature_2m' => 29, 'apparent_temperature' => 32, 'relative_humidity_2m' => 70, 'weather_code' => 61, 'wind_speed_10m' => 9, 'is_day' => 1],
+        'hourly' => ['time' => [$hour], 'temperature_2m' => [29], 'precipitation_probability' => [70], 'weather_code' => [61], 'is_day' => [1]],
+        'daily' => ['time' => [$day], 'weather_code' => [61], 'temperature_2m_max' => [31], 'temperature_2m_min' => [24], 'precipitation_probability_max' => [70], 'precipitation_sum' => [4], 'uv_index_max' => [7], 'wind_speed_10m_max' => [12], 'sunrise' => [$day . 'T06:45'], 'sunset' => [$day . 'T18:50']],
+    ])]);
+    $wx = $get('guest/stays/' . $token . '/weather')->json('data');
+    $check('stay weather (WeatherInfo)', $wx, ['available', 'days', 'hours', 'note', 'now', 'source', 'source_url', 'stay_note', 'tips', 'unit', 'updated_label']);
+    $check('weather now (WeatherNow)', $wx['now'] ?? null, ['feels_like', 'humidity', 'is_day', 'kind', 'summary', 'temp', 'wind_label']);
+    $check('weather hour (WeatherHour)', $wx['hours'][0] ?? null, ['is_day', 'kind', 'label', 'rain_chance', 'summary', 'temp']);
+    $check('weather day (WeatherDay)', $wx['days'][0] ?? null, ['arrival', 'date', 'departure', 'in_stay', 'kind', 'label', 'max', 'min', 'rain_chance', 'short', 'summary', 'sunrise', 'sunset', 'uv']);
+    $check('weather tip (WeatherTip)', $wx['tips'][0] ?? null, ['icon', 'text', 'tone']);
+
     // Guest account (signed in with a code).
     \Illuminate\Support\Facades\Mail::shouldReceive('raw')->andReturnUsing(function ($text) use (&$mailed) { $mailed = $text; });
     $email = $r->guest->email ?: 'contract@example.com';

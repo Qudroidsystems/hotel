@@ -64,6 +64,13 @@
                 </div>
             @endif
 
+            @if ($weatherOn)
+                <div class="panel wx" id="wx" data-url="{{ route('stay.weather', $r->guest_token) }}" aria-live="polite">
+                    <h2><i class="ri-sun-cloudy-line"></i> Weather at the hotel</h2>
+                    <p class="muted small" id="wxMsg">Loading the forecast…</p>
+                </div>
+            @endif
+
             @if ($cars['available'] || count($cars['rides']))
                 <div class="panel cars" id="cars">
                     <h2><i class="ri-taxi-line"></i> The hotel's car</h2>
@@ -269,9 +276,29 @@
     .order-cta > i { font-size: 28px; color: var(--lagoon); }
     .order-cta h2 { margin: 0; } .order-cta p { margin: 2px 0 0; }
     .keep { margin-top: 26px; }
+    .wx { min-width: 0; } .col { min-width: 0; }
+    .wx h2 i { color: var(--lagoon); }
+    .wx-now { display: flex; align-items: center; gap: 14px; }
+    .wx-now > i { font-size: 46px; color: var(--lagoon); line-height: 1; }
+    .wx-now .t { font-family: var(--serif); font-size: 40px; line-height: 1; }
+    .wx-hours { display: flex; gap: 6px; overflow-x: auto; margin: 14px -4px 4px; padding: 0 4px 6px; scrollbar-width: thin; }
+    .wx-hours div { flex: 0 0 auto; min-width: 58px; text-align: center; padding: 8px 6px; border-radius: 10px; background: var(--paper); font-size: 13px; }
+    .wx-hours i { display: block; font-size: 22px; color: var(--ink-2); margin: 2px 0; }
+    .wx-days { margin-top: 10px; }
+    .wx-day { display: grid; grid-template-columns: 92px 26px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-top: 1px solid var(--line); font-size: 14.5px; }
+    .wx-day:first-child { border-top: 0; }
+    .wx-day i { font-size: 20px; color: var(--ink-2); }
+    .wx-day.stay { background: var(--lagoon-l); border-radius: 8px; border-top-color: transparent; }
+    .wx-day .tag { font-size: 11.5px; font-weight: 700; color: var(--lagoon-d); text-transform: uppercase; letter-spacing: .03em; }
+    .wx-day .rain { color: #2563eb; font-size: 13px; }
+    .wx-tips { display: grid; gap: 8px; margin: 12px 0 4px; }
+    .wx-tip { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-radius: 10px; background: var(--paper); font-size: 14.5px; }
+    .wx-tip.warn { background: #fff4e0; } .wx-tip.good { background: var(--lagoon-l); }
+    .wx-tip i { font-size: 18px; color: var(--lagoon); margin-top: 1px; } .wx-tip.warn i { color: #b45309; }
+    .wx-more summary { cursor: pointer; font-weight: 600; color: var(--lagoon); margin-top: 8px; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .stay h1 { font-size: 28px; } }
     @media (max-width: 480px) { .qrbox { flex-direction: column; text-align: center; } }
-    @media print { .topbar, footer.site, .money, .btn, .req, .notice, .keep, .bank { display: none !important; } body { background: #fff; } }
+    @media print { .topbar, footer.site, .money, .btn, .req, .notice, .keep, .bank, .wx { display: none !important; } body { background: #fff; } }
 </style>
 @endpush
 
@@ -281,6 +308,41 @@
 <script>
     if (window.QRCode) new QRCode(document.getElementById('qr'), { text: @json(route('reservations.qr', $r->qr_token)), width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
     else document.getElementById('qr').innerHTML = '<div style="width:150px;padding:20px 6px;text-align:center;font-weight:700">{{ $r->reference }}</div>';
+</script>
+@endpush
+@endif
+
+@if ($weatherOn)
+@push('scripts')
+<script>
+(() => {
+    const box = document.getElementById('wx'), msg = document.getElementById('wxMsg');
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const tipIcon = { storm: 'ri-thunderstorms-line', umbrella: 'ri-umbrella-line', hot: 'ri-temp-hot-line', uv: 'ri-sun-line', wind: 'ri-windy-line', fog: 'ri-mist-line', arrival: 'ri-flight-land-line', departure: 'ri-flight-takeoff-line', good: 'ri-walk-line' };
+    fetch(box.dataset.url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then((res) => res.ok ? res.json() : Promise.reject())
+        .then(({ weather: w }) => {
+            if (!w.available) { if (w.note) msg.textContent = w.note; else box.remove(); return; }
+            const n = w.now, u = '°';
+            const days = w.days.map((d) => `<div class="wx-day${d.in_stay ? ' stay' : ''}">
+                <div><strong>${esc(d.label)}</strong>${d.arrival ? '<div class="tag">Arrival</div>' : d.departure ? '<div class="tag">Check-out</div>' : ''}</div>
+                <i class="${esc(d.icon)}" title="${esc(d.summary)}"></i>
+                <div class="small">${esc(d.summary)}${d.rain_chance >= 20 ? ` <span class="rain"><i class="ri-drop-line" style="font-size:13px;color:inherit"></i>${d.rain_chance}%</span>` : ''}</div>
+                <div><strong>${d.max}${u}</strong> <span class="muted">${d.min}${u}</span></div></div>`);
+            const stayDays = w.days.findIndex((d) => d.in_stay);
+            const first = Math.max(5, stayDays >= 0 ? w.days.filter((d) => d.in_stay).length + stayDays : 0);
+            box.innerHTML = `<h2><i class="ri-sun-cloudy-line"></i> Weather at the hotel</h2>
+                ${n ? `<div class="wx-now"><i class="${esc(n.icon)}" aria-hidden="true"></i><div><div class="t">${n.temp}${esc(w.unit)}</div>
+                    <div class="small muted">${esc(n.summary)} · feels like ${n.feels_like}${u}${n.humidity != null ? ` · humidity ${n.humidity}%` : ''}${n.wind_label ? ` · wind ${esc(n.wind_label)}` : ''}</div></div></div>` : ''}
+                ${w.hours.length ? `<div class="wx-hours" aria-label="The next hours">${w.hours.map((h) => `<div><div class="muted">${esc(h.label)}</div><i class="${esc(h.icon)}" title="${esc(h.summary)}"></i><strong>${h.temp}${u}</strong>${h.rain_chance >= 20 ? `<div class="rain small" style="color:#2563eb">${h.rain_chance}%</div>` : ''}</div>`).join('')}</div>` : ''}
+                ${w.tips.length ? `<div class="wx-tips">${w.tips.map((t) => `<div class="wx-tip ${esc(t.tone)}"><i class="${tipIcon[t.icon] || 'ri-information-line'}"></i><div>${esc(t.text)}</div></div>`).join('')}</div>` : ''}
+                <div class="wx-days">${days.slice(0, first).join('')}</div>
+                ${days.length > first ? `<details class="wx-more"><summary>Next ${days.length - first} days</summary><div class="wx-days">${days.slice(first).join('')}</div></details>` : ''}
+                ${w.stay_note ? `<p class="small muted">${esc(w.stay_note)}</p>` : ''}
+                <p class="small muted" style="margin:8px 0 0">${w.updated_label ? esc(w.updated_label) + ' · ' : ''}Forecast by <a href="${esc(w.source_url)}" target="_blank" rel="noopener">${esc(w.source)}</a></p>`;
+        })
+        .catch(() => { msg.textContent = 'The weather forecast isn’t available right now.'; });
+})();
 </script>
 @endpush
 @endif

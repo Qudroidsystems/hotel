@@ -33,6 +33,7 @@ class AuditLog extends Model
         'attendance'   => ['Attendance',          'ri-fingerprint-line'],
         'settings'     => ['Settings',            'ri-settings-3-line'],
         'security'     => ['Security',            'ri-alarm-warning-line'],
+        'tasks'        => ['Tasks',               'ri-task-line'],
     ];
 
     protected $fillable = [

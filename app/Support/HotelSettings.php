@@ -75,6 +75,8 @@ class HotelSettings
                     'booking.policies'        => ['type' => 'list', 'label' => 'Hotel policies shown to guests', 'help' => 'One per line.', 'max_items' => 15],
                     'booking.guest_requests'  => ['type' => 'bool', 'label' => 'Guests can send requests (towels, cleaning, repairs…) from their booking page during their stay'],
                     'booking.arrival_sharing' => ['type' => 'bool', 'label' => 'Guests on their way can share their arrival from the guest app: they get directions, and reception and housekeeping see how far away they are (set the hotel\'s map position under Settings → Hotels)'],
+                    'booking.weather'         => ['type' => 'bool', 'label' => 'Show guests the weather forecast at the hotel, with tips on getting around, on their booking page and in the guest app (uses the hotel\'s map position under Settings → Hotels; forecast from Open-Meteo, no key needed)'],
+                    'booking.weather_fahrenheit' => ['type' => 'bool', 'label' => 'Show the weather in °F and mph (off: °C and km/h)'],
                     'booking.guest_ordering'  => ['type' => 'bool', 'label' => 'Guests can order food and drinks to their room (guest app and the QR card in the room). Choose which outlets take orders in Menu & Prices → Outlets'],
                 ],
             ],

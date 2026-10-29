@@ -17,6 +17,6 @@ final class HotelTables
         'room_status_logs', 'room_type_photos', 'room_types', 'rooms', 'shifts', 'staff_leaves', 'staff_profiles', 'staff_rota',
         'stock_categories', 'stock_count_lines', 'stock_counts', 'stock_items', 'stock_levels', 'stock_locations', 'stock_movements',
         'stock_receipt_lines', 'stock_receipts', 'stock_transfer_lines', 'stock_transfers', 'supplier_invoices', 'supplier_payments',
-        'suppliers', 'visitors', 'vehicles', 'drivers', 'ride_places', 'rides',
+        'suppliers', 'visitors', 'vehicles', 'drivers', 'ride_places', 'rides', 'staff_tasks', 'staff_task_updates',
     ];
 }

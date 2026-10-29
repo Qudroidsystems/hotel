@@ -64,6 +64,12 @@ class GuestStayController extends ApiController
         return $this->ok($this->stay($r->fresh()), "Thanks — your request for “{$req->type_label}” has been sent.", status: 201);
     }
 
+    /** GET /guest/stays/{token}/weather — the forecast at the hotel, with the stay's days marked. */
+    public function weather(string $token, \App\Services\Weather\WeatherService $weather)
+    {
+        return $this->ok($weather->forGuest($this->reservation($token)));
+    }
+
     /** GET /guest/stays/{token}/menu — what the guest can order to their room. */
     public function menu(string $token, GuestOrderService $orders)
     {
