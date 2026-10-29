@@ -165,6 +165,18 @@ class StaffAlerts
         ]);
     }
 
+    /** An alert to these people (a chat section's staff, a caller's team …), never the person who did it. */
+    public function toUsers(Collection $users, array $data): void
+    {
+        $users = $users->reject(fn (User $u) => $u->id === auth()->id() || $u->is_disabled)->values();
+        $hotel = \App\Support\Tenancy\CurrentHotel::get()->id();
+        if ($hotel && \App\Support\Tenancy\CurrentHotel::multi()) {
+            $here = \Illuminate\Support\Facades\DB::table('hotel_user')->where('hotel_id', $hotel)->pluck('user_id')->all();
+            $users = $users->filter(fn (User $u) => in_array($u->id, $here, true) || $u->seesAllHotels())->values();
+        }
+        $this->send($users, $data + ['group' => 'guests', 'level' => 'normal']);
+    }
+
     /** An alert to everyone who holds a permission (night audit reminders, events…). */
     public function notify(string $permission, array $data): void
     {

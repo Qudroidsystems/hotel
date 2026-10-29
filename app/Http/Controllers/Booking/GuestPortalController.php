@@ -64,6 +64,8 @@ class GuestPortalController extends Controller
             'accounts'   => HotelBankAccount::ordered()->where('is_active', true)->where('show_on_invoice', true)->get(),
             'canRequest' => config('hotel.booking.guest_requests', true) && $r->status === ReservationStatus::CheckedIn,
             'canOrder'   => app(GuestOrderService::class)->canOrder($r),
+            'chatOn'     => app(\App\Services\Chat\ChatService::class)->blocker($r) === null,
+            'chatUnread' => (int) \App\Models\Chat\ChatConversation::where('reservation_id', $r->id)->sum('guest_unread'),
             'arrival'    => app(\App\Services\Booking\ArrivalService::class)->forGuest($r),
             'cars'       => app(\App\Services\Transport\RideService::class)->forGuest($r),
             'carPlaces'  => app(\App\Services\Transport\RideService::class)->places(),
@@ -120,6 +122,15 @@ class GuestPortalController extends Controller
         }
 
         return back()->with('success', "Car {$x->number} cancelled.");
+    }
+
+    /** Chat with (and call) the hotel's sections from the booking page. */
+    public function chat(string $token, \App\Services\Chat\ChatService $chat)
+    {
+        $r = $this->reservation($token);
+        $r->load('guest');
+
+        return view('booking.chat', ['r' => $r, 'home' => $chat->forGuest($r)]);
     }
 
     /** Order food and drinks to the room (checked-in guests). */

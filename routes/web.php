@@ -67,6 +67,9 @@ Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : redi
 
 // Staff accounts are created by an administrator, so public sign-up is off.
 Auth::routes(['register' => false, 'verify' => false]);
+// Second step of signing in for accounts with two-step sign-in
+Route::get('/two-factor/challenge', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'show'])->name('two-factor.challenge');
+Route::post('/two-factor/challenge', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store'])->middleware('throttle:20,1')->name('two-factor.verify');
 
 // Connection check used by every page to notice a dropped network.
 Route::get('/ping', fn () => response()->json(['ok' => true, 'time' => now()->toIso8601String()])
@@ -115,6 +118,22 @@ Route::middleware('throttle:booking-pages')->group(function () {
     // The QR card in each room: the guest confirms their surname once, then orders / opens their booking.
     Route::get('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'show'])->name('room.card');
     Route::post('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'verify'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('room.card.verify');
+    // Chat and calls from the booking page (same JSON as the guest app)
+    Route::get('/stay/{token}/chat', [GuestPortalController::class, 'chat'])->name('stay.chat');
+    Route::prefix('stay/{token}/live')->name('stay.live.')->controller(\App\Http\Controllers\Chat\GuestChatController::class)
+        ->withoutMiddleware('throttle:booking-pages')->middleware('throttle:guest-chat')->group(function () {
+            Route::get('/chat', 'index')->name('index');
+            Route::get('/chat/{section}', 'thread')->whereNumber('section')->name('thread');
+            Route::post('/chat/{section}', 'send')->whereNumber('section')->name('send');
+            Route::post('/chat/{section}/typing', 'typing')->whereNumber('section')->name('typing');
+            Route::post('/calls', 'call')->name('call');
+            Route::get('/calls/ringing', 'ringing')->name('ringing');
+            Route::get('/calls/{uuid}', 'show')->whereUuid('uuid')->name('call.show');
+            Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid')->name('call.signal');
+            Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid')->name('call.answer');
+            Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid')->name('call.end');
+        });
+    Route::post('/stay/{token}/realtime/auth', [\App\Http\Controllers\Chat\RealtimeController::class, 'auth'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:guest-chat')->name('stay.realtime.auth');
     Route::post('/stay/{token}/cancel', [GuestPortalController::class, 'cancel'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.cancel');
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
@@ -149,6 +168,15 @@ Route::middleware('auth')->group(function () {
     Route::delete('roles/removeuserrole/{userid}/{roleid}', [RoleController::class, 'removeuserrole'])->name('roles.removeuserrole');
     Route::resource('roles', RoleController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::resource('permissions', PermissionController::class)->only(['index', 'store', 'update', 'destroy']);
+
+    // Two-step sign-in: your own set-up, and the administrator's list and reset
+    Route::get('/two-factor', [\App\Http\Controllers\Auth\TwoFactorController::class, 'show'])->name('two-factor.show');
+    Route::post('/two-factor/confirm', [\App\Http\Controllers\Auth\TwoFactorController::class, 'confirm'])->middleware('throttle:10,1')->name('two-factor.confirm');
+    Route::post('/two-factor/recovery-codes', [\App\Http\Controllers\Auth\TwoFactorController::class, 'recoveryCodes'])->middleware('throttle:10,1')->name('two-factor.recovery');
+    Route::post('/two-factor/restart', [\App\Http\Controllers\Auth\TwoFactorController::class, 'restart'])->middleware('throttle:10,1')->name('two-factor.restart');
+    Route::post('/two-factor/disable', [\App\Http\Controllers\Auth\TwoFactorController::class, 'disable'])->middleware('throttle:10,1')->name('two-factor.disable');
+    Route::get('/security/two-step', [\App\Http\Controllers\Security\TwoFactorAdminController::class, 'index'])->name('security.two-factor');
+    Route::post('/security/two-step/{user}/reset', [\App\Http\Controllers\Security\TwoFactorAdminController::class, 'reset'])->name('security.two-factor.reset');
 
     // My account / profile settings
     Route::prefix('profile')->name('profile.')->group(function () {
@@ -462,6 +490,27 @@ Route::middleware('auth')->group(function () {
     });
     Route::get('/rates/revenue', [\App\Http\Controllers\Rates\RevenueController::class, 'index'])->name('rates.revenue');
     Route::post('/rates/revenue/apply', [\App\Http\Controllers\Rates\RevenueController::class, 'apply'])->name('rates.revenue.apply');
+
+    // Guest chat & calls: the inbox (and the browser ringer), the JSON it uses, and setting up sections
+    Route::get('/chat', [\App\Http\Controllers\Chat\ChatPageController::class, 'index'])->name('chat.index');
+    Route::get('/chat/sections', [\App\Http\Controllers\Chat\ChatPageController::class, 'sections'])->name('chat.sections');
+    Route::post('/chat/sections', [\App\Http\Controllers\Chat\ChatPageController::class, 'saveSection'])->name('chat.sections.store');
+    Route::put('/chat/sections/{section}', [\App\Http\Controllers\Chat\ChatPageController::class, 'saveSection'])->name('chat.sections.update');
+    Route::post('/realtime/auth', [\App\Http\Controllers\Chat\RealtimeController::class, 'auth'])->name('realtime.auth');
+    Route::prefix('chat/api')->name('chat.api.')->controller(\App\Http\Controllers\Chat\StaffChatController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{conversation}', 'show')->whereNumber('conversation')->name('show');
+        Route::post('/{conversation}', 'send')->whereNumber('conversation')->name('send');
+        Route::post('/{conversation}/typing', 'typing')->whereNumber('conversation')->name('typing');
+        Route::post('/{conversation}/close', 'close')->whereNumber('conversation')->name('close');
+        Route::post('/{conversation}/assign', 'assign')->whereNumber('conversation')->name('assign');
+        Route::post('/{conversation}/call', 'callBack')->whereNumber('conversation')->name('call');
+        Route::get('/calls/ringing', 'ringing')->name('ringing');
+        Route::get('/calls/{uuid}', 'call')->whereUuid('uuid')->name('call.show');
+        Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid')->name('call.answer');
+        Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid')->name('call.signal');
+        Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid')->name('call.end');
+    });
 
     // Car service: dispatch board, cars, drivers, set-fare places
     Route::prefix('transport')->name('transport.')->controller(\App\Http\Controllers\Transport\TransportController::class)->group(function () {

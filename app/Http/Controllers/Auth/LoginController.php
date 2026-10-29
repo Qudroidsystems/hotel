@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\Auth\TwoFactor;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
-    use AuthenticatesUsers;
+    use AuthenticatesUsers {
+        login as passwordLogin;
+    }
 
     protected $redirectTo = '/dashboard';
 
@@ -22,6 +25,36 @@ class LoginController extends Controller
     public function showLoginForm()
     {
         return view('auth.login');
+    }
+
+    /**
+     * Accounts with two-step sign-in: a right password only opens the code step
+     * (two-factor.challenge); they are not signed in until the code is checked.
+     */
+    public function login(Request $request)
+    {
+        $this->validateLogin($request);
+        if ($this->hasTooManyLoginAttempts($request)) {
+            $this->fireLockoutEvent($request);
+
+            return $this->sendLockoutResponse($request);
+        }
+
+        $provider = $this->guard()->getProvider();
+        $user = $provider->retrieveByCredentials($this->credentials($request));
+        if ($user && ! $user->is_disabled && TwoFactor::enabled($user) && $provider->validateCredentials($user, $this->credentials($request))) {
+            $this->clearLoginAttempts($request);
+            $request->session()->regenerate();
+            $request->session()->put('two_factor.login', [
+                'id'       => $user->id,
+                'remember' => $request->boolean('remember'),
+                'until'    => now()->addMinutes(config('two_factor.challenge_minutes', 5))->getTimestamp(),
+            ]);
+
+            return redirect()->route('two-factor.challenge');
+        }
+
+        return $this->passwordLogin($request);
     }
 
     /** The login box accepts either an email address or a username. */

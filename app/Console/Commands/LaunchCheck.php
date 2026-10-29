@@ -172,6 +172,20 @@ class LaunchCheck extends Command
         $this->check(filled(config('services.fcm.credentials_json')) || filled(config('services.fcm.credentials')), 'Push notifications (Firebase) set up',
             'No Firebase key: staff get alerts inside the app but no phone notifications. Hotel Settings → Phone Notifications', warnOnly: true);
 
+        // Guest chat and calls: a real-time server makes them instant; TURN makes calls work on mobile data.
+        $rt = config('services.realtime');
+        if (! ($rt['enabled'] ?? false)) {
+            $this->check(false, '', 'No real-time server: guest chat and calls still work but update every few seconds. See deploy/README.md → Live chat & calls', warnOnly: true);
+        } else {
+            $local = in_array($rt['host'] ?? '', ['127.0.0.1', 'localhost'], true);
+            $this->check(! $local || class_exists(\Laravel\Reverb\ReverbServiceProvider::class), 'Real-time server (' . ($local ? 'Reverb on this server' : $rt['host']) . ')',
+                'REALTIME_ENABLED is on but Laravel Reverb is not installed: composer require laravel/reverb, then start deploy/hotel-reverb.service');
+        }
+        if (config('hotel.booking.guest_calls', true)) {
+            $turn = filled(config('services.webrtc.turn_urls')) && (filled(config('services.webrtc.turn_secret')) || filled(config('services.webrtc.turn_user')));
+            $this->check($turn, 'Calls relay through ' . config('services.webrtc.turn_urls'), 'No TURN server for guest calls: many calls on mobile data will connect but stay silent. Install coturn (deploy/turnserver.conf) or add a TURN service in Hotel Settings → Live Chat & Calls', warnOnly: true);
+        }
+
         $behind = \App\Models\NightAudit::exists() ? \App\Models\NightAudit::businessDate()->diffInDays(today(), false) : 0;
         $this->check($behind <= 1, 'Night audit is up to date', (int) $behind . ' day(s) not closed: Front Desk → Night Audit', warnOnly: true);
     }

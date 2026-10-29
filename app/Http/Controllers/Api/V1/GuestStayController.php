@@ -315,6 +315,8 @@ class GuestStayController extends ApiController
             'can_request'  => $canRequest,
             'request_types' => $canRequest ? collect(GuestRequest::TYPES)->map(fn ($t, $k) => ['key' => $k, 'label' => $t[0]])->values() : [],
             'arrival'      => app(ArrivalService::class)->forGuest($r),
+            // Chat and calls with the hotel's sections (GET …/chat for the list).
+            'chat'         => ['available' => app(\App\Services\Chat\ChatService::class)->blocker($r) === null, 'unread' => (int) \App\Models\Chat\ChatConversation::where('reservation_id', $r->id)->sum('guest_unread')],
             'cars'         => app(RideService::class)->forGuest($r),
             'can_order'    => $orderSvc->canOrder($r),
             'order_note'   => $r->status === S::CheckedIn && ! $orderSvc->canOrder($r) && $orderSvc->outlets()->isNotEmpty() ? $orderSvc->blocker($r) : null,

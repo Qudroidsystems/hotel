@@ -259,6 +259,23 @@ class HotelSettings
                     'accounts.termii.base_url'      => ['type' => 'text', 'config' => 'services.termii.base_url', 'label' => 'Termii base URL', 'rules' => ['nullable', 'url', 'max:120'], 'help' => 'Shown on your Termii dashboard. Usually https://api.ng.termii.com.'],
                 ],
             ],
+            'live' => [
+                'title' => 'Live Chat & Calls', 'icon' => 'ri-chat-voice-line',
+                'intro' => 'Guests chat with and call the hotel\'s sections (set them up under Guest Chat → Sections). Messages are always kept and delivered; a real-time server makes them instant (Laravel Reverb on this server: php artisan reverb:start, see deploy/README), otherwise the apps check every few seconds. Calls need a TURN relay to work across mobile networks.',
+                'fields' => [
+                    'booking.guest_chat'            => ['type' => 'bool', 'label' => 'Guests can chat with the hotel (guest app and booking page)'],
+                    'booking.guest_calls'           => ['type' => 'bool', 'label' => 'Guests can call sections in the app'],
+                    'accounts.realtime.enabled'     => ['type' => 'bool', 'config' => 'services.realtime.enabled', 'label' => 'Use the real-time server'],
+                    'accounts.realtime.app_id'      => ['type' => 'text', 'config' => 'services.realtime.app_id', 'label' => 'Real-time app ID', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_ID (or your Pusher-compatible service\'s app id).'],
+                    'accounts.realtime.key'         => ['type' => 'text', 'config' => 'services.realtime.key', 'label' => 'Real-time app key', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_KEY — public: browsers and apps use it to connect.'],
+                    'accounts.realtime.secret'      => ['type' => 'secret', 'config' => 'services.realtime.secret', 'label' => 'Real-time app secret'],
+                    'accounts.realtime.client_host' => ['type' => 'text', 'config' => 'services.realtime.client_host', 'label' => 'Address browsers and apps connect to', 'rules' => ['nullable', 'string', 'max:120'], 'help' => 'Usually this site\'s own address (Nginx passes /app to Reverb). Empty = this site.'],
+                    'accounts.webrtc.turn_urls'     => ['type' => 'text', 'config' => 'services.webrtc.turn_urls', 'label' => 'TURN server(s)', 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'e.g. turn:turn.yourhotel.com:3478,turns:turn.yourhotel.com:5349'],
+                    'accounts.webrtc.turn_secret'   => ['type' => 'secret', 'config' => 'services.webrtc.turn_secret', 'label' => 'TURN shared secret (coturn)', 'help' => 'The static-auth-secret in coturn\'s turnserver.conf. Logins are made for each call and last a day.'],
+                    'accounts.webrtc.turn_user'     => ['type' => 'text', 'config' => 'services.webrtc.turn_user', 'label' => 'TURN username (paid service)', 'rules' => ['nullable', 'string', 'max:120']],
+                    'accounts.webrtc.turn_pass'     => ['type' => 'secret', 'config' => 'services.webrtc.turn_pass', 'label' => 'TURN password (paid service)'],
+                ],
+            ],
             'maps' => [
                 'title' => 'Maps & Directions', 'icon' => 'ri-map-2-line',
                 'intro' => 'The maps guests and drivers see, and how travel times are worked out (arrival sharing, the car service). OpenStreetMap is free and needs nothing. Google Maps gives real road routes, live traffic times and address search: create a key in Google Cloud with the Directions, Distance Matrix, Places, Geocoding and Map Tiles APIs switched on.',

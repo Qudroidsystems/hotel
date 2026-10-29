@@ -25,7 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound', 'termii/events']);
 
         // Multi-hotel: pick the hotel before route models are loaded (so they come from that hotel only).
-        $middleware->web(append: [\App\Http\Middleware\SetCurrentHotel::class]);
+        // Then: roles that must use two-step sign-in are sent to set it up first.
+        $middleware->web(append: [\App\Http\Middleware\SetCurrentHotel::class, \App\Http\Middleware\EnsureTwoFactorSetUp::class]);
         $middleware->api(append: [\App\Http\Middleware\SetCurrentHotel::class]);
         $middleware->prependToPriorityList(before: \Illuminate\Routing\Middleware\SubstituteBindings::class, prepend: \App\Http\Middleware\SetCurrentHotel::class);
 

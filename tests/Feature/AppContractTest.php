@@ -89,6 +89,23 @@ test('the staff app finds every field it reads', function () {
         $check('companies[0] (CompanyAccount)', $companies[0], ['account_number', 'available', 'credit_limit', 'id', 'name', 'owes']);
     }
 
+    // Guest chat: a guest's message to Reception, as the team sees it.
+    $inHouse = \App\Models\Reservation::where('status', 'checked_in')->first();
+    $chat = app(\App\Services\Chat\ChatService::class);
+    $reception = $chat->sections()->firstWhere('key', 'reception');
+    $chat->guestSend($inHouse, $reception, 'Could I have two more towels?', null, (string) \Illuminate\Support\Str::uuid());
+    $box = ($this->api)('chats')->json('data');
+    $check('chats (ChatInbox)', $box, ['conversations', 'live', 'ringing', 'sections', 'unread']);
+    $check('chats section (ChatSectionRow)', $box['sections'][0] ?? null, ['hours', 'icon', 'id', 'name', 'open', 'unread']);
+    $conv = $box['conversations'][0] ?? null;
+    $check('chats conversation (ChatConv)', $conv, ['assigned', 'guest', 'id', 'last', 'last_at', 'last_label', 'phone', 'reference', 'room', 'section', 'section_icon', 'section_id', 'stay', 'stay_status', 'status', 'typing', 'unread', 'vip']);
+    if ($conv) {
+        $th = ($this->api)('chats/' . $conv['id'])->json('data');
+        $check('chats/{id} (StaffThread)', $th, ['call', 'can_call', 'conversation', 'guest_read_up_to', 'messages', 'quick_replies', 'typing']);
+        $check('chat message (ChatMsg)', $th['messages'][0] ?? null, ['body', 'client_id', 'day', 'id', 'mine', 'name', 'photo', 'read', 'sender', 'time']);
+    }
+    $check('home counts', $home['counts'] ?? null, ['approvals', 'chats', 'unread_notifications', 'urgent', 'work']);
+
     // Driver mode, as the demo driver (a ride assigned to him).
     $musa = User::where('email', 'driver.musa@smarthotel.com')->first();
     if ($musa) {
@@ -192,6 +209,19 @@ test('the guest app finds every field it reads', function () {
     } else {
         $miss[] = 'no outlet takes room orders in the demo data';
     }
+
+    // Chat with the hotel's sections.
+    $ch = $get("guest/stays/{$t2}/chat")->json('data');
+    $check('chat home (ChatHome)', $ch, ['available', 'calls', 'live', 'note', 'sections']);
+    $check('chat section (ChatSectionInfo)', $ch['sections'][0] ?? null, ['can_call', 'description', 'hours', 'icon', 'id', 'key', 'last', 'last_label', 'name', 'open', 'phone', 'typing', 'unread']);
+    if ($ch['sections'][0] ?? null) {
+        $this->postJson("/api/v1/guest/stays/{$t2}/chat/{$ch['sections'][0]['id']}", ['body' => 'Hello there', 'client_id' => (string) \Illuminate\Support\Str::uuid()])->assertCreated();
+        $gt = $get("guest/stays/{$t2}/chat/{$ch['sections'][0]['id']}")->json('data');
+        $check('chat thread (ChatThread)', $gt, ['call', 'messages', 'read_up_to', 'section', 'typing']);
+        $check('chat thread section', $gt['section'] ?? null, ['can_call', 'hours', 'id', 'name', 'open', 'phone']);
+        $check('chat message (ChatMsg)', $gt['messages'][0] ?? null, ['body', 'client_id', 'day', 'id', 'mine', 'name', 'photo', 'read', 'sender', 'time']);
+    }
+    $check('stay chat', $get("guest/stays/{$t2}")->json('data.chat'), ['available', 'unread']);
 
     expect($miss)->toBe([]);
 });

@@ -21,6 +21,19 @@ use Illuminate\Support\Facades\Route;
 
 // Guests: their own booking, opened with the reference + e-mail/phone or the private link (no staff sign-in).
 Route::prefix('guest')->group(function () {
+    // Chat and calls with the hotel's sections (the booking's token is the key)
+    Route::prefix('stays/{token}')->controller(\App\Http\Controllers\Chat\GuestChatController::class)->middleware('throttle:guest-chat')->group(function () {
+        Route::get('/chat', 'index');
+        Route::get('/chat/{section}', 'thread')->whereNumber('section');
+        Route::post('/chat/{section}', 'send')->whereNumber('section');
+        Route::post('/chat/{section}/typing', 'typing')->whereNumber('section');
+        Route::post('/calls', 'call');
+        Route::get('/calls/ringing', 'ringing');
+        Route::get('/calls/{uuid}', 'show')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid');
+    });
     Route::post('/find', [GuestStayController::class, 'find'])->middleware('throttle:booking-lookup');
     // Guest accounts: sign in with a code sent to the e-mail / phone they booked with.
     Route::post('/auth/code', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'code'])->middleware('throttle:booking-lookup');
@@ -58,6 +71,8 @@ Route::prefix('guest')->group(function () {
 
 // The hotel's name, logo and colour, for both apps. `staff_api` says whether staff can sign in yet.
 Route::get('/app/config', [AppController::class, 'config'])->middleware('throttle:mobile-public');
+// Lets a socket listen on a private channel: guests with their booking token, staff with their sign-in.
+Route::post('/realtime/auth', [\App\Http\Controllers\Chat\RealtimeController::class, 'auth'])->middleware('throttle:guest-chat');
 
 if (! class_exists(\Laravel\Sanctum\Sanctum::class)) {
     return;   // staff sign-in needs Laravel Sanctum (composer require laravel/sanctum)
@@ -89,8 +104,23 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
     Route::get('/work', [WorkController::class, 'work']);
     Route::get('/approvals', [WorkController::class, 'approvals']);
     Route::post('/items/{kind}/{id}/actions/{action}', [WorkController::class, 'act'])
-        ->whereIn('kind', ['guest', 'housekeeping', 'maintenance', 'ticket', 'expense', 'po', 'pr', 'shift', 'count'])
+        ->whereIn('kind', array_merge(\App\Services\Mobile\StaffActions::WORK_KINDS, \App\Services\Mobile\StaffActions::APPROVAL_KINDS))
         ->whereNumber('id')->where('action', '[a-z_]+');
+    // Guest chat and calls (the sections this person answers)
+    Route::controller(\App\Http\Controllers\Chat\StaffChatController::class)->group(function () {
+        Route::get('/chats', 'index');
+        Route::get('/chats/{conversation}', 'show')->whereNumber('conversation');
+        Route::post('/chats/{conversation}', 'send')->whereNumber('conversation')->middleware('throttle:60,1');
+        Route::post('/chats/{conversation}/typing', 'typing')->whereNumber('conversation');
+        Route::post('/chats/{conversation}/close', 'close')->whereNumber('conversation');
+        Route::post('/chats/{conversation}/assign', 'assign')->whereNumber('conversation');
+        Route::post('/chats/{conversation}/call', 'callBack')->whereNumber('conversation');
+        Route::get('/calls/ringing', 'ringing');
+        Route::get('/calls/{uuid}', 'call')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid');
+    });
     Route::get('/report/options', [WorkController::class, 'reportOptions']);
     Route::post('/report', [WorkController::class, 'report']);
 

@@ -1,0 +1,20 @@
+# The real-time server for guest chat, calls and the live boards (Laravel Reverb), kept running by systemd.
+# Once:  cd /var/www/hotel && composer require laravel/reverb
+#        sudo cp deploy/hotel-reverb.service /etc/systemd/system/ && sudo systemctl enable --now hotel-reverb
+# Logs:  journalctl -u hotel-reverb -f
+# It listens on 127.0.0.1:8080 only; Nginx passes the apps' and browsers' sockets to it on /app (nginx.conf).
+[Unit]
+Description=Hotel real-time server (Laravel Reverb)
+After=network.target mariadb.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/hotel
+ExecStart=/usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080
+Restart=always
+RestartSec=3
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target

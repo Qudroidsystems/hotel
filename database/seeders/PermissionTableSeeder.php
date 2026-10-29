@@ -120,6 +120,8 @@ class PermissionTableSeeder extends Seeder
         'Guest Services' => [
             'Handle guest requests',
             'Message guests',
+            'Chat with guests',    // answer chats and calls for their sections
+            'Manage guest chat',   // every section, and setting sections up
         ],
         'Transport' => [
             'Drive guests',        // drivers: their rides in the staff app

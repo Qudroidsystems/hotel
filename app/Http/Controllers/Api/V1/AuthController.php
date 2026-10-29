@@ -6,10 +6,12 @@ use App\Models\MobileDevice;
 use App\Models\User;
 use App\Services\Mobile\MobileUser;
 use App\Support\Audit;
+use App\Support\Auth\TwoFactor;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
 /** Signing in and out of the staff mobile app. */
@@ -24,6 +26,7 @@ class AuthController extends ApiController
             'platform'    => 'nullable|in:ios,android',
             'push_token'  => 'nullable|string|max:255',
             'app_version' => 'nullable|string|max:20',
+            'code'        => 'nullable|string|max:20',   // two-step sign-in code, when the account uses it
         ]);
         $login = trim($data['login']);
         $user = $this->findUser($login);
@@ -35,6 +38,25 @@ class AuthController extends ApiController
         }
         if ($user->is_disabled) {
             return $this->fail('This account has been disabled. Please contact the hotel administrator.', 403, 'account_disabled');
+        }
+
+        if (TwoFactor::enabled($user)) {
+            if (blank($data['code'] ?? null)) {
+                return $this->fail('Type the code from your authenticator app.', 422, 'two_factor_required');
+            }
+            $key = '2fa|' . $user->id;
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                return $this->fail('Too many wrong codes. Try again in ' . RateLimiter::availableIn($key) . ' seconds.', 429, 'two_factor_locked');
+            }
+            if (! TwoFactor::verify($user, $data['code'])) {
+                RateLimiter::hit($key, 60);
+                Audit::record('auth.2fa_failed', "Wrong sign-in code for {$user->name} on the mobile app", $user, by: $user, flagged: RateLimiter::remaining($key, 5) === 0);
+
+                return $this->fail('That code is not right. Check the time on your phone and try the newest code.', 422, 'two_factor_invalid');
+            }
+            RateLimiter::clear($key);
+        } elseif (TwoFactor::required($user)) {
+            return $this->fail('Your role needs two-step sign-in. Set it up on the website first (Profile → Two-step sign-in), then sign in here.', 403, 'two_factor_setup_required');
         }
 
         $device = $data['device_name'] ?? 'Phone';

@@ -109,6 +109,15 @@
                 </div>
             @endif
 
+            @if ($chatOn)
+                <a class="panel order-cta" href="{{ route('stay.chat', $r->guest_token) }}">
+                    <i class="ri-chat-smile-3-line" aria-hidden="true"></i>
+                    <div class="grow"><h2>Chat with us</h2><p class="muted small">Message or call Reception, the restaurant, the bar, laundry … replies come straight here.</p></div>
+                    @if ($chatUnread)<span class="pill">{{ $chatUnread }} new</span>@endif
+                    <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                </a>
+            @endif
+
             @if ($canOrder)
                 <a class="panel order-cta" href="{{ route('stay.order', $r->guest_token) }}">
                     <i class="ri-restaurant-line" aria-hidden="true"></i>

@@ -22,6 +22,7 @@ class MobileUser
         'owner'      => ['View management reports', 'View finance reports'],
         'driver'     => ['Drive guests'],
         'transport'  => ['Manage transport'],
+        'chat'       => ['Chat with guests', 'Manage guest chat'],
     ];
 
     public static function toArray(User $user): array

@@ -32,9 +32,19 @@ systemctl restart mariadb
 mkdir -p /var/www /var/backups/hotel
 chown www-data:www-data /var/backups/hotel
 
-# Firewall: web and SSH only
+# Guest voice calls: coturn relays calls on mobile data (configure with deploy/turnserver.conf)
+if [ "${WITH_TURN:-yes}" = "yes" ]; then
+  apt-get install -y coturn
+  sed -i 's/^#*TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null || true
+fi
+
+# Firewall: web and SSH (and the call relay's ports when coturn is installed)
 if command -v ufw >/dev/null; then
-  ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
+  ufw allow OpenSSH && ufw allow 'Nginx Full'
+  if command -v turnserver >/dev/null; then
+    ufw allow 3478 && ufw allow 5349/tcp && ufw allow 49152:65535/udp
+  fi
+  ufw --force enable
 fi
 
 echo "Done. Next: create the database (see the launch guide), then clone the code into /var/www/hotel."

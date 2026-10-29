@@ -6,7 +6,7 @@ namespace App\Support\Tenancy;
 final class HotelTables
 {
     public const LIST = [
-        'attendance_days', 'attendance_points', 'attendance_punches', 'audit_logs', 'buildings', 'cash_shift_movements', 'cash_shifts',
+        'attendance_days', 'attendance_points', 'attendance_punches', 'audit_logs', 'buildings', 'cash_shift_movements', 'cash_shifts', 'chat_conversations', 'chat_sections', 'guest_calls',
         'channel_bookings', 'channel_sync_logs', 'companies', 'company_ledger_entries', 'departments', 'event_items', 'event_packages',
         'event_payments', 'events', 'expense_categories', 'expenses', 'floors', 'folio_charges', 'guest_arrivals', 'folios', 'guest_messages', 'guest_orders', 'guest_requests',
         'guests', 'halls', 'hotel_bank_accounts', 'housekeeping_tasks', 'ical_feeds', 'incident_updates', 'incidents', 'it_alerts', 'it_assets',

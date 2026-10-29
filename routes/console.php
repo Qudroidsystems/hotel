@@ -56,6 +56,11 @@ Artisan::command('rates:auto-price {--force : Even when automatic pricing is off
     $this->info($revenue->apply(null, null, true) . ' night price(s) set from the suggestions.');
 }))->purpose('Apply the price suggestions to nights not priced by hand (Hotel Settings → Price Suggestions → automatic)');
 
+Artisan::command('calls:expire', $eachHotel(function (\App\Services\Chat\CallService $calls) {
+    $n = $calls->expire();
+    $this->info("{$n} unanswered guest call(s) marked missed.");
+}))->purpose('Guest calls ringing for too long become missed calls (shown in the chat with a call-back)');
+
 Artisan::command('arrivals:expire', $eachHotel(function (\App\Services\Booking\ArrivalService $arrivals) {
     $n = $arrivals->expire();
     $this->info("{$n} arrival share(s) stopped.");
@@ -163,6 +168,7 @@ Schedule::command('channels:sync')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('bookings:expire-holds')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('arrivals:expire')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('calls:expire')->everyMinute()->withoutOverlapping();
 Schedule::command('rates:auto-price')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();

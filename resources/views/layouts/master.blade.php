@@ -463,6 +463,11 @@
                                     <li class="nav-item">
                                         <a href="{{ route('users.index') }}" class="nav-link" data-key="t-signin">Users</a>
                                     </li>
+                                    @can('Update user')
+                                    <li class="nav-item">
+                                        <a href="{{ route('security.two-factor') }}" class="nav-link">Two-step Sign-in</a>
+                                    </li>
+                                    @endcan
                                 </ul>
                             </div>
                         </li>
@@ -488,6 +493,11 @@
                                 <li class="nav-item">
                                     <a href="{{ route('profile.settings', ['id' => Auth::id()]) }}#security" class="nav-link ps-4">
                                         <i class="ri-lock-password-line me-2"></i> Change Password
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('two-factor.show') }}" class="nav-link ps-4">
+                                        <i class="ri-shield-keyhole-line me-2"></i> Two-step Sign-in
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -763,6 +773,15 @@
                             </a>
                         </li>
                     @endcan
+                    @canany(['Chat with guests', 'Manage guest chat'])
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="{{ route('chat.index') }}">
+                                <i class="ph-chats-circle"></i> <span>Guest Chat</span>
+                                @php $chatUnread = \Illuminate\Support\Facades\Schema::hasTable('chat_conversations') ? app(\App\Services\Chat\ChatService::class)->unreadFor(auth()->user()) : 0; @endphp
+                                @if ($chatUnread)<span class="badge bg-success ms-auto" id="chat-menu-badge">{{ $chatUnread }}</span>@endif
+                            </a>
+                        </li>
+                    @endcanany
                     @can('Message guests')
                         <li class="nav-item">
                             <a class="nav-link menu-link" href="{{ route('messages.index') }}">
@@ -1393,6 +1412,10 @@
         /* ── My Account ── */
         {title:'My Profile',                            url:'{{ route("users.overview", ["id" => Auth::id()]) }}',           icon:'mdi-account-circle',          category:'My Account',          keywords:['profile','bio','account']},
         {title:'Account Settings',                      url:'{{ route("profile.settings", ["id" => Auth::id()]) }}',         icon:'mdi-cog',                     category:'My Account',          keywords:['settings','password','avatar']},
+        {title:'Two-step Sign-in',                      url:'{{ route("two-factor.show") }}',                                icon:'mdi-shield-key-outline',      category:'My Account',          keywords:['2fa','mfa','two factor','authenticator','code','security','otp']},
+        @can('Update user')
+        {title:'Staff Two-step Sign-in',                url:'{{ route("security.two-factor") }}',                            icon:'mdi-shield-key-outline',      category:'Users & Privileges',  keywords:['2fa','mfa','reset','lost phone','authenticator']},
+        @endcan
 
         /* ── Hotel modules: add an entry per page as modules are built ── */
         @can('View rooms')
@@ -1487,6 +1510,8 @@
         @canany(['View events', 'Manage events']){title:'Events & Halls',   url:'{{ route("events.index") }}',                               icon:'mdi-party-popper',            category:'Front Desk',          keywords:['event','hall','conference','wedding','banquet','meeting']},@endcanany
         @canany(['View room calendars', 'Manage room calendars']){title:'Room Calendars', url:'{{ route("channels.index") }}',           icon:'mdi-calendar-sync',           category:'Front Desk',          keywords:['room calendars','airbnb','vrbo','ical','calendar sync']},@endcanany
         @canany(['Run night audit', 'View night audit reports']){title:'Night Audit', url:'{{ route("night-audit.index") }}',                 icon:'mdi-weather-night',           category:'Front Desk',          keywords:['night audit','close day','end of day','daily report','business date']},@endcanany
+        {title:'Guest Chat',                            url:'{{ route("chat.index") }}',                                 icon:'mdi-chat-processing-outline', category:'Front Desk',          keywords:['chat','call','guest','reception','restaurant','bar','laundry','message']},
+        {title:'Guest Chat Sections',                   url:'{{ route("chat.sections") }}',                              icon:'mdi-forum-outline',           category:'Settings',            keywords:['chat','sections','departments','calls','hours']},
         {title:'Guest Messages',                        url:'{{ route("messages.index") }}',                             icon:'mdi-message-text-outline',    category:'Front Desk',          keywords:['sms','whatsapp','text','message','reply','guest']},
         {title:'Guest Requests',                        url:'{{ route("guest-requests.index") }}',                       icon:'mdi-bell-ring-outline',       category:'Front Desk',          keywords:['guest','request','towels','room service','complaint']},
         @endcan
@@ -1988,5 +2013,36 @@
     });
 })();
 </script>
+@if (auth()->check() && auth()->user()->canAny(['Chat with guests', 'Manage guest chat']) && ! request()->routeIs('chat.index'))
+    {{-- Guest calls ring on every page: a small banner that opens Guest Chat to answer. --}}
+    <div id="hc-ring" role="alertdialog" aria-live="assertive" style="display:none;position:fixed;right:20px;bottom:20px;z-index:2000;background:#0f172a;color:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 18px 45px rgba(0,0,0,.35);max-width:320px">
+        <div style="font-size:12px;opacity:.7" id="hc-ring-s"></div><div style="font-weight:700" id="hc-ring-t"></div>
+        <div style="display:flex;gap:8px;margin-top:10px"><button type="button" id="hc-ring-x" style="flex:1;border:0;border-radius:10px;padding:8px;background:#334155;color:#fff;font-weight:700">Later</button>
+            <a id="hc-ring-a" style="flex:1;border-radius:10px;padding:8px;background:#16a34a;color:#fff;font-weight:700;text-align:center;text-decoration:none">Answer</a></div>
+    </div>
+    <script src="{{ asset('js/hotel-live.js') }}?v={{ @filemtime(public_path('js/hotel-live.js')) }}"></script>
+    <script>
+    (() => {
+        const url = @json(route('chat.api.ringing')), chat = @json(route('chat.index'));
+        let seen = {}, stop = null;
+        const box = document.getElementById('hc-ring');
+        async function check() {
+            try {
+                const r = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+                const list = (await r.json()).data || [];
+                const c = list.find(x => !seen[x.uuid]);
+                if (c) {
+                    document.getElementById('hc-ring-s').textContent = 'Incoming call · ' + c.section;
+                    document.getElementById('hc-ring-t').textContent = c.guest + (c.room ? ' · room ' + c.room : '');
+                    document.getElementById('hc-ring-a').href = chat + '?answer=' + c.uuid;
+                    document.getElementById('hc-ring-x').onclick = () => { seen[c.uuid] = 1; box.style.display = 'none'; if (stop) { stop(); stop = null; } };
+                    box.style.display = 'block'; if (!stop) stop = window.hotelRingTone ? hotelRingTone() : null;
+                } else if (!list.length) { box.style.display = 'none'; if (stop) { stop(); stop = null; } }
+            } catch (e) {}
+        }
+        setInterval(check, 6000); setTimeout(check, 1500);
+    })();
+    </script>
+@endif
 </body>
 </html>

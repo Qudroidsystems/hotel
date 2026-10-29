@@ -142,7 +142,9 @@ return [
         ],
         'guest_requests'  => true,
         'guest_ordering'  => true,
-        'arrival_sharing' => true,   // guests on the way can share their arrival (needs the hotel's map position)   // room orders from the guest app / room QR card (outlets choose in Menu & Prices)
+        'arrival_sharing' => true,
+        'guest_chat'      => true,   // guests chat with the hotel's sections (Guest Chat → Sections)
+        'guest_calls'     => true,   // and call them in the app (needs a TURN relay across mobile networks)   // guests on the way can share their arrival (needs the hotel's map position)   // room orders from the guest app / room QR card (outlets choose in Menu & Prices)
     ],
 
     /*

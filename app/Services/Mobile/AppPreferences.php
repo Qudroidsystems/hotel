@@ -14,6 +14,8 @@ class AppPreferences
         'guests'    => 'Guest requests',
         'approvals' => 'Approvals',
         'it'        => 'IT alerts',
+        'chat'      => 'Guest chat messages',
+        'calls'     => 'Calls from guests',
     ];
 
     private function __construct(private User $user, private array $prefs)
