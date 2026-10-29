@@ -54,6 +54,7 @@ IT control room…) are built on top of it.
 | Audit trail | `AuditLogController` (`/audit-trail`: filter by date, person, area, flagged; history of one record; CSV export), `App\Support\Audit::record()` (write an entry from anywhere), `App\Providers\AuditServiceProvider` (records sign-ins and failed sign-ins, set-up changes with before/after values — rates, prices, users, roles —, voids, refunds, discounts, stock adjustments, attendance corrections, check-in/out and QR scans). Table `audit_logs` is append-only; passwords and tokens are never stored. Large voids/refunds/discounts (`HOTEL_AUDIT_FLAG_AMOUNT`, default 50,000) and repeated failed sign-ins or scans (`HOTEL_AUDIT_FLAG_FAILURES`, default 5 in 15 min) are flagged. Permission: `View audit log`. |
 | Two-step sign-in | `Auth\TwoFactorController` (`/two-factor`: set up with any authenticator app by QR code or key, 8 one-off recovery codes, move to a new phone, turn off), `Auth\TwoFactorChallengeController` (the code step after the password, website), staff app login takes a `code` field (`two_factor_required` / `two_factor_invalid` / `two_factor_setup_required`), `Security\TwoFactorAdminController` (`/security/two-step`: who uses it, reset with a reason; permission `Update user`). Roles in `HOTEL_2FA_ROLES` (default Super Admin, Hotel Owner, General Manager) must set it up before using anything else. Codes are RFC 6238 (`App\Support\Auth\Totp`), each accepted once; the key and recovery codes are stored encrypted. Locked out with no phone and no codes: `php artisan hotel:2fa-reset email@or-username`. |
 | Department tasks | `Operations\TaskController` (`/tasks`: give a task to a department or a person with priority, due time, room or place, photos and documents, and an optional supervisor check; everyone sees *My tasks* and *My department*, anyone in the department can take an unassigned task; start, mark done with notes and photos; the giver, the department's manager or `Manage tasks` checks it — never the person who did it — or sends it back; history of every change). `App\Services\Operations\TaskService`. `tasks:escalate` (every 15 minutes): when a task passes its due time the person (or department) and the department manager are reminded; if it is still not done after 1 h (urgent), 2 h (high), 4 h (normal) or a day (low), everyone with `Manage tasks` is told and it is flagged on the audit trail. Department managers are set on the departments page. Permissions: `Give tasks`, `View all tasks`, `Manage tasks`. |
+| Public website | `Website\SiteController` (the public pages at `/`), `Website\WebsiteAdminController`, `WebsiteContentController`, `WebsiteEnquiryController` (Website in the sidebar), `App\Support\Website` (settings and colour schemes), `App\Models\Website\*`, `App\Services\Website\WebsiteService`, `resources/views/site/*`, `resources/views/website/admin/*`, `public/site/*`. See **Public website** below. |
 | Seeders | `PermissionTableSeeder` (core permissions), `RoleTableSeeder` (the 13 hotel roles from the spec), `UserTableSeeder` (first Super Admin) |
 
 The **Super Admin** role passes every permission check (`AppServiceProvider`)
@@ -63,6 +64,28 @@ and cannot be deleted, renamed, or removed from yourself.
 
 Set in `.env` (see `config/hotel.php`): `HOTEL_NAME`, `HOTEL_TAGLINE`,
 `HOTEL_LOGO`, `HOTEL_LOGO_LIGHT`, `HOTEL_FAVICON` (paths relative to `public/`).
+
+## Public website
+
+The main address (`/`) is now the hotel's public website: home, rooms (from Room Types), dining,
+meetings & events (halls and ticketed events), experiences, offers, gallery, journal, about and contact.
+Every "Book" button opens the online booking pages (`/book`), and an offer's promo code is filled in.
+Staff sign in at `/login` as before; with the website switched off (Website → Settings & Texts), `/`
+goes to the sign-in page again.
+
+- Content: **Website** in the sidebar (permission `Manage website`): home page slides, highlights,
+  dining, experiences, offers (with promo code and dates), gallery, journal, reviews, FAQs and extra pages.
+  Each item can be hidden, featured, scheduled and reordered.
+- Settings & Texts: tagline, colour scheme, announcement bar, the home page texts and numbers, each page's
+  heading and picture, contact details, opening hours, map, social links and SEO.
+- Enquiries: contact, table and event forms from the website and the guest app land under Website →
+  Enquiries (permission `View website enquiries`) and are e-mailed to the address in Settings. Newsletter
+  sign-ups can be exported to CSV.
+- Pictures are stored in `public/uploads/website` (no `storage:link` needed on XAMPP).
+- Fonts (Cormorant Garamond, Jost; OFL) are bundled in `public/site/fonts`, so the site works offline.
+- Guest app: `GET /api/v1/guest/website` gives the same content for the app's home screen;
+  `POST /api/v1/guest/website/enquiries` and `/subscribe` take its forms.
+- Sample content: `php artisan db:seed --class=WebsiteDemoSeeder` (uses the admin theme's pictures).
 
 ## Adding a module
 

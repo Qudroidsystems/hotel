@@ -29,6 +29,7 @@ class DemoSeeder extends Seeder
             GuestServicesDemoSeeder::class, // loyalty, guest requests, messages
             CommercialDemoSeeder::class,    // rates & seasons, company accounts, halls & events
             TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
+            WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
         ]);
     }
 }

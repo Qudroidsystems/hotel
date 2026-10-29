@@ -63,7 +63,27 @@ use Illuminate\Support\Facades\Session;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : redirect()->route('login'))->name('home');
+// The hotel's public website (Website in the sidebar). Switched off, the main address opens staff sign-in as before.
+Route::get('/', [\App\Http\Controllers\Website\SiteController::class, 'home'])->middleware('throttle:booking-pages')->name('home');
+Route::middleware(['throttle:booking-pages', \App\Http\Middleware\WebsiteOn::class])->name('site.')->controller(\App\Http\Controllers\Website\SiteController::class)->group(function () {
+    Route::get('/accommodation', 'rooms')->name('rooms');
+    Route::get('/accommodation/{type}', 'room')->whereNumber('type')->name('rooms.show');
+    Route::get('/dining', 'dining')->name('dining');
+    Route::get('/dining/{slug}', 'item')->defaults('kind', 'dining')->name('dining.show');
+    Route::get('/meetings-events', 'events')->name('events');
+    Route::get('/experiences', 'experiences')->name('experiences');
+    Route::get('/experiences/{slug}', 'item')->defaults('kind', 'experience')->name('experiences.show');
+    Route::get('/offers', 'offers')->name('offers');
+    Route::get('/offers/{slug}', 'item')->defaults('kind', 'offer')->name('offers.show');
+    Route::get('/gallery', 'gallery')->name('gallery');
+    Route::get('/journal', 'journal')->name('journal');
+    Route::get('/journal/{slug}', 'item')->defaults('kind', 'post')->name('journal.show');
+    Route::get('/about', 'about')->name('about');
+    Route::get('/contact', 'contact')->name('contact');
+    Route::get('/page/{slug}', 'page')->name('page');
+    Route::post('/contact', 'send')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('send');
+    Route::post('/newsletter', 'subscribe')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('subscribe');
+});
 
 // Staff accounts are created by an administrator, so public sign-up is off.
 Auth::routes(['register' => false, 'verify' => false]);
@@ -164,6 +184,31 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Website: the public site's content, settings, enquiries and newsletter list
+    Route::prefix('website')->name('website.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Website\WebsiteAdminController::class, 'index'])->name('index');
+        Route::get('/settings/{group?}', [\App\Http\Controllers\Website\WebsiteAdminController::class, 'settings'])->name('settings');
+        Route::post('/settings/{group}', [\App\Http\Controllers\Website\WebsiteAdminController::class, 'saveSettings'])->name('settings.save');
+        Route::controller(\App\Http\Controllers\Website\WebsiteContentController::class)->prefix('content/{kind}')->name('content.')->where(['kind' => '[a-z]+'])->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/new', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/{item}/edit', 'edit')->whereNumber('item')->name('edit');
+            Route::put('/{item}', 'update')->whereNumber('item')->name('update');
+            Route::delete('/{item}', 'destroy')->whereNumber('item')->name('destroy');
+            Route::post('/{item}/toggle', 'toggle')->whereNumber('item')->name('toggle');
+            Route::post('/{item}/move', 'move')->whereNumber('item')->name('move');
+        });
+        Route::controller(\App\Http\Controllers\Website\WebsiteEnquiryController::class)->group(function () {
+            Route::get('/enquiries', 'index')->name('enquiries.index');
+            Route::get('/enquiries/{message}', 'show')->whereNumber('message')->name('enquiries.show');
+            Route::put('/enquiries/{message}', 'update')->whereNumber('message')->name('enquiries.update');
+            Route::get('/newsletter', 'subscribers')->name('subscribers');
+            Route::get('/newsletter/export', 'export')->name('subscribers.export');
+            Route::post('/newsletter/{subscriber}/remove', 'removeSubscriber')->whereNumber('subscriber')->name('subscribers.remove');
+        });
+    });
 
     // Users
     Route::get('/users/roles', [UserController::class, 'roles'])->name('users.roles');

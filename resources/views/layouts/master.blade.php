@@ -832,6 +832,31 @@
                             </ul>
                         </div>
                     </li>
+                    {{-- Website: the public site's content, enquiries and newsletter --}}
+                    @canany(['Manage website', 'View website enquiries'])
+                        <li class="nav-item">
+                            <a class="nav-link menu-link collapsed" href="#sidebarWebsite" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarWebsite">
+                                <i class="ph-globe-hemisphere-west"></i> <span>Website</span>
+                                @php $siteEnquiries = \Illuminate\Support\Facades\Schema::hasTable('website_messages') ? \App\Models\Website\WebsiteMessage::where('status', 'new')->count() : 0; @endphp
+                                @if ($siteEnquiries)<span class="badge bg-danger ms-auto">{{ $siteEnquiries }}</span>@endif
+                            </a>
+                            <div class="collapse menu-dropdown" id="sidebarWebsite">
+                                <ul class="nav nav-sm flex-column">
+                                    <li class="nav-item"><a href="{{ route('website.index') }}" class="nav-link">Overview</a></li>
+                                    @can('Manage website')
+                                        <li class="nav-item"><a href="{{ route('website.content.index', 'slide') }}" class="nav-link">Home Page Slides</a></li>
+                                        <li class="nav-item"><a href="{{ route('website.content.index', 'offer') }}" class="nav-link">Offers</a></li>
+                                        <li class="nav-item"><a href="{{ route('website.content.index', 'dining') }}" class="nav-link">Dining</a></li>
+                                        <li class="nav-item"><a href="{{ route('website.content.index', 'gallery') }}" class="nav-link">Gallery</a></li>
+                                        <li class="nav-item"><a href="{{ route('website.content.index', 'post') }}" class="nav-link">Journal</a></li>
+                                        <li class="nav-item"><a href="{{ route('website.settings') }}" class="nav-link">Settings &amp; Texts</a></li>
+                                    @endcan
+                                    <li class="nav-item"><a href="{{ route('website.enquiries.index') }}" class="nav-link">Enquiries</a></li>
+                                    <li class="nav-item"><a href="{{ route('home') }}" target="_blank" rel="noopener" class="nav-link">Open the Website <i class="ri-external-link-line"></i></a></li>
+                                </ul>
+                            </div>
+                        </li>
+                    @endcanany
                     @can('Manage hotel settings')
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarSettings" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
@@ -1544,6 +1569,17 @@
         {title:'IT Equipment',                          url:'{{ route("it.assets.index") }}',                            icon:'mdi-router-wireless',         category:'IT',                  keywords:['asset','router','switch','access point','device','inventory','warranty']},
         {title:'Planned IT Maintenance',                url:'{{ route("it.maintenance.index") }}',                       icon:'mdi-wrench-clock',            category:'IT',                  keywords:['maintenance','downtime','window']},
         @endcanany
+        @canany(['Manage website', 'View website enquiries'])
+        {title:'Website',                               url:'{{ route("website.index") }}',                                  icon:'mdi-web',                     category:'Website',             keywords:['website','site','public','cms','home page','landing']},
+        {title:'Website Enquiries',                     url:'{{ route("website.enquiries.index") }}',                        icon:'mdi-email-outline',           category:'Website',             keywords:['enquiry','contact','message','table','event enquiry','website form']},
+        @endcanany
+        @can('Manage website')
+        {title:'Website Settings & Texts',              url:'{{ route("website.settings") }}',                               icon:'mdi-cog-outline',             category:'Website',             keywords:['website','colours','seo','social','instagram','whatsapp','about','announcement']},
+        {title:'Website Slides',                        url:'{{ route("website.content.index", "slide") }}',                 icon:'mdi-image-multiple-outline',  category:'Website',             keywords:['hero','banner','slider','home page']},
+        {title:'Website Offers',                        url:'{{ route("website.content.index", "offer") }}',                 icon:'mdi-tag-outline',             category:'Website',             keywords:['offer','deal','package','promo']},
+        {title:'Website Gallery',                       url:'{{ route("website.content.index", "gallery") }}',               icon:'mdi-image-outline',           category:'Website',             keywords:['photos','pictures','gallery']},
+        {title:'Website Journal',                       url:'{{ route("website.content.index", "post") }}',                  icon:'mdi-newspaper-variant-outline', category:'Website',           keywords:['news','blog','post','article']},
+        @endcan
         @can('Manage hotel settings')
         {title:'Hotel Settings',                        url:'{{ route("settings.hotel.index") }}',                           icon:'mdi-cog-outline',             category:'Settings',            keywords:['settings','hotel name','logo','tax','vat','approval limit','tolerance','price jump','branding','currency']},
         {title:'Bank Accounts',                         url:'{{ route("settings.bank-accounts.index") }}',                   icon:'mdi-bank',                    category:'Billing',             keywords:['bank','account','transfer','invoice','settings']},

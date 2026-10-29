@@ -176,6 +176,10 @@ class PermissionTableSeeder extends Seeder
             'View room calendars',
             'Manage room calendars',
         ],
+        'Website' => [
+            'Manage website',
+            'View website enquiries',
+        ],
         'Guest Management' => [
             'View guests',
             'Manage guests',

@@ -53,6 +53,8 @@ class PermissionMeta
         'Manage payment gateways'   => ['Manage', 'Configure the payment gateways (Paystack, OPay).'],
         'Close accounting period'   => ['Close',  'Lock the accounting books up to a date.'],
         'Post journal entries'      => ['Post',   'Post entries directly into the general ledger.'],
+        'Manage website'            => ['Manage', 'Change the public website: its pictures, texts, dining, offers, gallery, journal and settings.'],
+        'View website enquiries'    => ['View',   'Read and answer messages, event enquiries and table requests sent from the website, and see newsletter sign-ups.'],
         'Use POS'                   => ['Use',    'Sell at the bar / restaurant till, including when the network is down.'],
         'Charge to room'            => ['Charge', 'Put a bar or restaurant sale on an in-house guest\'s bill.'],
         'Give POS discounts'        => ['Discount','Take money off a bar or restaurant sale.'],

@@ -53,10 +53,14 @@ Route::prefix('guest')->group(function () {
         Route::get('/stays/{token}/places/{id}', [GuestStayController::class, 'place'])->where('id', '[A-Za-z0-9_-]{10,300}');
         Route::post('/stays/{token}/rides/quote', [GuestStayController::class, 'rideQuote']);
         Route::get('/hotels', [GuestBookingController::class, 'hotels']);
+        // The website's content for the app's home screen (Website in the sidebar)
+        Route::get('/website', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'show']);
         Route::get('/booking', [GuestBookingController::class, 'options']);
         Route::get('/search', [GuestBookingController::class, 'search']);
     });
     Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
+    Route::post('/website/enquiries', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'enquiry'])->middleware('throttle:booking-actions');
+    Route::post('/website/subscribe', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'subscribe'])->middleware('throttle:booking-actions');
     // The guest's luggage list (optional), ticked off when packing to leave
     Route::prefix('stays/{token}/luggage')->controller(\App\Http\Controllers\Api\V1\GuestLuggageController::class)->middleware('throttle:luggage')->group(function () {
         Route::get('/', 'index');
