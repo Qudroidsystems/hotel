@@ -106,9 +106,12 @@
                     </table>
                 </div>
             </x-cb.card>
+
+            @include('events.partials.tickets')
         </div>
 
         <div class="col-xl-4">
+            @include('events.partials.day')
             <x-cb.card title="Money" icon="ri-money-dollar-circle-line">
                 <div class="d-flex justify-content-between small py-1"><span>Total</span><strong>{{ $fmt($e->total) }}</strong></div>
                 <div class="d-flex justify-content-between small py-1"><span>Paid</span><span>{{ $fmt($paid) }}</span></div>

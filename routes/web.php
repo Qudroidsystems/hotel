@@ -109,6 +109,7 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
     Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
+    Route::get('/tickets/{code}', [\App\Http\Controllers\Events\TicketController::class, 'public'])->name('tickets.public');
     Route::get('/stay/{token}/weather', [GuestPortalController::class, 'weather'])->name('stay.weather');
     Route::post('/stay/{token}/arrival', [GuestPortalController::class, 'arrival'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:arrival')->name('stay.arrival');
     Route::post('/stay/{token}/rides', [GuestPortalController::class, 'bookRide'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.book');
@@ -136,6 +137,14 @@ Route::middleware('throttle:booking-pages')->group(function () {
         });
     Route::post('/stay/{token}/realtime/auth', [\App\Http\Controllers\Chat\RealtimeController::class, 'auth'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:guest-chat')->name('stay.realtime.auth');
     Route::post('/stay/{token}/cancel', [GuestPortalController::class, 'cancel'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.cancel');
+    // The guest's luggage list (optional), ticked off when packing to leave
+    Route::prefix('stay/{token}/luggage')->name('stay.luggage.')->controller(\App\Http\Controllers\Booking\GuestLuggageController::class)
+        ->withoutMiddleware('throttle:booking-pages')->middleware('throttle:luggage')->group(function () {
+            Route::post('/', 'store')->name('store');
+            Route::post('/unpack', 'unpack')->name('unpack');
+            Route::post('/{item}', 'update')->whereNumber('item')->name('update');
+            Route::post('/{item}/remove', 'destroy')->whereNumber('item')->name('remove');
+        });
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
 Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middleware('throttle:paystack-webhook')->name('book.paystack.webhook');
@@ -584,6 +593,22 @@ Route::middleware('auth')->group(function () {
             Route::put('/halls/{hall}', 'update')->name('halls.update');
             Route::post('/packages', 'storePackage')->name('packages.store');
             Route::put('/packages/{package}', 'updatePackage')->name('packages.update');
+        });
+        Route::get('/usage', [\App\Http\Controllers\Events\HallUsageController::class, 'report'])->name('usage');
+        Route::post('/{event}/check-in', [\App\Http\Controllers\Events\HallUsageController::class, 'checkIn'])->name('check-in');
+        Route::post('/{event}/check-out', [\App\Http\Controllers\Events\HallUsageController::class, 'checkOut'])->name('check-out');
+        // Tickets
+        Route::controller(\App\Http\Controllers\Events\TicketController::class)->name('tickets.')->group(function () {
+            Route::get('/tickets', 'index')->name('index');
+            Route::get('/tickets/door', 'door')->name('door');
+            Route::post('/tickets/door', 'admit')->middleware('throttle:120,1')->name('admit');
+            Route::get('/tickets/orders/{order}', 'order')->name('order');
+            Route::post('/tickets/orders/{order}/cancel', 'cancel')->name('cancel');
+            Route::post('/{event}/tickets/setup', 'configure')->name('configure');
+            Route::post('/{event}/tickets/sales', 'sales')->name('sales');
+            Route::post('/{event}/tickets/types', 'storeType')->name('types.store');
+            Route::put('/{event}/tickets/types/{type}', 'updateType')->name('types.update');
+            Route::post('/{event}/tickets/sell', 'sell')->middleware('throttle:60,1')->name('sell');
         });
         Route::controller(\App\Http\Controllers\Events\EventController::class)->group(function () {
             Route::get('/', 'index')->name('index');

@@ -570,6 +570,12 @@
                                     @canany(['View events', 'Manage events'])
                                         <li class="nav-item"><a href="{{ route('events.index') }}" class="nav-link">Events &amp; Halls</a></li>
                                     @endcanany
+                                    @canany(['Sell event tickets', 'View events'])
+                                        <li class="nav-item"><a href="{{ route('events.tickets.index') }}" class="nav-link">Event Tickets</a></li>
+                                    @endcanany
+                                    @canany(['Check event tickets', 'Sell event tickets'])
+                                        <li class="nav-item"><a href="{{ route('events.tickets.door') }}" class="nav-link">Check Tickets</a></li>
+                                    @endcanany
                                     @canany(['Run night audit', 'View night audit reports'])
                                         <li class="nav-item"><a href="{{ route('night-audit.index') }}" class="nav-link">Night Audit</a></li>
                                     @endcanany
@@ -1514,6 +1520,9 @@
         @can('Manage rates'){title:'Rates & Seasons',                       url:'{{ route("rates.index") }}',                                icon:'mdi-tag-multiple-outline',    category:'Front Desk',          keywords:['rates','prices','season','promo','discount','rate plan','calendar','peak']},@endcan
         @can('View company accounts'){title:'Company Accounts',             url:'{{ route("companies.index") }}',                            icon:'mdi-domain',                  category:'Front Desk',          keywords:['company','corporate','city ledger','account','statement','invoice','credit']},@endcan
         @canany(['View events', 'Manage events']){title:'Events & Halls',   url:'{{ route("events.index") }}',                               icon:'mdi-party-popper',            category:'Front Desk',          keywords:['event','hall','conference','wedding','banquet','meeting']},@endcanany
+        @canany(['View events', 'Manage events']){title:'Hall Usage',       url:'{{ route("events.usage") }}',                               icon:'mdi-chart-bar',               category:'Front Desk',          keywords:['hall','usage','utilisation','occupancy','overtime','damage','attendance']},@endcanany
+        @canany(['Sell event tickets', 'View events']){title:'Event Tickets', url:'{{ route("events.tickets.index") }}',                     icon:'mdi-ticket-confirmation-outline', category:'Front Desk',      keywords:['ticket','tickets','sell','concert','show','gala','order']},@endcanany
+        @canany(['Check event tickets', 'Sell event tickets']){title:'Check Tickets', url:'{{ route("events.tickets.door") }}',               icon:'mdi-qrcode-scan',             category:'Front Desk',          keywords:['scan','ticket','door','entry','gate','qr','admit']},@endcanany
         @canany(['View room calendars', 'Manage room calendars']){title:'Room Calendars', url:'{{ route("channels.index") }}',           icon:'mdi-calendar-sync',           category:'Front Desk',          keywords:['room calendars','airbnb','vrbo','ical','calendar sync']},@endcanany
         @canany(['Run night audit', 'View night audit reports']){title:'Night Audit', url:'{{ route("night-audit.index") }}',                 icon:'mdi-weather-night',           category:'Front Desk',          keywords:['night audit','close day','end of day','daily report','business date']},@endcanany
         {title:'Guest Chat',                            url:'{{ route("chat.index") }}',                                 icon:'mdi-chat-processing-outline', category:'Front Desk',          keywords:['chat','call','guest','reception','restaurant','bar','laundry','message']},

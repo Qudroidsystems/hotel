@@ -17,6 +17,7 @@
             <div class="d-flex justify-content-between small py-1"><span>Bar &amp; restaurant ({{ $r['revenue']['pos']['orders'] }} sales)</span><span>{{ $fmt($r['revenue']['pos']['sales']) }}</span></div>
             @foreach ($r['revenue']['pos']['by_outlet'] as $outlet => $v)<div class="d-flex justify-content-between small text-muted ps-3"><span>{{ $outlet }}</span><span>{{ $fmt($v) }}</span></div>@endforeach
             @if (($r['revenue']['events']['count'] ?? 0) > 0)<div class="d-flex justify-content-between small py-1"><span>Events ({{ $r['revenue']['events']['count'] }})</span><span>{{ $fmt($r['revenue']['events']['revenue']) }}</span></div>@endif
+            @if (abs($r['revenue']['tickets']['revenue'] ?? 0) > 0.004)<div class="d-flex justify-content-between small py-1"><span>Event tickets ({{ $r['revenue']['tickets']['count'] }})</span><span>{{ $fmt($r['revenue']['tickets']['revenue']) }}</span></div>@endif
             <div class="d-flex justify-content-between border-top mt-2 pt-2 fw-bold" style="color:var(--cb-heading)"><span>Total</span><span>{{ $fmt($r['revenue']['total']) }}</span></div>
         </x-cb.card>
     </div>

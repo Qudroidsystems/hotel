@@ -28,6 +28,9 @@
         <x-slot:actions>
             @can('Manage events')<a class="cb-hero-btn" href="{{ route('events.create') }}"><i class="ri-add-line"></i> New event</a>@endcan
             @can('Manage halls')<a class="cb-hero-btn" href="{{ route('events.halls.index') }}"><i class="ri-building-4-line"></i> Halls &amp; packages</a>@endcan
+            @canany(['Sell event tickets', 'View events'])<a class="cb-hero-btn" href="{{ route('events.tickets.index') }}"><i class="ri-coupon-3-line"></i> Tickets</a>@endcanany
+            @canany(['Check event tickets', 'Sell event tickets'])<a class="cb-hero-btn" href="{{ route('events.tickets.door') }}"><i class="ri-qr-scan-2-line"></i> Check tickets</a>@endcanany
+            <a class="cb-hero-btn" href="{{ route('events.usage') }}"><i class="ri-bar-chart-box-line"></i> Hall usage</a>
         </x-slot:actions>
     </x-cb.hero>
 
@@ -99,7 +102,7 @@
                                 @php $left = $e->balance(); $depositShort = in_array($e->status, Event::HOLDING, true) && (float) $e->deposit_due > 0 && $e->paid() + 0.001 < (float) $e->deposit_due; @endphp
                                 <tr>
                                     <td data-label="When" class="small text-nowrap">{{ $e->starts_at->format('D j M Y') }}<div class="text-muted">{{ $e->starts_at->format('g:i A') }} – {{ $e->ends_at->format($e->starts_at->isSameDay($e->ends_at) ? 'g:i A' : 'D j M') }}</div></td>
-                                    <td data-label="Event"><a href="{{ route('events.show', $e) }}" class="fw-semibold">{{ $e->title }}</a> <span class="status-pill {{ $e->status_class }}">{{ $e->status_label }}</span>
+                                    <td data-label="Event"><a href="{{ route('events.show', $e) }}" class="fw-semibold">{{ $e->title }}</a> <span class="status-pill {{ $e->status_class }}">{{ $e->status_label }}</span>@if ($e->stage === 'in') <span class="status-pill st-success">In the hall</span>@endif @if ($e->is_ticketed) <span class="status-pill st-info"><i class="ri-coupon-3-line"></i> Tickets</span>@endif
                                         <div class="small text-muted">{{ $e->number }} · {{ $e->type_label }} · {{ $e->company?->name ?? $e->organiser_name }}</div></td>
                                     <td data-label="Hall" class="small">{{ $e->hall?->name }}</td>
                                     <td data-label="Guests" class="num">{{ $e->guests_expected }}</td>

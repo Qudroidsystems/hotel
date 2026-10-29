@@ -83,6 +83,43 @@ class GuestStayController extends ApiController
         ]);
     }
 
+    /** GET /guest/stays/{token}/events — events at the hotel with tickets on sale, and the guest's tickets. */
+    public function events(string $token, \App\Services\Events\TicketService $tickets)
+    {
+        return $this->ok($tickets->forGuest($this->reservation($token)));
+    }
+
+    /** POST /guest/stays/{token}/tickets  {event_id, lines: [{ticket_type_id, quantity}], key} — charged to the room. */
+    public function buyTickets(Request $request, string $token, \App\Services\Events\TicketService $tickets)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate([
+            'event_id'               => 'required|integer',
+            'lines'                  => 'required|array|min:1|max:10',
+            'lines.*.ticket_type_id' => 'required|integer',
+            'lines.*.quantity'       => 'required|integer|min:1|max:50',
+            'key'                    => 'nullable|string|max:64',
+        ]);
+        $event = \App\Models\Events\Event::find($data['event_id']);
+        if (! $event) {
+            return $this->fail('That event isn’t on sale.');
+        }
+        $lines = [];
+        foreach ($data['lines'] as $l) {
+            $lines[$l['ticket_type_id']] = ($lines[$l['ticket_type_id']] ?? 0) + $l['quantity'];
+        }
+        $r->loadMissing('guest');
+        try {
+            $order = $tickets->sell($event, $lines, ['name' => $r->guest?->full_name ?? 'Guest', 'phone' => $r->guest?->phone, 'email' => $r->guest?->email],
+                \App\Models\Events\EventTicketOrder::ROOM, null, null, $r, 'app', ! empty($data['key']) ? 'app:' . $r->id . ':' . $data['key'] : null);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+        Audit::record('guest.tickets', "Guest bought tickets {$order->number} in the app", $r);
+
+        return $this->ok($tickets->forGuest($r->fresh()), "{$order->quantity} " . str('ticket')->plural($order->quantity) . " for {$event->title}, charged to your room. Show the QR codes at the door.", status: 201);
+    }
+
     /** POST /guest/stays/{token}/orders  {outlet_id, lines: [{item_id, quantity, note}], note} */
     public function order(Request $request, string $token, GuestOrderService $orders)
     {
@@ -327,6 +364,7 @@ class GuestStayController extends ApiController
             'can_order'    => $orderSvc->canOrder($r),
             'order_note'   => $r->status === S::CheckedIn && ! $orderSvc->canOrder($r) && $orderSvc->outlets()->isNotEmpty() ? $orderSvc->blocker($r) : null,
             'orders'       => $orderSvc->forGuest($r),
+            'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)
             'requests'     => $r->guestRequests->map(fn (GuestRequest $q) => [
                 'id'           => $q->id,
                 'type'         => $q->type,

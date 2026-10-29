@@ -9,7 +9,7 @@ class EventItem extends Model
 {
     use BelongsToHotel;
 
-    public const KINDS = ['catering' => 'Catering', 'equipment' => 'Equipment', 'service' => 'Service', 'other' => 'Other'];
+    public const KINDS = ['catering' => 'Catering', 'equipment' => 'Equipment', 'service' => 'Service', 'overtime' => 'Overtime', 'damage' => 'Damage / loss', 'other' => 'Other'];
 
     protected $fillable = ['event_id', 'kind', 'description', 'quantity', 'unit_price', 'amount', 'created_by'];
 

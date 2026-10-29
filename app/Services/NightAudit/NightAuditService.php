@@ -153,6 +153,21 @@ class NightAuditService
             $events = ['count' => $ev->count(), 'revenue' => round((float) $ev->sum('total'), 2)];
         }
 
+        // Tickets paid at the desk (tickets charged to a room are already in the room's charges); a cancelled order comes off on the day it's cancelled.
+        $tickets = ['count' => 0, 'revenue' => 0.0, 'by_method' => []];
+        if (Schema::hasTable('event_ticket_orders')) {
+            $sold = \App\Models\Events\EventTicketOrder::where('method', '!=', 'room')->whereDate('paid_at', $d)->get();
+            $back = \App\Models\Events\EventTicketOrder::where('method', '!=', 'room')->where('status', 'cancelled')->whereDate('cancelled_at', $d)->get();
+            foreach ([[$sold, 1], [$back, -1]] as [$list, $sign]) {
+                foreach ($list as $o) {
+                    $key = \App\Enums\PaymentMethod::tryFrom((string) $o->method)?->label() ?? 'Tickets';
+                    $tickets['by_method'][$key] = round(($tickets['by_method'][$key] ?? 0) + $sign * (float) $o->total, 2);
+                }
+            }
+            $tickets['count'] = $sold->count();
+            $tickets['revenue'] = round(array_sum($tickets['by_method']), 2);
+        }
+
         // Money in: guest bills, the tills (sales paid there), company payments.
         $collections = [];
         foreach (Payment::whereNull('voided_at')->whereDate('received_at', $d)->get() as $p) {
@@ -164,6 +179,9 @@ class NightAuditService
                 $key = \App\Enums\PaymentMethod::tryFrom((string) $o->method)?->label() ?? 'Till';
                 $collections[$key] = round(($collections[$key] ?? 0) + (float) $o->total, 2);
             }
+        }
+        foreach ($tickets['by_method'] as $key => $amount) {
+            $collections[$key] = round(($collections[$key] ?? 0) + $amount, 2);
         }
         $companyPaid = Schema::hasTable('company_ledger_entries')
             ? round(-1 * (float) CompanyLedgerEntry::whereNull('voided_at')->where('type', 'payment')->whereDate('entry_date', $d)->sum('amount'), 2) : 0.0;
@@ -180,7 +198,7 @@ class NightAuditService
         $owingAfterStay = Reservation::where('status', ReservationStatus::CheckedOut->value)->whereHas('folio', fn ($f) => $f->where('status', 'open'))->with('folio')->get()
             ->sum(fn ($r) => max(0, $r->folio->balance()));
 
-        $revenue = round($roomRevenue + array_sum($other) + $pos['sales'] + $events['revenue'], 2);
+        $revenue = round($roomRevenue + array_sum($other) + $pos['sales'] + $events['revenue'] + $tickets['revenue'], 2);
 
         return [
             'date'  => $d,
@@ -192,7 +210,7 @@ class NightAuditService
                 'revpar' => $sellable ? round($roomRevenue / $sellable, 2) : 0,
             ],
             'revenue' => [
-                'rooms' => $roomRevenue, 'other' => $other, 'pos' => $pos, 'events' => $events, 'total' => $revenue,
+                'rooms' => $roomRevenue, 'other' => $other, 'pos' => $pos, 'events' => $events, 'tickets' => ['count' => $tickets['count'], 'revenue' => $tickets['revenue']], 'total' => $revenue,
             ],
             'collections' => ['by_method' => $collections, 'total' => round(array_sum($collections), 2), 'billed_to_companies' => round((float) $billedToCompanies, 2)],
             'guests' => [

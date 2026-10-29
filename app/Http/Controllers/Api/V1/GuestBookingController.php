@@ -63,6 +63,7 @@ class GuestBookingController extends ApiController
             'check_in_time'   => config('hotel.booking.check_in_time'),
             'check_out_time'  => config('hotel.booking.check_out_time'),
             'policies'        => array_values((array) config('hotel.booking.policies', [])),
+            'luggage_list'    => app(\App\Services\Booking\LuggageService::class)->enabled(),   // offer the optional luggage list on the booking form
             'room_types'      => $types->map(fn (RoomType $t) => $this->type($t) + [
                 'from' => (float) $t->base_rate, 'from_label' => $sym . number_format((float) $t->base_rate, 2),
             ])->values(),
@@ -131,6 +132,7 @@ class GuestBookingController extends ApiController
             'phone'            => ['required', 'string', 'max:30', 'regex:/^[0-9+()\-\s]{7,30}$/'],
             'arrival_time'     => 'nullable|date_format:H:i',
             'special_requests' => 'nullable|string|max:1000',
+            'luggage'          => 'nullable|string|max:5000',   // optional luggage list, one item per line
             'accept'           => 'accepted',
             'rate_plan_id'     => 'nullable|integer',
             'promo'            => 'nullable|string|max:30',
@@ -154,6 +156,7 @@ class GuestBookingController extends ApiController
         try {
             $data['via_group'] = ($data['via'] ?? null) === 'group';
             $r = $this->booking->book($data);
+            $this->addLuggage($r, $data['luggage'] ?? null);
         } catch (BookingException $e) {
             return $this->fail($e->getMessage(), 422);
         }
@@ -197,5 +200,19 @@ class GuestBookingController extends ApiController
     private function promo(string $code): string
     {
         return mb_substr(strtoupper(preg_replace('/[^A-Za-z0-9_-]/', '', $code)), 0, 30);
+    }
+
+    /** The optional luggage list written on the booking form: never stops the booking. */
+    private function addLuggage(\App\Models\Reservation $r, ?string $text): void
+    {
+        $luggage = app(\App\Services\Booking\LuggageService::class);
+        if (blank($text) || ! $luggage->enabled()) {
+            return;
+        }
+        try {
+            $luggage->add($r, array_slice($luggage->parse($text), 0, \App\Services\Booking\LuggageService::MAX_ITEMS));
+        } catch (\App\Exceptions\BookingException) {
+            // The booking stands; the guest can fix the list on their booking page.
+        }
     }
 }

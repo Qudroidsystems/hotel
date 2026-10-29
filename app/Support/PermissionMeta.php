@@ -65,6 +65,8 @@ class PermissionMeta
         'View night audit reports'  => ['View',   'See the daily reports saved by each night audit.'],
         'Change closed days'        => ['Approve','Void charges or payments dated on a day the night audit has closed.'],
         'Manage halls'              => ['Manage', 'Set up halls, their rates and the event packages.'],
+        'Sell event tickets'        => ['Create', 'Sell tickets for events at the desk (paid or charged to a room), reprint them and cancel orders.'],
+        'Check event tickets'       => ['Use',    'Scan tickets at the door and let holders in.'],
         'Receive stock'             => ['Receive','Book goods delivered by suppliers into a store (goods received note).'],
         'Transfer stock'            => ['Move',   'Move stock between stores, e.g. main store to the bar.'],
         'Adjust stock'              => ['Adjust', 'Record stock used, wasted or broken, and correct mistakes (a reason is required).'],
