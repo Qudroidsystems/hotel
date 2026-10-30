@@ -50,7 +50,9 @@ function section(string $key): ChatSection
 test('a guest sees the sections, writes to Reception, and Reception answers; read ticks and unread counts follow', function () {
     $home = $this->getJson("{$this->api}/chat")->assertOk()->json('data');
     expect(collect($home['sections'])->pluck('key')->all())->toBe(['reception', 'restaurant', 'bar', 'laundry', 'housekeeping', 'concierge'])
-        ->and($home['available'])->toBeTrue();
+        ->and($home['available'])->toBeTrue()
+        // One-tap messages fit the section.
+        ->and($home['sections'][4]['suggestions'])->toContain('Fresh towels, please.');
 
     $rec = section('reception');
     $id = (string) Str::uuid();

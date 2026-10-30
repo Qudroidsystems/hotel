@@ -106,6 +106,25 @@ class SiteController extends Controller
         return view('site.item', ['item' => $item, 'more' => collect(), 'kind' => 'page']);
     }
 
+    /** Get our app: store links, the Android file and how to install it. */
+    public function app()
+    {
+        abort_unless(Website::get('apps.show') && Website::apps(), 404);
+
+        return view('site.app', ['apps' => Website::apps()]);
+    }
+
+    /** Sends an uploaded Android app (.apk) as a download. */
+    public function download(string $app)
+    {
+        abort_if($app === 'staff' && ! Website::get('apps.staff.show'), 404);
+        $file = Website::appFile($app);
+        abort_unless($file, 404);
+        $name = \Illuminate\Support\Str::slug(config('hotel.name') . ' ' . $app) . (($v = Website::get("apps.$app.version")) ? '-' . preg_replace('/[^0-9A-Za-z.]+/', '', $v) : '') . '.apk';
+
+        return response()->download(storage_path('app/' . $file['path']), $name, ['Content-Type' => 'application/vnd.android.package-archive']);
+    }
+
     public function about()
     {
         return view('site.about', ['highlights' => $this->site->items('amenity', 8), 'reviews' => $this->site->items('review', 6),

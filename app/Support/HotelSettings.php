@@ -223,6 +223,28 @@ class HotelSettings
                     'it.check_retention_days'      => ['type' => 'int', 'label' => 'Keep monitoring history for (days)', 'min' => 7, 'max' => 730],
                 ],
             ],
+            'network' => [
+                'title' => 'Internet & Wi-Fi', 'icon' => 'ri-wifi-line',
+                'intro' => 'The internet lines (Starlink dishes…) and guest Wi-Fi codes under IT Support → Internet & Wi-Fi.',
+                'fields' => [
+                    'network.driver'                => ['type' => 'select', 'label' => 'Router connection', 'options' => ['demo' => 'Demo data (made-up readings, to try it out)', 'manual' => 'Not connected (lines listed by hand, codes typed into the router)'], 'help' => 'A real router connection (MikroTik, UniFi…) is added here once it is set up.'],
+                    'network.guest_ssid'            => ['type' => 'text', 'label' => 'Guest Wi-Fi name', 'rules' => ['required', 'string', 'max:32'], 'help' => 'Shown to guests with their code.'],
+                    'network.auto_issue'            => ['type' => 'bool', 'label' => 'Give every guest a Wi-Fi code at check-in', 'help' => 'On the plan marked "At check-in". The code stops at check-out.'],
+                    'network.grace_minutes'         => ['type' => 'int', 'label' => 'Keep Wi-Fi on after check-out time (minutes)', 'min' => 0, 'max' => 1440],
+                    'network.code_length'           => ['type' => 'int', 'label' => 'Wi-Fi code length (characters)', 'min' => 6, 'max' => 12],
+                    'network.sample_retention_days' => ['type' => 'int', 'label' => 'Keep internet readings for (days)', 'min' => 7, 'max' => 365],
+                ],
+            ],
+            'call_console' => [
+                'title' => 'Call Console', 'icon' => 'ri-headphone-line',
+                'intro' => 'The IT / security call console: picking up guest calls nobody answers, putting calls through, and listening in. Every listen is in the audit trail.',
+                'fields' => [
+                    'call_console.monitoring'           => ['type' => 'bool', 'label' => 'Supervisors with the “Listen to guest calls” permission can listen in'],
+                    'call_console.monitoring_notice'    => ['type' => 'text', 'label' => 'What callers are told at the start of each call', 'rules' => ['required', 'string', 'max:200'], 'help' => 'Shown on the guest’s call screen while listening in is on.'],
+                    'call_console.escalate_after'       => ['type' => 'int', 'label' => 'Alarm on the console when a call is not picked up after (seconds)', 'min' => 5, 'max' => 40],
+                    'call_console.device_stale_minutes' => ['type' => 'int', 'label' => 'Show “No signal” when hardware has not reported for (minutes)', 'min' => 2, 'max' => 240],
+                ],
+            ],
             'security' => [
                 'title' => 'Security & Visitors', 'icon' => 'ri-shield-user-line',
                 'intro' => 'Visitor passes, privacy and lost property.',
@@ -272,6 +294,7 @@ class HotelSettings
                 'fields' => [
                     'booking.guest_chat'            => ['type' => 'bool', 'label' => 'Guests can chat with the hotel (guest app and booking page)'],
                     'booking.guest_calls'           => ['type' => 'bool', 'label' => 'Guests can call sections in the app'],
+                    'guest_app.open_sign_up'        => ['type' => 'bool', 'label' => 'New guests can join in the guest app with their e-mail', 'help' => 'Off: only guests who have booked before can sign in.'],
                     'accounts.realtime.enabled'     => ['type' => 'bool', 'config' => 'services.realtime.enabled', 'label' => 'Use the real-time server'],
                     'accounts.realtime.app_id'      => ['type' => 'text', 'config' => 'services.realtime.app_id', 'label' => 'Real-time app ID', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_ID (or your Pusher-compatible service\'s app id).'],
                     'accounts.realtime.key'         => ['type' => 'text', 'config' => 'services.realtime.key', 'label' => 'Real-time app key', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_KEY — public: browsers and apps use it to connect.'],

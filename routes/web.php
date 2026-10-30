@@ -142,6 +142,8 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'verify'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('room.card.verify');
     // Chat and calls from the booking page (same JSON as the guest app)
     Route::get('/stay/{token}/chat', [GuestPortalController::class, 'chat'])->name('stay.chat');
+    // A voice message in guest chat, played through a signed link that lasts a few hours (guest, staff, both apps)
+    Route::get('/chat/audio/{message}', \App\Http\Controllers\Chat\ChatAudioController::class)->whereNumber('message')->middleware('signed')->name('chat.audio');
     Route::prefix('stay/{token}/live')->name('stay.live.')->controller(\App\Http\Controllers\Chat\GuestChatController::class)
         ->withoutMiddleware('throttle:booking-pages')->middleware('throttle:guest-chat')->group(function () {
             Route::get('/chat', 'index')->name('index');
@@ -579,6 +581,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid')->name('call.answer');
         Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid')->name('call.signal');
         Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid')->name('call.end');
+        Route::post('/calls/{uuid}/transfer', 'transfer')->whereUuid('uuid')->name('call.transfer');
+        Route::get('/calls/{uuid}/targets', 'targets')->whereUuid('uuid')->name('call.targets');
+        Route::post('/calls/{uuid}/tap/{listen}', 'tap')->whereUuid('uuid')->whereNumber('listen')->name('call.tap');
     });
 
     // Car service: dispatch board, cars, drivers, set-fare places
@@ -695,6 +700,36 @@ Route::middleware('auth')->group(function () {
         Route::post('/check-now', [ControlRoomController::class, 'runChecks'])->middleware('throttle:6,1')->name('check-now');
         Route::get('/report', [ControlRoomController::class, 'report'])->name('report');
 
+        // The call console: calls, listening in, voice messages, network, weather, the equipment board
+        Route::prefix('console')->name('console.')->controller(\App\Http\Controllers\It\CallConsoleController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/feed', 'feed')->name('feed');
+            Route::get('/board', 'board')->name('board');
+            Route::get('/weather', 'weather')->name('weather');
+            Route::get('/calls/{uuid}', 'show')->whereUuid('uuid')->name('call');
+            Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid')->name('answer');
+            Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid')->name('signal');
+            Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid')->name('end');
+            Route::get('/calls/{uuid}/targets', 'targets')->whereUuid('uuid')->name('targets');
+            Route::post('/calls/{uuid}/transfer', 'transfer')->whereUuid('uuid')->name('transfer');
+            Route::post('/calls/{uuid}/tap/{listen}', 'tap')->whereUuid('uuid')->whereNumber('listen')->name('tap');
+            Route::post('/calls/{uuid}/listen', 'listen')->whereUuid('uuid')->middleware('throttle:20,1')->name('listen');
+            Route::get('/listens/{listen}', 'listenShow')->name('listen.show');
+            Route::post('/listens/{listen}/signal', 'listenSignal')->name('listen.signal');
+            Route::post('/listens/{listen}/end', 'listenEnd')->name('listen.end');
+            Route::get('/voice/{message}', 'voice')->name('voice');
+        });
+        Route::prefix('equipment-board')->name('facilities.')->controller(\App\Http\Controllers\It\FacilityController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::post('/standard', 'standard')->name('standard');
+            Route::put('/{device}', 'update')->name('update');
+            Route::delete('/{device}', 'destroy')->name('destroy');
+            Route::post('/{device}/state', 'state')->middleware('throttle:120,1')->name('state');
+            Route::post('/hubs', 'hubStore')->name('hubs.store');
+            Route::post('/hubs/{hub}/revoke', 'hubRevoke')->name('hubs.revoke');
+        });
+
         Route::get('/monitors', [ItMonitorController::class, 'index'])->name('monitors.index');
         Route::post('/monitors', [ItMonitorController::class, 'store'])->name('monitors.store');
         Route::get('/monitors/{monitor}', [ItMonitorController::class, 'show'])->name('monitors.show');
@@ -725,6 +760,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/tickets/{ticket}/updates', [ItTicketController::class, 'update'])->name('tickets.update');
         Route::post('/tickets/{ticket}/assign', [ItTicketController::class, 'assign'])->name('tickets.assign');
         Route::post('/tickets/{ticket}/triage', [ItTicketController::class, 'triage'])->name('tickets.triage');
+
+        // Internet & guest Wi-Fi: Starlink dishes and other lines, speed plans, guest Wi-Fi codes
+        Route::prefix('network')->name('network.')->controller(\App\Http\Controllers\It\NetworkController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/summary', 'summary')->name('summary');
+            Route::post('/refresh', 'refresh')->middleware('throttle:10,1')->name('refresh');
+            Route::post('/links', 'storeLink')->name('links.store');
+            Route::put('/links/{link}', 'updateLink')->name('links.update');
+            Route::delete('/links/{link}', 'destroyLink')->name('links.destroy');
+            Route::post('/plans', 'storePlan')->name('plans.store');
+            Route::put('/plans/{plan}', 'updatePlan')->name('plans.update');
+            Route::delete('/plans/{plan}', 'destroyPlan')->name('plans.destroy');
+            Route::post('/codes', 'storePass')->middleware('throttle:30,1')->name('passes.store');
+            Route::put('/codes/{pass}', 'updatePass')->name('passes.update');
+            Route::post('/codes/{pass}/revoke', 'revokePass')->name('passes.revoke');
+            Route::get('/codes/{pass}/print', 'printPass')->name('passes.print');
+        });
     });
 
     // Group overview (multi-hotel)

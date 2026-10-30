@@ -57,6 +57,8 @@ test('a guest signs in with a code to their e-mail and sees every booking made w
 });
 
 test('an unknown contact gets the same answer and no code; wrong codes run out', function () {
+    // With sign-up open, a new e-mail gets a code to join (see GuestExploreApiTest); closed, unknown contacts get nothing.
+    config(['hotel.guest_app.open_sign_up' => false]);
     Mail::shouldReceive('raw')->never();
     $this->postJson('/api/v1/guest/auth/code', ['contact' => 'nobody@example.com'])->assertOk()->assertJsonPath('message', fn ($m) => str_contains($m, 'If you’ve booked with us'));
     expect(GuestLoginCode::count())->toBe(0);

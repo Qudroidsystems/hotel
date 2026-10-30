@@ -143,6 +143,15 @@ class PermissionTableSeeder extends Seeder
             'View IT control room',
             'Manage IT monitoring',
             'Manage IT tickets',
+            'Use call console',
+            'Answer any guest call',
+            'Listen to guest calls',
+            'Manage room equipment',
+        ],
+        'Internet & Wi-Fi' => [
+            'View network',
+            'Manage network',
+            'Give Wi-Fi codes',
         ],
         'Hotel Settings' => [
             'Manage hotel settings',

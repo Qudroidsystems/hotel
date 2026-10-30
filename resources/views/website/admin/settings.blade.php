@@ -63,6 +63,23 @@
                                         <input type="file" class="form-control" id="{{ $id }}" name="{{ $name }}" accept="image/jpeg,image/png,image/webp">
                                         @if (! $saved)<div class="ws-help">None yet: the page uses one of your other photos.</div>@endif
                                         @break
+                                    @case('file')
+                                        @if (is_array($saved) && ! empty($saved['path']))
+                                            <div class="d-flex gap-3 align-items-center mb-2 p-2 border rounded">
+                                                <i class="ri-android-line fs-3 text-success"></i>
+                                                <div class="flex-grow-1 small"><b>{{ $saved['name'] ?? 'app.apk' }}</b><br><span class="text-muted">{{ Website::bytes((int) ($saved['size'] ?? 0)) }} · uploaded {{ \Illuminate\Support\Carbon::parse($saved['at'] ?? now())->format('d M Y H:i') }}</span>
+                                                    @if (Website::appFile(explode('.', $key)[1]))
+                                                        · <a href="{{ route('site.app.download', explode('.', $key)[1]) }}">download</a>
+                                                    @else
+                                                        · <span class="text-danger">the file is missing on the server, upload it again</span>
+                                                    @endif
+                                                </div>
+                                                <div class="form-check"><input class="form-check-input" type="checkbox" name="{{ $name }}__remove" value="1" id="{{ $id }}_rm"><label class="form-check-label small" for="{{ $id }}_rm">Remove</label></div>
+                                            </div>
+                                        @endif
+                                        <input type="file" class="form-control ws-apk" id="{{ $id }}" name="{{ $name }}" accept=".apk,application/vnd.android.package-archive" data-limit="{{ Website::uploadLimit() }}">
+                                        <div class="ws-help">{{ is_array($saved) && ! empty($saved['path']) ? 'Choose a new file to replace it.' : 'No file yet.' }} This server takes files up to {{ Website::uploadLimit() >= PHP_INT_MAX ? 'any size' : Website::bytes(Website::uploadLimit()) }}.</div>
+                                        @break
                                     @default
                                         <input type="{{ $f['type'] === 'url' ? 'url' : 'text' }}" class="form-control" id="{{ $id }}" name="{{ $name }}" value="{{ $value }}" placeholder="{{ $default ?? ($f['type'] === 'url' ? 'https://' : '') }}" maxlength="255">
                                 @endswitch
@@ -90,4 +107,24 @@
 </div>
 </div>
 </div>
+<script>
+// A file bigger than the server takes would empty the whole form, so stop it here with a clear message.
+document.querySelectorAll('.ws-apk').forEach(function (input) {
+    input.addEventListener('change', function () {
+        var f = input.files[0], limit = +input.dataset.limit;
+        input.setCustomValidity('');
+        if (f && !/\.apk$/i.test(f.name)) input.setCustomValidity('Choose the Android app file, ending in .apk.');
+        else if (f && limit && f.size > limit) input.setCustomValidity('This file is ' + Math.round(f.size / 1048576) + ' MB but the server takes at most ' + Math.round(limit / 1048576) + ' MB. Raise upload_max_filesize and post_max_size in php.ini, or use a store link instead.');
+        input.reportValidity();
+    });
+});
+document.querySelectorAll('form[enctype]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+        if (form.querySelector('.ws-apk') && form.checkValidity()) {
+            var b = form.querySelector('button.btn-primary');
+            if (b && form.querySelector('.ws-apk').files.length) { b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading…'; }
+        }
+    });
+});
+</script>
 @endsection

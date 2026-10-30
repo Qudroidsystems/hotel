@@ -816,6 +816,12 @@
                         </a>
                         <div class="collapse menu-dropdown" id="sidebarIt">
                             <ul class="nav nav-sm flex-column">
+                                @can('Use call console')
+                                    <li class="nav-item"><a href="{{ route('it.console.index') }}" class="nav-link">Call Console</a></li>
+                                @endcan
+                                @canany(['Use call console', 'Manage room equipment'])
+                                    <li class="nav-item"><a href="{{ route('it.facilities.index') }}" class="nav-link">Room &amp; Area Equipment</a></li>
+                                @endcanany
                                 @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
                                     <li class="nav-item"><a href="{{ route('it.index') }}" class="nav-link">Control Room</a></li>
                                     <li class="nav-item"><a href="{{ route('it.alerts.index') }}" class="nav-link">Alerts</a></li>
@@ -825,6 +831,9 @@
                                     <li class="nav-item"><a href="{{ route('it.monitors.index') }}" class="nav-link">Monitors</a></li>
                                     <li class="nav-item"><a href="{{ route('it.assets.index') }}" class="nav-link">Equipment</a></li>
                                     <li class="nav-item"><a href="{{ route('it.maintenance.index') }}" class="nav-link">Planned Maintenance</a></li>
+                                @endcanany
+                                @canany(['View network', 'Manage network', 'Give Wi-Fi codes'])
+                                    <li class="nav-item"><a href="{{ route('it.network.index') }}" class="nav-link">Internet &amp; Wi-Fi</a></li>
                                 @endcanany
                                 @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
                                     <li class="nav-item"><a href="{{ route('it.report') }}" class="nav-link">Monthly Service Report</a></li>
@@ -1559,7 +1568,12 @@
         {title:'Staff App (phone)',                     url:'{{ route("staff.home") }}',                                 icon:'mdi-cellphone',               category:'Staff',               keywords:['mobile','phone','app','my work','tasks','approvals','install']},
         {title:'Raise an IT Ticket',                    url:'{{ route("it.tickets.index") }}#new',                       icon:'mdi-lifebuoy',                category:'IT',                  keywords:['it','support','help','computer','wifi','printer','internet','ticket','broken']},
         {title:'My IT Requests',                        url:'{{ route("it.tickets.index") }}',                           icon:'mdi-ticket-outline',          category:'IT',                  keywords:['it','ticket','service desk','support']},
+        @can('Use call console')
+        {title:'Call Console',                          url:'{{ route("it.console.index") }}',                           icon:'mdi-headset',                 category:'IT',                  keywords:['call','console','listen','monitor calls','transfer','headset','voice message','cockpit','security','switchboard']},
+        {title:'Room & Area Equipment',                 url:'{{ route("it.facilities.index") }}',                        icon:'mdi-power-plug-outline',      category:'IT',                  keywords:['equipment','ac','air conditioner','lights','generator','on','off','devices','iot','bms','room status']},
+        @endcan
         @canany(['View IT control room', 'Manage IT monitoring', 'Manage IT tickets'])
+        @canany(['View network', 'Manage network', 'Give Wi-Fi codes']){title:'Internet & Wi-Fi',                    url:'{{ route("it.network.index") }}',                           icon:'mdi-satellite-uplink',        category:'IT',                  keywords:['starlink','internet','wifi','wi-fi','code','voucher','bandwidth','speed','data','network']},@endcanany
         {title:'IT Control Room',                       url:'{{ route("it.index") }}',                                   icon:'mdi-monitor-dashboard',       category:'IT',                  keywords:['network','uptime','monitoring','server','router','wifi','backup','noc','control room']},
         {title:'IT Alerts',                             url:'{{ route("it.alerts.index") }}',                            icon:'mdi-alert-octagon-outline',   category:'IT',                  keywords:['alert','outage','down','incident']},
         {title:'IT Service Report',                     url:'{{ route("it.report") }}',                                  icon:'mdi-file-chart-outline',      category:'IT',                  keywords:['sla','uptime','monthly','service report']},
@@ -2065,7 +2079,7 @@
     });
 })();
 </script>
-@if (auth()->check() && auth()->user()->canAny(['Chat with guests', 'Manage guest chat']) && ! request()->routeIs('chat.index'))
+@if (auth()->check() && auth()->user()->canAny(['Chat with guests', 'Manage guest chat']) && ! request()->routeIs('chat.index', 'it.console.index'))
     {{-- Guest calls ring on every page: a small banner that opens Guest Chat to answer. --}}
     <div id="hc-ring" role="alertdialog" aria-live="assertive" style="display:none;position:fixed;right:20px;bottom:20px;z-index:2000;background:#0f172a;color:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 18px 45px rgba(0,0,0,.35);max-width:320px">
         <div style="font-size:12px;opacity:.7" id="hc-ring-s"></div><div style="font-weight:700" id="hc-ring-t"></div>

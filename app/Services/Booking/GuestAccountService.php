@@ -73,7 +73,10 @@ class GuestAccountService
             throw new BookingException('Too many codes asked for. Please wait a while and try again.');
         }
         $guests = $this->guests($contact);
-        if ($guests->isEmpty()) {
+        // New guests can make an account with their e-mail (to browse, book and keep their bookings in one place);
+        // a phone number still has to be one the hotel knows.
+        $newcomer = $guests->isEmpty();
+        if ($newcomer && ($type !== 'email' || ! config('hotel.guest_app.open_sign_up', true))) {
             return 'none';
         }
         if ($type === 'phone' && ! ($this->messenger->enabled() && $this->messenger->configured())) {
@@ -84,12 +87,12 @@ class GuestAccountService
         GuestLoginCode::where('contact', $contact)->whereNull('used_at')->update(['used_at' => now()]);   // only the newest works
         GuestLoginCode::create(['contact' => $contact, 'code_hash' => hash('sha256', $contact . '|' . $code), 'expires_at' => now()->addMinutes(self::CODE_MINUTES), 'ip' => $ip]);
         $guest = $guests->sortByDesc('id')->first();
-        $hotel = $this->hotelName($guest);
+        $hotel = $guest ? $this->hotelName($guest) : (CurrentHotel::multi() ? (config('hotel.group_name') ?: config('hotel.name')) : config('hotel.name'));
         $text = "{$code} is your {$hotel} sign-in code. It works for " . self::CODE_MINUTES . ' minutes. If you didn’t ask for it, ignore this message.';
 
         if ($type === 'email') {
             try {
-                Mail::raw($text, fn ($m) => $m->to($contact, $guest->full_name)->subject("{$code} — your {$hotel} sign-in code"));
+                Mail::raw($text, fn ($m) => $m->to($contact, $guest?->full_name)->subject("{$code} — your {$hotel} sign-in code"));
             } catch (Throwable $e) {
                 Log::warning('Guest sign-in code e-mail failed: ' . $e->getMessage());
                 throw new BookingException('We couldn’t send the e-mail just now. Please try again in a minute.');

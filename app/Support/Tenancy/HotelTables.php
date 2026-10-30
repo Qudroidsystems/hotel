@@ -19,5 +19,7 @@ final class HotelTables
         'stock_receipt_lines', 'stock_receipts', 'stock_transfer_lines', 'stock_transfers', 'supplier_invoices', 'supplier_payments',
         'suppliers', 'visitors', 'vehicles', 'drivers', 'ride_places', 'rides', 'staff_tasks', 'staff_task_updates',
         'event_ticket_types', 'event_ticket_orders', 'event_tickets', 'website_settings', 'website_items', 'website_messages', 'website_subscribers',
+        'network_links', 'network_samples', 'network_plans', 'network_passes',
+        'call_listens', 'facility_devices', 'facility_hubs',
     ];
 }

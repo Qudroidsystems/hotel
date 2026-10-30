@@ -30,6 +30,7 @@ class DemoSeeder extends Seeder
             CommercialDemoSeeder::class,    // rates & seasons, company accounts, halls & events
             TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
             WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
+            NetworkDemoSeeder::class,       // Starlink dishes, guest Wi-Fi plans and codes
         ]);
     }
 }

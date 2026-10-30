@@ -30,6 +30,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [\App\Http\Middleware\SetCurrentHotel::class]);
         $middleware->prependToPriorityList(before: \Illuminate\Routing\Middleware\SubstituteBindings::class, prepend: \App\Http\Middleware\SetCurrentHotel::class);
 
+        // WebRTC call set-up (SDP) must keep its exact line endings: trimming the last CRLF breaks every call.
+        $middleware->trimStrings(except: ['payload.sdp', 'payload.candidate']);
+
         // Signed-in users go to the dashboard instead of the login page.
         $middleware->redirectUsersTo('/dashboard');
     })

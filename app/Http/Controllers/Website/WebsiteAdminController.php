@@ -57,6 +57,12 @@ class WebsiteAdminController extends Controller
                 'textarea' => ['nullable', 'string', 'max:4000'],
                 'list'     => ['nullable', 'string', 'max:2000'],
                 'select'   => ['nullable', 'in:' . implode(',', array_keys(Website::THEMES))],
+                // An Android app. Its contents are a zip, so the extension is what tells an .apk apart.
+                'file'     => ['nullable', 'file', 'max:409600', function ($attr, $v, $fail) {
+                    if ($v instanceof \Illuminate\Http\UploadedFile && strtolower($v->getClientOriginalExtension()) !== 'apk') {
+                        $fail('Choose the Android app file, ending in .apk.');
+                    }
+                }],
                 default    => $key === 'notify_email' ? ['nullable', 'email', 'max:150'] : ['nullable', 'string', 'max:255'],
             };
         }
@@ -70,6 +76,7 @@ class WebsiteAdminController extends Controller
                 'bool'  => $request->boolean($name),
                 'list'  => array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $request->input($name))))),
                 'image' => $this->image($request, $name, $key, $before[$key] ?? null),
+                'file'  => $this->appFile($request, $name, $key, $before[$key] ?? null),
                 default => ($v = trim((string) $request->input($name))) === '' ? null : $v,
             };
         }
@@ -88,6 +95,22 @@ class WebsiteAdminController extends Controller
     public static function input(string $key): string
     {
         return str_replace('.', '__', $key);
+    }
+
+    private function appFile(Request $request, string $name, string $key, mixed $old): ?array
+    {
+        if ($request->boolean($name . '__remove')) {
+            Website::deleteApp($old);
+
+            return null;
+        }
+        if ($request->hasFile($name)) {
+            Website::deleteApp($old);
+
+            return Website::storeApp($request->file($name), explode('.', $key)[1] ?? 'app');
+        }
+
+        return is_array($old) ? $old : null;
     }
 
     private function image(Request $request, string $name, string $key, ?string $old): ?string

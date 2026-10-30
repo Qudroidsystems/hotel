@@ -24,7 +24,7 @@ class Website
     ];
 
     /**
-     * group => [title, icon, fields]. field: type (text|textarea|bool|image|select|list|url), label, help, default.
+     * group => [title, icon, fields]. field: type (text|textarea|bool|image|file|select|list|url), label, help, default.
      */
     public const FIELDS = [
         'general' => ['General', 'ri-settings-3-line', [
@@ -91,6 +91,21 @@ class Website
             'social.youtube'     => ['type' => 'url', 'label' => 'YouTube'],
             'social.linkedin'    => ['type' => 'url', 'label' => 'LinkedIn'],
             'social.tripadvisor' => ['type' => 'url', 'label' => 'Tripadvisor'],
+        ]],
+        'apps' => ['Mobile apps', 'ri-smartphone-line', [
+            'apps.show'          => ['type' => 'bool', 'label' => 'Show "Get our app" on the website', 'default' => true, 'help' => 'A section on the home page, a page at /app and buttons in the footer. They appear once at least one store link or file below is set.'],
+            'apps.title'         => ['type' => 'text', 'label' => 'Heading', 'default' => 'Your stay, in your pocket'],
+            'apps.text'          => ['type' => 'textarea', 'label' => 'Text', 'default' => 'Book a room, check in with your phone, order food to your room, chat with the front desk and see your bill, all from our app.'],
+            'apps.image'         => ['type' => 'image', 'label' => 'Picture of the app', 'help' => 'A screenshot of the app, upright (about 1080 × 2160 px). It is shown inside a phone. Empty: the phone shows the hotel\'s name.'],
+            'apps.guest.play'    => ['type' => 'url', 'label' => 'Guest app: Google Play link', 'help' => 'e.g. https://play.google.com/store/apps/details?id=…'],
+            'apps.guest.ios'     => ['type' => 'url', 'label' => 'Guest app: App Store link', 'help' => 'e.g. https://apps.apple.com/app/…'],
+            'apps.guest.apk'     => ['type' => 'file', 'label' => 'Guest app: Android file (.apk) to download from the website', 'help' => 'For Android phones without Google Play, or before the app is in the store. iPhones can only install from the App Store.'],
+            'apps.guest.version' => ['type' => 'text', 'label' => 'Guest app: version', 'help' => 'Shown next to the download, e.g. 1.2.0.'],
+            'apps.staff.show'    => ['type' => 'bool', 'label' => 'Also offer the staff app on the app page', 'default' => false, 'help' => 'For your team. Anyone with the page can download it, but only staff accounts can sign in.'],
+            'apps.staff.play'    => ['type' => 'url', 'label' => 'Staff app: Google Play link'],
+            'apps.staff.ios'     => ['type' => 'url', 'label' => 'Staff app: App Store link'],
+            'apps.staff.apk'     => ['type' => 'file', 'label' => 'Staff app: Android file (.apk)'],
+            'apps.staff.version' => ['type' => 'text', 'label' => 'Staff app: version'],
         ]],
         'seo' => ['Search & sharing', 'ri-search-eye-line', [
             'seo.title'       => ['type' => 'text', 'label' => 'Title in search results', 'help' => 'Empty: the hotel\'s name and tagline.'],
@@ -202,6 +217,94 @@ class Website
         if ($path && str_starts_with($path, 'uploads/website/') && ! str_contains($path, '..') && is_file(public_path($path))) {
             @unlink(public_path($path));
         }
+    }
+
+    /** The apps a guest can get: guest, and staff when switched on. Only apps with a link or a file. */
+    public const APPS = [
+        'guest' => ['Guest app', 'For guests: book, check in with your phone, order to your room, chat with us and pay your bill.'],
+        'staff' => ['Staff app', 'For our team: front desk, housekeeping, tasks and the till on the move. Staff sign-in needed.'],
+    ];
+
+    /** app => [label, text, play, ios, apk (download address or null), version, size]. */
+    public static function apps(bool $withStaff = true): array
+    {
+        $out = [];
+        foreach (self::APPS as $key => [$label, $text]) {
+            if ($key === 'staff' && (! $withStaff || ! self::get('apps.staff.show'))) {
+                continue;
+            }
+            $file = self::appFile($key);
+            $app = [
+                'key' => $key, 'label' => $label, 'text' => $text,
+                'play' => self::get("apps.$key.play"), 'ios' => self::get("apps.$key.ios"),
+                'apk' => $file ? route('site.app.download', $key) : null,
+                'version' => self::get("apps.$key.version"),
+                'size' => $file ? self::bytes((int) ($file['size'] ?? 0)) : null,
+            ];
+            if ($app['play'] || $app['ios'] || $app['apk']) {
+                $out[$key] = $app;
+            }
+        }
+
+        return $out;
+    }
+
+    /** The website offers the guest app (switched on, and a link or a file is set). */
+    public static function hasApps(): bool
+    {
+        return (bool) self::get('apps.show') && isset(self::apps(false)['guest']);
+    }
+
+    /** An uploaded app file that is still on disk: [path, name, size, at], or null. */
+    public static function appFile(string $app): ?array
+    {
+        $f = self::get("apps.$app.apk");
+
+        return is_array($f) && ! empty($f['path']) && is_file(storage_path('app/' . $f['path'])) ? $f : null;
+    }
+
+    /** Keeps an uploaded app (.apk) in storage/app/website-apps, out of the public folder; it is sent by /app/download/{app}. */
+    public static function storeApp(\Illuminate\Http\UploadedFile $file, string $app): array
+    {
+        $dir = storage_path('app/website-apps');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        $size = (int) $file->getSize();
+        $name = $app . '-' . now()->format('YmdHis') . '-' . \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8)) . '.apk';
+        $file->move($dir, $name);
+
+        return ['path' => 'website-apps/' . $name, 'name' => mb_substr($file->getClientOriginalName(), 0, 120), 'size' => $size, 'at' => now()->toDateTimeString()];
+    }
+
+    public static function deleteApp(mixed $file): void
+    {
+        $path = is_array($file) ? (string) ($file['path'] ?? '') : '';
+        if (str_starts_with($path, 'website-apps/') && ! str_contains($path, '..') && is_file(storage_path('app/' . $path))) {
+            @unlink(storage_path('app/' . $path));
+        }
+    }
+
+    /** The largest upload this server takes (the smaller of PHP's upload_max_filesize and post_max_size), in bytes. */
+    public static function uploadLimit(): int
+    {
+        $parse = function (string|false $v): int {
+            $v = trim((string) $v);
+            if ($v === '' || $v === '-1' || $v === '0') {
+                return PHP_INT_MAX;
+            }
+            $n = (float) $v;
+
+            return (int) match (strtolower(substr($v, -1))) { 'g' => $n * 1073741824, 'm' => $n * 1048576, 'k' => $n * 1024, default => $n };
+        };
+
+        return min($parse(ini_get('upload_max_filesize')), $parse(ini_get('post_max_size')));
+    }
+
+    /** 52428800 → "50 MB". */
+    public static function bytes(int $n): string
+    {
+        return $n >= 1048576 ? rtrim(rtrim(number_format($n / 1048576, 1), '0'), '.') . ' MB' : max(1, (int) round($n / 1024)) . ' KB';
     }
 
     /** "number|words" lines → [[number, words]]. */

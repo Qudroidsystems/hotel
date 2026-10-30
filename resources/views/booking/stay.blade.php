@@ -153,6 +153,15 @@
                 </div>
             @endif
 
+            @if (! empty($wifi))
+                <div class="panel wifi" id="wifi">
+                    <h2><i class="ri-wifi-line"></i> Wi-Fi</h2>
+                    <div class="wifi-row"><div><span class="muted small">Network</span><strong>{{ $wifi['network'] }}</strong></div>
+                        <div><span class="muted small">Your code</span><strong class="wifi-code">{{ $wifi['code'] }}</strong></div></div>
+                    <p class="muted small">{{ $wifi['how'] }} {{ $wifi['devices'] }} device{{ $wifi['devices'] === 1 ? '' : 's' }} · {{ $wifi['speed_label'] }} · {{ $wifi['data_label'] }}. Works until {{ $wifi['valid_until_label'] }}.</p>
+                </div>
+            @endif
+
             @if ($luggage['available'])
                 <div class="panel luggage {{ $luggage['check_now'] ? 'due' : '' }}" id="luggage">
                     <div class="lg-head">
@@ -324,6 +333,10 @@
     .keep { margin-top: 26px; }
     .luggage-nudge { text-decoration: none; color: inherit; }
     .luggage.due { border-color: #f2b84b; box-shadow: 0 0 0 3px rgba(242,184,75,.18); }
+    .wifi h2 i { color: var(--lagoon); }
+    .wifi-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 6px 0 8px; }
+    .wifi-row span { display: block; } .wifi-row strong { font-size: 18px; }
+    .wifi-code { font-family: ui-monospace, Menlo, monospace; letter-spacing: .12em; font-size: 22px !important; }
     .lg-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
     .lg-head h2 { margin-bottom: 4px; } .lg-head h2 i { color: var(--lagoon); }
     .lg-list { list-style: none; margin: 8px 0 4px; padding: 0; }

@@ -39,6 +39,9 @@
     .gc-quick { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; }
     .gc-quick button { border: 1px solid var(--cb-border); background: var(--cb-surface, #fff); border-radius: 99px; padding: 4px 10px; font-size: 12px; white-space: nowrap; cursor: pointer; color: var(--cb-text); }
     .gc-compose { display: flex; gap: 8px; padding: 10px 12px 12px; align-items: flex-end; }
+    .gc-rec { align-items: center; } .gc-rec[hidden] { display: none; } .gc-rec .dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: gcRec 1.2s infinite; }
+    .hv-note { display: flex; align-items: center; gap: 8px; } .hv-note audio { height: 36px; max-width: 240px; } .hv-len { font-size: 12px; opacity: .7; }
+    @keyframes gcRec { 50% { opacity: .3; } }
     .gc-compose textarea { flex: 1; resize: none; border: 1px solid var(--cb-border); border-radius: 14px; padding: 9px 12px; max-height: 140px; background: var(--cb-surface, #fff); color: var(--cb-text); }
     .gc-iconbtn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--cb-border); background: var(--cb-surface, #fff); display: grid; place-items: center; font-size: 19px; cursor: pointer; color: var(--cb-text); flex: 0 0 auto; }
     .gc-send { background: #0f766e; color: #fff; border-color: transparent; }
@@ -47,11 +50,15 @@
     .gc-live { font-size: 11.5px; color: var(--cb-muted); display: inline-flex; align-items: center; gap: 5px; }
     .gc-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
     .gc-live.on .dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.2); }
+    .gc-msg .retry { background: none; border: 0; color: inherit; text-decoration: underline; font-weight: 700; padding: 0; cursor: pointer; }
+    .gc-typing .dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 3px; animation: gcDot 1.2s infinite; }
+    .gc-typing .dots span:nth-child(2) { animation-delay: .15s; } .gc-typing .dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes gcDot { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-3px); opacity: 1; } }
+    .gc-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 3000; display: grid; place-items: center; padding: 20px; }
+    .gc-lightbox[hidden] { display: none; }
+    .gc-lightbox img { max-width: 100%; max-height: 90vh; border-radius: 12px; }
+    .gc-lightbox button { position: absolute; top: 18px; right: 18px; }
     /* Calls */
-    .gc-callbar { display: none; align-items: center; gap: 10px; padding: 10px 16px; background: #0f172a; color: #fff; }
-    .gc-callbar.on { display: flex; }
-    .gc-callbar .st { flex: 1; font-weight: 600; }
-    .gc-callbar button { border: 0; border-radius: 99px; padding: 7px 14px; font-weight: 700; cursor: pointer; }
     .gc-ring { position: fixed; right: 24px; bottom: 24px; z-index: 1060; width: 320px; background: #0f172a; color: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.35); display: none; animation: gcIn .25s ease-out; }
     .gc-ring.on { display: block; }
     .gc-ring .pulse { width: 52px; height: 52px; border-radius: 50%; background: #16a34a; display: grid; place-items: center; font-size: 24px; animation: gcPulse 1.4s infinite; }
@@ -102,16 +109,17 @@
                 <a class="gc-iconbtn" id="gc-booking" title="Open the booking" target="_blank"><i class="ri-hotel-bed-line"></i></a>
                 <button class="gc-iconbtn" id="gc-close" title="Close the chat (it reopens when the guest writes)"><i class="ri-check-double-line"></i></button>
             </div>
-            <div class="gc-callbar" id="gc-callbar" role="status"><i class="ri-phone-fill"></i><span class="st" id="gc-callst"></span><span id="gc-calltime"></span>
-                <button id="gc-mute" style="background:#334155;color:#fff">Mute</button><button id="gc-hang" style="background:#dc2626;color:#fff">End</button></div>
             <div class="gc-thread d-none" id="gc-thread"></div>
             <div class="gc-typing d-none" id="gc-typing"></div>
             <div class="gc-quick d-none" id="gc-quick"></div>
             <form class="gc-compose d-none" id="gc-form" autocomplete="off">
                 <label class="gc-iconbtn mb-0" title="Send a photo"><i class="ri-image-add-line"></i><input type="file" accept="image/*" id="gc-photo" hidden></label>
                 <textarea id="gc-text" rows="1" maxlength="2000" placeholder="Write to the guest… (Enter sends, Shift+Enter for a new line)" aria-label="Message"></textarea>
+                <button type="button" class="gc-iconbtn" id="gc-mic" title="Record a voice message" aria-label="Record a voice message" hidden><i class="ri-mic-line"></i></button>
                 <button class="gc-iconbtn gc-send" type="submit" aria-label="Send"><i class="ri-send-plane-2-fill"></i></button>
             </form>
+            <div class="gc-compose gc-rec" id="gc-rec" hidden><span class="dot"></span><strong id="gc-rec-t" style="font-variant-numeric:tabular-nums;min-width:40px">0:00</strong><span class="flex-grow-1 small text-muted">Recording a voice message…</span>
+                <button type="button" class="gc-iconbtn" id="gc-rec-x" aria-label="Cancel"><i class="ri-delete-bin-line"></i></button><button type="button" class="gc-iconbtn gc-send" id="gc-rec-ok" aria-label="Send the voice message"><i class="ri-send-plane-2-fill"></i></button></div>
         </section>
     </div>
 
@@ -121,6 +129,7 @@
         <div class="act"><button id="gc-decline" style="background:#334155;color:#fff">Decline</button><button id="gc-answer" style="background:#16a34a;color:#fff">Answer</button></div>
     </div>
     <audio id="gc-audio" autoplay playsinline></audio>
+    <div class="gc-lightbox" id="gc-lb" hidden role="dialog" aria-label="Photo"><img alt="Photo"><button type="button" class="btn-close btn-close-white" aria-label="Close"></button></div>
 
 </div>
 </div>
@@ -145,7 +154,7 @@
         config: @json($live), channels: @json($channels), authUrl: @json(route('realtime.auth')), csrf: CSRF,
         onState: (up) => { socketUp = up; $('gc-live').classList.toggle('on', up); $('gc-live').querySelector('span:last-child').textContent = up ? 'Live' : 'Checking every few seconds'; },
         onEvent: (ch, ev, d) => {
-            if (ev === 'chat.message') { if (st.current && d.conversation && d.conversation.id === st.current) { addMessages([d.message]); markRead(); } loadList(); }
+            if (ev === 'chat.message') { if (st.current && d.conversation && d.conversation.id === st.current) { addMessages([d.message]); markRead(); } loadList(); if (d.message && !d.message.mine && d.message.sender === 'guest') notify(d); }
             if (ev === 'chat.typing' && st.current && d.conversation_id === st.current) showTyping();
             if (ev === 'chat.read' && st.current && d.conversation_id === st.current) document.querySelectorAll('.gc-msg.mine .tick').forEach(t => t.textContent = '✓✓');
             if (ev === 'call.ring' || ev === 'call.state') ringCheck();
@@ -153,6 +162,19 @@
         },
     });
     if (!@json($live['enabled'] ?? false)) { $('gc-live').querySelector('span:last-child').textContent = 'Checking every few seconds'; }
+
+    // A guest writes while this tab is in the background: a chime, a count in the title and (when allowed) a notification.
+    const baseTitle = document.title; let missed = 0;
+    function notify(d) {
+        if (!document.hidden) return;
+        missed++; document.title = `(${missed}) ${baseTitle}`;
+        try { const C = window.AudioContext || window.webkitAudioContext; const c = new C(), o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.12, c.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.4); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.45); setTimeout(() => c.close(), 600); } catch (e) {}
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const n = new Notification((d.conversation && d.conversation.guest) || 'A guest wrote', { body: d.message.body || 'Sent a photo', tag: 'chat-' + (d.conversation ? d.conversation.id : '') });
+            n.onclick = () => { window.focus(); if (d.conversation) open(d.conversation.id); n.close(); };
+        }
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { missed = 0; document.title = baseTitle; } });
 
     // ── The list ──
     function chips(sections) {
@@ -188,7 +210,8 @@
         if (m.sender === 'system') return `<div class="gc-msg sys" data-id="${m.id}">${esc(m.body)}</div>`;
         return `<div class="gc-msg ${m.mine ? 'mine' : ''}" data-id="${m.id || ''}" data-client="${esc(m.client_id || '')}">
             ${!m.mine ? `<div class="by">${esc(m.name)}</div>` : (m.name && m.name !== 'You' ? `<div class="by">${esc(m.name)}</div>` : '')}
-            ${m.photo ? `<a href="${esc(m.photo)}" target="_blank" rel="noopener"><img src="${esc(m.photo)}" alt="Photo" loading="lazy"></a>` : ''}
+            ${m.photo ? `<img src="${esc(m.photo)}" alt="Photo" loading="lazy">` : ''}
+            ${m.audio ? HotelVoiceNote.html(m, esc) : ''}
             ${m.body ? `<div class="txt">${esc(m.body)}</div>` : ''}
             <div class="tm">${esc(m.time || '')}${m.mine ? ` <span class="tick">${m.read ? '✓✓' : '✓'}</span>` : ''}</div></div>`;
     }
@@ -237,19 +260,26 @@
         } catch (e) {}
     }
     const markRead = () => refreshThread();
-    let typT; function showTyping() { $('gc-typing').textContent = 'The guest is typing…'; clearTimeout(typT); typT = setTimeout(() => $('gc-typing').textContent = '', 6000); }
+    $('gc-thread').addEventListener('click', e => { const img = e.target.closest('.gc-msg img'); if (img) { $('gc-lb').querySelector('img').src = img.src; $('gc-lb').hidden = false; } });
+    $('gc-lb').addEventListener('click', () => $('gc-lb').hidden = true);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') $('gc-lb').hidden = true; });
+    let typT; function showTyping() { $('gc-typing').innerHTML = '<span class="dots"><span></span><span></span><span></span></span> The guest is typing…'; clearTimeout(typT); typT = setTimeout(() => $('gc-typing').textContent = '', 6000); }
     $('gc-back').addEventListener('click', () => { $('gc').classList.remove('thread-open'); st.current = null; });
 
     // ── Writing ──
-    async function send(body, photo) {
-        if (!st.current || (!body && !photo)) return;
-        const client_id = uuid();
-        if (body) addMessages([{ client_id, sender: 'staff', mine: true, body, time: 'sending…' }]);
+    async function send(body, photo, client_id, voice) {
+        if (!st.current || (!body && !photo && !voice)) return;
+        const retry = !!client_id; client_id = client_id || uuid();
+        if (!retry) addMessages([{ client_id, sender: 'staff', mine: true, body, photo: photo ? URL.createObjectURL(photo) : null, audio: voice ? URL.createObjectURL(voice.blob) : null, audio_label: voice ? '(' + voice.seconds + ' s)' : null, time: 'sending…' }]);
         document.querySelector(`.gc-msg[data-client="${client_id}"]`)?.classList.add('sending');
         const fd = new FormData(); fd.append('client_id', client_id); if (body) fd.append('body', body); if (photo) fd.append('photo', photo);
+        if (voice) { fd.append('audio', voice.blob, voice.name); fd.append('audio_seconds', voice.seconds); }
         for (let i = 0; i < 3; i++) {
             try { const d = await req('/' + st.current, { method: 'POST', body: fd }); addMessages([d.message]); return; }
-            catch (e) { if (i === 2) { const el = document.querySelector(`.gc-msg[data-client="${client_id}"] .tm`); if (el) el.textContent = 'Not sent — ' + e.message; } else await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+            catch (e) {
+                if (i === 2) { const el = document.querySelector(`.gc-msg[data-client="${client_id}"] .tm`); if (el) { el.innerHTML = `Not sent — ${esc(e.message)} <button type="button" class="retry">Try again</button>`; el.querySelector('.retry').onclick = () => send(body, photo, client_id, voice); } }
+                else await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+            }
         }
     }
     $('gc-form').addEventListener('submit', e => { e.preventDefault(); const t = $('gc-text').value.trim(); if (!t) return; $('gc-text').value = ''; autosize(); send(t); });
@@ -257,6 +287,17 @@
     const autosize = () => { const t = $('gc-text'); t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; };
     $('gc-text').addEventListener('input', () => { autosize(); if (st.current && Date.now() - st.typingAt > 3000) { st.typingAt = Date.now(); req(`/${st.current}/typing`, { method: 'POST' }).catch(() => {}); } });
     $('gc-photo').addEventListener('change', e => { const f = e.target.files[0]; if (f) send(null, f); e.target.value = ''; });
+    let rec = null;
+    if (window.HotelVoiceNote && HotelVoiceNote.supported()) $('gc-mic').hidden = false;
+    const recDone = () => { rec = null; $('gc-rec').hidden = true; $('gc-form').classList.remove('d-none'); };
+    $('gc-mic').addEventListener('click', () => {
+        if (rec || !st.current) return;
+        $('gc-form').classList.add('d-none'); $('gc-rec').hidden = false;
+        rec = HotelVoiceNote.start({ max: 120, onTick: (s) => { $('gc-rec-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); } });
+        rec.promise.catch(() => { recDone(); alertBar('The microphone isn’t available in this browser.'); });
+    });
+    $('gc-rec-x').addEventListener('click', () => { rec?.cancel(); recDone(); });
+    $('gc-rec-ok').addEventListener('click', async () => { const r = rec; if (!r) return; try { const v = await r.stop(); recDone(); send(null, null, null, v); } catch (e) { recDone(); } });
     $('gc-quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { $('gc-text').value = b.textContent; $('gc-text').focus(); autosize(); } });
     $('gc-close').addEventListener('click', async () => { if (!st.current) return; await req(`/${st.current}/close`, { method: 'POST' }).catch(() => {}); loadList(); });
 
@@ -279,20 +320,20 @@
         catch (e) { alertBar(e.message); }
     }
     function startCall(c) {
-        const call = new HotelCall({ call: c, base: `${API}/calls/${c.uuid}`, csrf: CSRF, audio: $('gc-audio'),
-            onState: (text, phase) => { $('gc-callbar').classList.add('on'); $('gc-callst').textContent = text; if (phase === 'ended') setTimeout(() => $('gc-callbar').classList.remove('on'), 2500); },
-            onEnd: () => { st.call = null; refreshThread(); } });
+        const conv = st.list.find(x => x.id === c.conversation_id) || {};
+        const who = c.guest || conv.guest || $('gc-hname').textContent || 'Guest';
+        const ui = new HotelCallUI({ title: who, subtitle: [c.section || conv.section, (c.room || conv.room) ? 'Room ' + (c.room || conv.room) : null].filter(Boolean).join(' · '), initials: (c.room || conv.room) || initials(who), label: 'Guest call',
+            transfer: { targets: (u) => req(`/calls/${u}/targets`), put: (u, t) => req(`/calls/${u}/transfer`, { method: 'POST', json: true, body: JSON.stringify(t.type === 'user' ? { user_id: t.id } : { section_id: t.id }) }) } });
+        const call = new HotelCall(Object.assign({ call: c, base: `${API}/calls/${c.uuid}`, csrf: CSRF, audio: $('gc-audio'), onEnd: () => { st.call = null; refreshThread(); } }, ui.hooks()));
+        ui.bind(call);
         st.call = call;
-        call.start().catch(e => { alertBar(e.message); call.hangUp(); });
+        call.start().catch(e => { ui.status(e.message, 'ended'); call.hangUp(); });
     }
-    function alertBar(t) { $('gc-callbar').classList.add('on'); $('gc-callst').textContent = t; setTimeout(() => { if (!st.call) $('gc-callbar').classList.remove('on'); }, 4000); }
-    $('gc-hang').addEventListener('click', () => st.call?.hangUp());
-    $('gc-mute').addEventListener('click', e => { if (!st.call) return; const m = e.target.textContent === 'Mute'; st.call.mute(m); e.target.textContent = m ? 'Unmute' : 'Mute'; });
+    function alertBar(t) { const ui = new HotelCallUI({ title: $('gc-hname').textContent || 'Call' }); ui.status(t, 'ended'); }
     $('gc-callback').addEventListener('click', async () => {
         if (!st.current || st.call) return;
         try { const c = await req(`/${st.current}/call`, { method: 'POST' }); startCall(c); } catch (e) { alertBar(e.message); }
     });
-    setInterval(() => { if (st.call && st.call.seconds()) { const s = st.call.seconds(); $('gc-calltime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); } }, 1000);
     if ('Notification' in window && Notification.permission === 'default') document.addEventListener('click', () => Notification.requestPermission(), { once: true });
 
     // ── Polling: often without a socket, rarely with one ──

@@ -365,6 +365,7 @@ class GuestStayController extends ApiController
             'order_note'   => $r->status === S::CheckedIn && ! $orderSvc->canOrder($r) && $orderSvc->outlets()->isNotEmpty() ? $orderSvc->blocker($r) : null,
             'orders'       => $orderSvc->forGuest($r),
             'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)
+            'wifi'         => app(\App\Services\Network\NetworkService::class)->forGuest($r),   // the guest's Wi-Fi code while checked in, else null
             'requests'     => $r->guestRequests->map(fn (GuestRequest $q) => [
                 'id'           => $q->id,
                 'type'         => $q->type,

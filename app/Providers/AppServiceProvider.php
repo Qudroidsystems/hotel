@@ -80,6 +80,9 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // Guest Wi-Fi: a code at check-in, cut off at check-out.
+        \App\Services\Network\NetworkHooks::register();
+
         // Texts to guests (Hotel Settings → Guest Messages): confirmation, deposit link, thank you, request updates.
         \App\Services\Messaging\MessagingHooks::register();
 

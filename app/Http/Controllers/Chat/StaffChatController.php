@@ -65,9 +65,10 @@ class StaffChatController extends Controller
     public function send(Request $request, ChatConversation $conversation)
     {
         $user = $this->staff($request);
-        $d = $request->validate(['body' => 'nullable|string|max:' . ChatService::MAX_LENGTH, 'client_id' => 'nullable|uuid', 'photo' => 'nullable|image|max:8192']);
+        $d = $request->validate(['body' => 'nullable|string|max:' . ChatService::MAX_LENGTH, 'client_id' => 'nullable|uuid', 'photo' => 'nullable|image|max:8192',
+            'audio' => 'nullable|file|max:6144|mimetypes:' . ChatService::AUDIO_TYPES, 'audio_seconds' => 'nullable|integer|min:1|max:300']);
         try {
-            $m = $this->chat->staffSend($conversation, $user, $d['body'] ?? null, $request->file('photo'), $d['client_id'] ?? null);
+            $m = $this->chat->staffSend($conversation, $user, $d['body'] ?? null, $request->file('photo'), $d['client_id'] ?? null, $request->file('audio'), isset($d['audio_seconds']) ? (int) $d['audio_seconds'] : null);
         } catch (BookingException $e) {
             return $this->fail($e->getMessage());
         }
@@ -123,17 +124,13 @@ class StaffChatController extends Controller
         return $this->ok($this->calls->callJson($call, 'staff'), 201);
     }
 
-    /** GET calls/{uuid}?after=id */
+    /** GET calls/{uuid}?after=id&after_tap=id */
     public function call(Request $request, string $uuid)
     {
         $user = $this->staff($request);
         $call = GuestCall::where('uuid', $uuid)->firstOrFail();
-        $this->chat->authorize($call->conversation, $user);
-        $this->calls->expire($call);
 
-        return $this->ok($this->calls->callJson($call->fresh(), 'staff') + [
-            'signals' => $this->calls->signals($call, 'staff', $request->integer('after'))->map(fn ($s) => ['id' => $s->id, 'kind' => $s->kind, 'payload' => $s->payload])->values(),
-        ]);
+        return $this->ok($this->calls->staffView($call, $user, $request->integer('after'), $request->integer('after_tap')));
     }
 
     public function answer(Request $request, string $uuid)
@@ -151,13 +148,13 @@ class StaffChatController extends Controller
     public function signal(Request $request, string $uuid)
     {
         $user = $this->staff($request);
-        $d = $request->validate(['kind' => 'required|in:offer,answer,candidate', 'payload' => 'nullable|array']);
+        $d = $request->validate(['kind' => 'required|in:offer,answer,candidate', 'payload' => 'nullable|array', 'leg' => 'nullable|integer|min:1']);
         $call = GuestCall::where('uuid', $uuid)->firstOrFail();
         if ($call->status === 'active' && $call->answered_by && $call->answered_by !== $user->id) {
             return $this->fail('Someone else is on this call.', 409);
         }
         try {
-            $s = $this->calls->signal($call, 'staff', $d['kind'], $d['payload'] ?? null, $user);
+            $s = $this->calls->signal($call, 'staff', $d['kind'], $d['payload'] ?? null, $user, isset($d['leg']) ? (int) $d['leg'] : null);
         } catch (BookingException $e) {
             return $this->fail($e->getMessage());
         }
@@ -174,12 +171,53 @@ class StaffChatController extends Controller
         return $this->ok($this->calls->callJson($call, 'staff'));
     }
 
+    /** POST calls/{uuid}/transfer {user_id | section_id, note} — put the call through to someone. */
+    public function transfer(Request $request, string $uuid)
+    {
+        $user = $this->staff($request);
+        $d = $request->validate(['user_id' => 'nullable|integer', 'section_id' => 'nullable|integer', 'note' => 'nullable|string|max:160']);
+        $call = GuestCall::where('uuid', $uuid)->firstOrFail();
+        try {
+            $call = $this->calls->transfer($call, $user, ! empty($d['user_id']) ? User::findOrFail($d['user_id']) : null,
+                ! empty($d['section_id']) ? \App\Models\Chat\ChatSection::findOrFail($d['section_id']) : null, $d['note'] ?? null);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($this->calls->callJson($call, 'staff'));
+    }
+
+    /** GET calls/{uuid}/targets — who the call can be put through to. */
+    public function targets(Request $request, string $uuid)
+    {
+        $user = $this->staff($request);
+        $call = GuestCall::where('uuid', $uuid)->firstOrFail();
+        $this->calls->authorizeCall($call, $user);
+
+        return $this->ok($this->calls->transferTargets($call, $user));
+    }
+
+    /** POST calls/{uuid}/tap/{listen} {kind, payload} — the sound this browser sends to a supervisor listening in. */
+    public function tap(Request $request, string $uuid, int $listen)
+    {
+        $user = $this->staff($request);
+        $d = $request->validate(['kind' => 'required|in:offer,answer,candidate', 'payload' => 'nullable|array']);
+        $l = \App\Models\Chat\CallListen::whereKey($listen)->whereHas('call', fn ($q) => $q->where('uuid', $uuid))->firstOrFail();
+        try {
+            $s = $this->calls->listenSignal($l, 'tap', $d['kind'], $d['payload'] ?? null, $user);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage(), 409);
+        }
+
+        return $this->ok(['id' => $s->id]);
+    }
+
     // ------------------------------------------------------------------
 
     private function staff(Request $request): User
     {
         $user = $request->user();
-        if (! $user || ! $user->canAny(['Chat with guests', 'Manage guest chat'])) {
+        if (! $user || ! $user->canAny(['Chat with guests', 'Manage guest chat', 'Answer any guest call'])) {
             throw new AuthorizationException('Guest chat isn’t part of your work.');
         }
 

@@ -93,6 +93,13 @@ class PermissionMeta
         'View IT control room'      => ['View',   'See the IT control room: network, systems and backup status, alerts and the service desk queue.'],
         'Manage IT monitoring'      => ['Manage', 'Set up what is monitored, the equipment register and planned maintenance; acknowledge and close alerts.'],
         'Manage IT tickets'         => ['Manage', 'Work on every IT support ticket: assign, update, resolve and close. (Any staff member can raise a ticket.)'],
+        'View network'              => ['View', 'See the internet lines (Starlink dishes and others), their speed, signal and data used, and the guest Wi-Fi codes.'],
+        'Manage network'            => ['Manage', 'Add and change internet lines and guest Wi-Fi speed plans.'],
+        'Give Wi-Fi codes'          => ['Give', 'Give guests and visitors Wi-Fi codes, change their plan or end time, and cut a code off.'],
+        'Use call console'          => ['View',   'Open the call console: every guest call ringing or on, missed calls, network strength, weather and the room / area equipment board.'],
+        'Answer any guest call'     => ['Manage', 'Pick up any guest call from the console (with a headset) and put calls through to the right person or section.'],
+        'Listen to guest calls'     => ['Manage', 'Listen in on guest calls and play guests\' voice messages. Sensitive: a reason is asked each time and every listen is in the audit trail.'],
+        'Manage room equipment'     => ['Manage', 'List the equipment in rooms and other areas, switch it on or off on the board, and create keys for hardware hubs.'],
         'Manage hotel settings'     => ['Manage', 'Change hotel settings: name and logo, taxes, approval limits, cash and audit rules, and the bank accounts shown on invoices.'],
     ];
 

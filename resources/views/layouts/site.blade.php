@@ -136,6 +136,9 @@
                     @if ($socials)
                         <div class="socials">@foreach ($socials as [$label, $url, $icon])<a href="{{ $url }}" target="_blank" rel="noopener" aria-label="{{ $label }}"><i class="{{ $icon }}"></i></a>@endforeach</div>
                     @endif
+                    @if (Website::hasApps())
+                        <div class="footer-app"><span>Get our app</span>@include('site.partials.app-badges', ['app' => Website::apps(false)['guest'], 'small' => true])</div>
+                    @endif
                 </div>
                 <div>
                     <h4>Stay</h4>
@@ -144,6 +147,7 @@
                         <li><a href="{{ route('site.offers') }}">Special Offers</a></li>
                         @if (config('hotel.booking.enabled', true))<li><a href="{{ route('book.index') }}">Book a stay</a></li>@endif
                         <li><a href="{{ route('stay.find') }}">Manage my booking</a></li>
+                        @if (Website::hasApps())<li><a href="{{ route('site.app') }}">Our app</a></li>@endif
                         @if ($multi)<li><a href="{{ route('hotels.public') }}">All our hotels</a></li>@endif
                     </ul>
                 </div>

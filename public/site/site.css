@@ -619,3 +619,57 @@ p { margin: 0 0 1em; }
     .curtain { display: none; }
 }
 @media print { .site-header, .site-footer, .wa, .to-top, .mobile-book, .bookbar, .curtain { display: none !important; } }
+
+/* ── Get our app ── */
+.app-band { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(40px, 7vw, 110px); align-items: center; }
+.app-badges { display: flex; flex-wrap: wrap; gap: 12px; }
+.app-badge { display: inline-flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 22px 0 18px; background: var(--ink); color: #fff; border: 1px solid var(--ink); border-radius: 12px;
+    transition: transform .35s var(--ease), background .35s var(--ease), box-shadow .35s var(--ease); }
+.app-badge:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -14px rgba(0,0,0,.45); }
+.app-badge i { font-size: 28px; line-height: 1; }
+.app-badge span { display: flex; flex-direction: column; font: 500 17px/1.1 var(--sans); letter-spacing: .01em; }
+.app-badge small { font-size: 10.5px; font-weight: 400; letter-spacing: .06em; opacity: .75; margin-bottom: 3px; }
+.app-badge.apk { background: transparent; color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
+.app-badge.apk i { color: #3ddc84; }
+.app-badge.apk:hover { background: var(--ink); color: #fff; }
+.dark .app-badge { background: #fff; color: var(--ink); border-color: #fff; }
+.dark .app-badge.apk { background: transparent; color: #fff; border-color: var(--line-l); }
+.app-badges.sm { gap: 8px; }
+.app-badges.sm .app-badge { min-height: 42px; padding: 0 14px 0 12px; border-radius: 9px; background: transparent; color: #fff; border-color: rgba(255,255,255,.3); }
+.app-badges.sm .app-badge:hover { background: #fff; color: var(--ink); }
+.app-badges.sm .app-badge i { font-size: 20px; }
+.app-badges.sm .app-badge span { font-size: 13px; }
+.app-badges.sm .app-badge small { font-size: 9px; margin-bottom: 1px; }
+.footer-app { margin-top: 26px; }
+.footer-app > span { display: block; font: 500 11px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+.app-side { display: flex; align-items: flex-end; justify-content: center; gap: 28px; }
+.phone { width: min(270px, 60vw); aspect-ratio: 9 / 19; flex: none; padding: 10px; background: #111; border-radius: 42px; box-shadow: 0 40px 70px -30px rgba(14,23,38,.55), inset 0 0 0 2px #333;
+    animation: phone-float 6s ease-in-out infinite; }
+.phone .screen { position: relative; height: 100%; overflow: hidden; border-radius: 33px; background: var(--paper); }
+.phone .screen::before { content: ''; position: absolute; top: 9px; left: 50%; width: 80px; height: 22px; margin-left: -40px; background: #111; border-radius: 12px; z-index: 2; }
+.phone img { width: 100%; height: 100%; object-fit: cover; }
+.phone .mock { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 52px 18px 18px; background: linear-gradient(180deg, var(--ink) 0 38%, var(--paper) 38%); }
+.phone .mock .t { font: 400 24px/1.1 var(--serif); color: #fff; }
+.phone .mock .b { height: 8px; width: 70%; border-radius: 4px; background: rgba(255,255,255,.35); }
+.phone .mock .b.s { width: 45%; }
+.phone .mock .row { display: flex; justify-content: space-between; margin-top: 18px; }
+.phone .mock .row i { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: #fff; color: var(--accent); font-size: 21px; box-shadow: 0 8px 18px -10px rgba(0,0,0,.3); }
+.phone .mock .card { flex: 1; border-radius: 16px; background: #fff; box-shadow: 0 8px 18px -12px rgba(0,0,0,.25); }
+@keyframes phone-float { 50% { transform: translateY(-12px); } }
+.app-qr { display: flex; flex-direction: column; gap: 12px; width: 156px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.app-qr > div { padding: 12px; background: #fff; border-radius: 14px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.35); }
+.app-qr > div img, .app-qr > div canvas { display: block; width: 100%; height: auto; }
+.app-feats { list-style: none; padding: 0; margin: 0 0 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px 28px; }
+.app-feats li { display: flex; gap: 14px; font-size: 15px; color: var(--muted); }
+.app-feats i { flex: none; font-size: 24px; color: var(--accent); }
+.app-feats b { display: block; color: var(--ink); font-weight: 500; margin-bottom: 2px; }
+@media (max-width: 900px) {
+    .app-band { grid-template-columns: 1fr; }
+    .app-side { justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+    .app-qr { display: none; }
+    .app-feats { grid-template-columns: 1fr; }
+    .app-side { justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) { .phone { animation: none; } }

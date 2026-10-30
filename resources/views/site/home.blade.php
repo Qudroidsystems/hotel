@@ -246,6 +246,35 @@
 </section>
 @endif
 
+{{-- ── Get our app ── --}}
+@if (Website::hasApps())
+@php $guestApp = Website::apps(false)['guest']; @endphp
+<section class="section tint">
+    <div class="wrap app-band">
+        <div>
+            <div class="eyebrow" data-reveal="up">Get our app</div>
+            <h2 class="h2 split">{{ Website::get('apps.title') }}</h2>
+            <p class="lede" data-reveal="up" style="margin:20px 0 30px">{{ Website::get('apps.text') }}</p>
+            <div data-reveal="up">@include('site.partials.app-badges', ['app' => $guestApp])</div>
+            <div style="margin-top:24px" data-reveal="up"><a href="{{ route('site.app') }}" class="link">More about the app <i class="ri-arrow-right-line"></i></a></div>
+        </div>
+        <div class="app-side" data-reveal="up">
+            @include('site.partials.app-phone')
+            <div class="app-qr"><div data-qr="{{ route('site.app') }}"></div><span>Scan to get the app on your phone.</span></div>
+        </div>
+    </div>
+</section>
+@push('scripts')
+<script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
+<script>
+document.querySelectorAll('[data-qr]').forEach(function (el) {
+    if (window.QRCode) new QRCode(el, { text: el.dataset.qr, width: 132, height: 132, colorDark: '#0e1726', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    else el.textContent = el.dataset.qr;
+});
+</script>
+@endpush
+@endif
+
 {{-- ── Gallery ── --}}
 @if ($gallery->isNotEmpty())
 <section class="section tight white" style="padding-bottom:clamp(100px,12vw,160px)">

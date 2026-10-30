@@ -23,6 +23,23 @@ class ChatSection extends Model
         ['concierge', 'Concierge', 'ri-map-pin-user-line', 'Tours, tickets, directions, recommendations', ['Front Desk'], '07:00', '22:00'],
     ];
 
+    /** One-tap messages offered to guests, by section; any other section gets the general ones. */
+    public const SUGGESTIONS = [
+        'reception'    => ['Can I check in early?', 'Could I have a late check-out?', 'Please call me a taxi.', 'What’s the Wi-Fi password?'],
+        'restaurant'   => ['Can I see today’s menu?', 'I’d like to book a table.', 'Is breakfast included?', 'How long for room service?'],
+        'bar'          => ['What’s on tonight?', 'Can drinks come to my room?', 'Do you do happy hour?'],
+        'laundry'      => ['Please collect my laundry.', 'Can you iron a shirt for today?', 'How long does dry cleaning take?'],
+        'housekeeping' => ['Fresh towels, please.', 'Please clean my room.', 'Extra pillows, please.', 'Please don’t disturb today.'],
+        'concierge'    => ['What should I see nearby?', 'Can you book me a tour?', 'I need directions.'],
+        '*'            => ['Hello! I have a question.', 'Can someone call me?', 'Thank you!'],
+    ];
+
+    /** @return list<string> */
+    public function suggestions(): array
+    {
+        return self::SUGGESTIONS[$this->key] ?? self::SUGGESTIONS['*'];
+    }
+
     protected $fillable = ['key', 'name', 'icon', 'description', 'phone', 'opens', 'closes', 'calls', 'roles', 'users', 'away_message', 'is_active', 'sort_order'];
 
     protected $casts = ['roles' => 'array', 'users' => 'array', 'calls' => 'boolean', 'is_active' => 'boolean'];

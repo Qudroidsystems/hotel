@@ -121,6 +121,11 @@ return [
     | deposit are released after hold_hours. Guests can cancel online up to
     | cancel_hours before the check-in time.
     */
+    // The guest app: new guests may make an account with their e-mail before their first booking.
+    'guest_app' => [
+        'open_sign_up' => env('HOTEL_GUEST_OPEN_SIGN_UP', true),
+    ],
+
     'booking' => [
         'enabled'         => (bool) env('HOTEL_BOOKING_ENABLED', true),
         'welcome'         => null,      // one line under the hotel name on the booking page
@@ -250,6 +255,20 @@ return [
     ],
 
     /*
+    | Internet & guest Wi-Fi (IT Support → Internet & Wi-Fi). "driver" is how the
+    | app talks to the router the internet lines (Starlink dishes…) plug into:
+    | demo (made-up readings to try it out) or manual (nothing connected).
+    */
+    'network' => [
+        'driver'                => env('HOTEL_NETWORK_DRIVER', 'demo'),
+        'guest_ssid'            => env('HOTEL_GUEST_WIFI_NAME', 'Hotel Guest'),
+        'auto_issue'            => (bool) env('HOTEL_WIFI_AUTO_ISSUE', true),   // a Wi-Fi code for every guest at check-in
+        'grace_minutes'         => (int) env('HOTEL_WIFI_GRACE_MINUTES', 60),   // after check-out time
+        'code_length'           => 8,
+        'sample_retention_days' => (int) env('HOTEL_NETWORK_RETENTION_DAYS', 30),
+    ],
+
+    /*
     | Night audit: closing the business day (room charges, no-shows, the daily
     | report). It runs from Front Desk → Night Audit, or by itself.
     */
@@ -272,5 +291,18 @@ return [
     'audit' => [
         'flag_amount'   => (float) env('HOTEL_AUDIT_FLAG_AMOUNT', 50000),
         'flag_failures' => (int) env('HOTEL_AUDIT_FLAG_FAILURES', 5),
+    ],
+
+    /*
+    | The call console (IT Control Room → Console): operators pick up guest
+    | calls nobody answers, put calls through to the right person and, with the
+    | 'Listen to guest calls' permission, listen in. Every listen is in the
+    | audit trail, and callers are told at the start of each call.
+    */
+    'call_console' => [
+        'monitoring'        => (bool) env('HOTEL_CALL_MONITORING', true),
+        'monitoring_notice' => env('HOTEL_CALL_MONITORING_NOTICE', 'Calls may be listened to by a supervisor for quality and security.'),
+        'escalate_after'    => (int) env('HOTEL_CALL_ESCALATE_SECONDS', 20),   // unanswered this long: the console alarms
+        'device_stale_minutes' => 15,                                          // a hub that stops reporting: "no signal"
     ],
 ];

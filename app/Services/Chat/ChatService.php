@@ -30,6 +30,9 @@ use Illuminate\Support\Str;
 class ChatService
 {
     public const MAX_LENGTH = 2000;
+
+    /** What a browser or phone records a voice message as (Chrome: webm, Safari/iOS: mp4/m4a, Android: aac/3gp). */
+    public const AUDIO_TYPES = 'audio/webm,video/webm,audio/ogg,audio/mpeg,audio/mp4,video/mp4,audio/x-m4a,audio/m4a,audio/aac,audio/x-aac,audio/3gpp,video/3gpp,audio/wav,audio/x-wav';
     public const PAGE = 60;
 
     public function __construct(private Realtime $realtime)
@@ -87,7 +90,7 @@ class ChatService
 
     // ── Sending ───────────────────────────────────────────────────────
 
-    public function guestSend(Reservation $r, ChatSection $section, ?string $body, ?UploadedFile $photo = null, ?string $clientId = null): ChatMessage
+    public function guestSend(Reservation $r, ChatSection $section, ?string $body, ?UploadedFile $photo = null, ?string $clientId = null, ?UploadedFile $audio = null, ?int $audioSeconds = null): ChatMessage
     {
         if ($why = $this->blocker($r)) {
             throw new BookingException($why);
@@ -96,7 +99,7 @@ class ChatService
             throw new BookingException('That part of the hotel isn’t taking messages. Try Reception.');
         }
         $conv = $this->conversation($r, $section);
-        $msg = $this->store($conv, 'guest', null, $body, $photo, $clientId);
+        $msg = $this->store($conv, 'guest', null, $body, $photo, $clientId, $audio, $audioSeconds);
         if (! $msg->wasRecentlyCreated) {
             return $msg;   // a resend
         }
@@ -113,10 +116,10 @@ class ChatService
         return $msg;
     }
 
-    public function staffSend(ChatConversation $conv, User $user, ?string $body, ?UploadedFile $photo = null, ?string $clientId = null): ChatMessage
+    public function staffSend(ChatConversation $conv, User $user, ?string $body, ?UploadedFile $photo = null, ?string $clientId = null, ?UploadedFile $audio = null, ?int $audioSeconds = null): ChatMessage
     {
         $this->authorize($conv, $user);
-        $msg = $this->store($conv, 'staff', $user, $body, $photo, $clientId);
+        $msg = $this->store($conv, 'staff', $user, $body, $photo, $clientId, $audio, $audioSeconds);
         if (! $msg->wasRecentlyCreated) {
             return $msg;
         }
@@ -137,10 +140,10 @@ class ChatService
         return $msg;
     }
 
-    private function store(ChatConversation $conv, string $sender, ?User $user, ?string $body, ?UploadedFile $photo, ?string $clientId): ChatMessage
+    private function store(ChatConversation $conv, string $sender, ?User $user, ?string $body, ?UploadedFile $photo, ?string $clientId, ?UploadedFile $audio = null, ?int $audioSeconds = null): ChatMessage
     {
         $body = $body !== null ? trim(Str::limit(str_replace("\r\n", "\n", $body), self::MAX_LENGTH, '')) : null;
-        if (($body === null || $body === '') && ! $photo) {
+        if (($body === null || $body === '') && ! $photo && ! $audio) {
             throw new BookingException('Write a message first.');
         }
         if ($clientId && ! Str::isUuid($clientId)) {
@@ -150,15 +153,18 @@ class ChatService
             return $same;
         }
         $path = $photo ? $photo->store('chat/' . $conv->id, 'public') : null;
+        // Voice messages stay private: they are played through a signed link (see audioUrl).
+        $voice = $audio ? $audio->store('chat-audio/' . $conv->id, 'local') : null;
+        $seconds = $audio ? max(1, min(300, (int) ($audioSeconds ?: 1))) : null;
         try {
             $msg = ChatMessage::create([
                 'conversation_id' => $conv->id, 'sender' => $sender, 'user_id' => $user?->id,
-                'body' => $body ?: null, 'photo' => $path, 'client_id' => $clientId,
+                'body' => $body ?: null, 'photo' => $path, 'audio' => $voice, 'audio_seconds' => $seconds, 'client_id' => $clientId,
             ]);
         } catch (UniqueConstraintViolationException) {
             return ChatMessage::where('conversation_id', $conv->id)->where('client_id', $clientId)->firstOrFail();
         }
-        $conv->forceFill(['last_message_at' => $msg->created_at, 'last_preview' => Str::limit($body ?: '📷 Photo', 150)])->save();
+        $conv->forceFill(['last_message_at' => $msg->created_at, 'last_preview' => Str::limit($body ?: ($voice ? '🎤 Voice message (' . self::clock($seconds) . ')' : '📷 Photo'), 150)])->save();
 
         return $msg;
     }
@@ -230,6 +236,19 @@ class ChatService
 
     // ── JSON ──────────────────────────────────────────────────────────
 
+    /** A link that plays a voice message for a few hours (works in the browser, the guest app and the staff app). */
+    public function audioUrl(ChatMessage $m): string
+    {
+        return \Illuminate\Support\Facades\URL::temporarySignedRoute('chat.audio', now()->addHours(6), ['message' => $m->id]);
+    }
+
+    public static function clock(?int $seconds): string
+    {
+        $seconds = (int) $seconds;
+
+        return intdiv($seconds, 60) . ':' . str_pad((string) ($seconds % 60), 2, '0', STR_PAD_LEFT);
+    }
+
     /** A message for the guest (staff by first name only) or for staff (full name). */
     public function messageJson(ChatMessage $m, string $for): array
     {
@@ -243,6 +262,8 @@ class ChatService
             'id' => $m->id, 'client_id' => $m->client_id, 'sender' => $m->sender, 'name' => $name,
             'mine' => ($for === 'guest' && $m->sender === 'guest') || ($for === 'staff' && $m->sender === 'staff'),
             'body' => $m->body, 'photo' => $m->photo_url,
+            'audio' => $m->audio ? $this->audioUrl($m) : null, 'audio_seconds' => $m->audio_seconds,
+            'audio_label' => $m->audio ? '🎤 Voice message (' . self::clock((int) $m->audio_seconds) . ')' : null,
             'at' => $m->created_at->toIso8601String(), 'time' => $m->created_at->format('g:i A'), 'day' => $m->created_at->format('D j M'),
             'read' => $m->read_at !== null,
         ];
@@ -269,6 +290,7 @@ class ChatService
                     'last' => $c?->last_preview, 'last_at' => $c?->last_message_at?->toIso8601String(),
                     'last_label' => $c?->last_message_at?->diffForHumans(short: true),
                     'typing' => (bool) $c?->staffTyping(),
+                    'suggestions' => $s->suggestions(),
                 ];
             })->values(),
             'unread' => (int) $convs->sum('guest_unread'),
@@ -286,7 +308,7 @@ class ChatService
         return [
             'conversation_id' => $conv->id,
             'section' => ['id' => $section->id, 'name' => $section->name, 'icon' => $section->icon, 'open' => $section->isOpen(), 'hours' => $section->hours_label, 'phone' => $section->phone,
-                'can_call' => app(CallService::class)->enabled() && $section->calls && $section->isOpen()],
+                'can_call' => app(CallService::class)->enabled() && $section->calls && $section->isOpen(), 'key' => $section->key, 'suggestions' => $section->suggestions()],
             'messages' => $this->messages($conv, $afterId)->map(fn ($m) => $this->messageJson($m, 'guest'))->values(),
             'typing' => $conv->staffTyping(),
             'read_up_to' => $conv->messages()->where('sender', 'guest')->whereNotNull('read_at')->max('id'),
@@ -360,7 +382,7 @@ class ChatService
         $staff = $conv->assigned_to ? $conv->section->staff()->where('id', $conv->assigned_to)->values() : collect();
         app(StaffAlerts::class)->toUsers($staff->isNotEmpty() ? $staff : $conv->section->staff(), [
             'title' => "{$conv->section->name}: {$who}",
-            'body' => $msg->body ? Str::limit($msg->body, 160) : 'Sent a photo',
+            'body' => $msg->body ? Str::limit($msg->body, 160) : ($msg->audio ? 'Sent a voice message' : 'Sent a photo'),
             'group' => 'chat', 'level' => $conv->reservation?->guest?->is_vip ? 'urgent' : 'normal',
             'url' => 'chat:' . $conv->id, 'thread' => "chat:{$conv->id}", 'kind' => 'chat', 'item_id' => $conv->id,
         ]);

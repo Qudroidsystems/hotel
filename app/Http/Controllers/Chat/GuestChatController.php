@@ -41,9 +41,10 @@ class GuestChatController extends Controller
     public function send(Request $request, string $token, int $section)
     {
         $r = $this->reservation($token);
-        $d = $request->validate(['body' => 'nullable|string|max:' . ChatService::MAX_LENGTH, 'client_id' => 'nullable|uuid', 'photo' => 'nullable|image|max:8192']);
+        $d = $request->validate(['body' => 'nullable|string|max:' . ChatService::MAX_LENGTH, 'client_id' => 'nullable|uuid', 'photo' => 'nullable|image|max:8192',
+            'audio' => 'nullable|file|max:6144|mimetypes:' . ChatService::AUDIO_TYPES, 'audio_seconds' => 'nullable|integer|min:1|max:300']);
         try {
-            $m = $this->chat->guestSend($r, $this->section($section), $d['body'] ?? null, $request->file('photo'), $d['client_id'] ?? null);
+            $m = $this->chat->guestSend($r, $this->section($section), $d['body'] ?? null, $request->file('photo'), $d['client_id'] ?? null, $request->file('audio'), isset($d['audio_seconds']) ? (int) $d['audio_seconds'] : null);
         } catch (BookingException $e) {
             return $this->fail($e->getMessage());
         }
@@ -102,9 +103,9 @@ class GuestChatController extends Controller
     public function signal(Request $request, string $token, string $uuid)
     {
         $call = $this->callFor($token, $uuid);
-        $d = $request->validate(['kind' => 'required|in:offer,answer,candidate', 'payload' => 'nullable|array']);
+        $d = $request->validate(['kind' => 'required|in:offer,answer,candidate', 'payload' => 'nullable|array', 'leg' => 'nullable|integer|min:1']);
         try {
-            $s = $this->calls->signal($call, 'guest', $d['kind'], $d['payload'] ?? null);
+            $s = $this->calls->signal($call, 'guest', $d['kind'], $d['payload'] ?? null, null, isset($d['leg']) ? (int) $d['leg'] : null);
         } catch (BookingException $e) {
             return $this->fail($e->getMessage());
         }

@@ -48,6 +48,15 @@ Artisan::command('tasks:escalate', $eachHotel(function (\App\Services\Operations
     $this->info($tasks->escalate() . ' overdue task reminder(s) sent.');
 }))->purpose('Remind and escalate department tasks that are past their due time');
 
+// Internet & guest Wi-Fi: read every internet line (Starlink dishes…), track Wi-Fi codes, close expired ones.
+Artisan::command('network:poll', $eachHotel(function (\App\Services\Network\NetworkService $network) {
+    $this->info($network->poll() . ' internet line(s) read.');
+}))->purpose('Read the internet lines and guest Wi-Fi codes');
+
+Artisan::command('network:prune', $eachHotel(function (\App\Services\Network\NetworkService $network) {
+    $this->info($network->prune() . ' old internet reading(s) removed.');
+}))->purpose('Remove internet line readings older than the retention period');
+
 Artisan::command('it:prune', $eachHotel(function (\App\Services\It\MonitorService $monitors) {
     $this->info($monitors->prune() . ' old check result(s) removed.');
 }))->purpose('Remove IT check history older than the retention period');
@@ -183,9 +192,37 @@ Schedule::command('it:monitor')->everyMinute()->withoutOverlapping(10);
 Schedule::command('it:escalate')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('tasks:escalate')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('it:prune')->dailyAt('03:30');
+Schedule::command('network:poll')->everyMinute()->withoutOverlapping(5);
+Schedule::command('network:prune')->dailyAt('03:40');
 Schedule::command('rooms:prepare-arrivals')->dailyAt('00:05');
 Schedule::command('folios:night-audit')->dailyAt('02:00');
 Schedule::command('security:prune-visitors')->dailyAt('03:00');
 Schedule::command('loyalty:sync')->dailyAt('04:00')->withoutOverlapping();
 Schedule::command('luggage:checkout-reminders')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('messages:arrival-reminders')->dailyAt((string) config('hotel.messaging.reminder_time', '10:00'))->withoutOverlapping();
+
+// Call console demo: the demo hardware hub flips a few equipment states (php artisan facility:simulate --loop).
+Artisan::command('facility:simulate {--loop : Keep going every 20 seconds} {--n=4 : How many devices to change}', $eachHotel(function (\App\Services\Facility\FacilityService $facility) {
+    do {
+        $hub = \App\Models\Facility\FacilityHub::where('is_active', true)->first();
+        $devices = \App\Models\Facility\FacilityDevice::active()->inRandomOrder()->limit((int) $this->option('n'))->get();
+        if (! $hub || $devices->isEmpty()) {
+            $this->warn('No demo hub or hardware-fed equipment (run db:seed --class=CallConsoleDemoSeeder).');
+
+            return;
+        }
+        $report = $devices->map(fn ($d) => ['code' => $d->code, 'state' => match (true) {
+            $d->is_critical && $d->state === 'fault' => 'on',
+            mt_rand(1, 25) === 1 => 'fault',
+            default => $d->state === 'on' ? 'off' : 'on',
+        }])->all();
+        // Everything else the hub knows reports in too (keeps them from showing "No signal").
+        $rest = \App\Models\Facility\FacilityDevice::active()->where('source', 'hub')->whereNotIn('id', $devices->pluck('id'))
+            ->get()->map(fn ($d) => ['code' => $d->code, 'state' => $d->state])->all();
+        $r = $facility->report($hub, array_merge($report, $rest));
+        $this->info(now()->format('H:i:s') . " — {$r['changed']} changed, {$r['updated']} reported");
+        if ($this->option('loop')) {
+            sleep(20);
+        }
+    } while ($this->option('loop'));
+}))->purpose('Demo: flip a few equipment states as hardware would');

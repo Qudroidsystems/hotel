@@ -55,6 +55,7 @@ IT control room…) are built on top of it.
 | Two-step sign-in | `Auth\TwoFactorController` (`/two-factor`: set up with any authenticator app by QR code or key, 8 one-off recovery codes, move to a new phone, turn off), `Auth\TwoFactorChallengeController` (the code step after the password, website), staff app login takes a `code` field (`two_factor_required` / `two_factor_invalid` / `two_factor_setup_required`), `Security\TwoFactorAdminController` (`/security/two-step`: who uses it, reset with a reason; permission `Update user`). Roles in `HOTEL_2FA_ROLES` (default Super Admin, Hotel Owner, General Manager) must set it up before using anything else. Codes are RFC 6238 (`App\Support\Auth\Totp`), each accepted once; the key and recovery codes are stored encrypted. Locked out with no phone and no codes: `php artisan hotel:2fa-reset email@or-username`. |
 | Department tasks | `Operations\TaskController` (`/tasks`: give a task to a department or a person with priority, due time, room or place, photos and documents, and an optional supervisor check; everyone sees *My tasks* and *My department*, anyone in the department can take an unassigned task; start, mark done with notes and photos; the giver, the department's manager or `Manage tasks` checks it — never the person who did it — or sends it back; history of every change). `App\Services\Operations\TaskService`. `tasks:escalate` (every 15 minutes): when a task passes its due time the person (or department) and the department manager are reminded; if it is still not done after 1 h (urgent), 2 h (high), 4 h (normal) or a day (low), everyone with `Manage tasks` is told and it is flagged on the audit trail. Department managers are set on the departments page. Permissions: `Give tasks`, `View all tasks`, `Manage tasks`. |
 | Public website | `Website\SiteController` (the public pages at `/`), `Website\WebsiteAdminController`, `WebsiteContentController`, `WebsiteEnquiryController` (Website in the sidebar), `App\Support\Website` (settings and colour schemes), `App\Models\Website\*`, `App\Services\Website\WebsiteService`, `resources/views/site/*`, `resources/views/website/admin/*`, `public/site/*`. See **Public website** below. |
+| Internet & guest Wi-Fi | `It\NetworkController` (`/it/network`, IT Support → Internet & Wi-Fi: every internet line — Starlink dishes, fibre, 4G — with live speed, delay, signal, sky obstruction, packet loss, 24-hour history and data used against its monthly allowance; guest Wi-Fi speed plans; Wi-Fi codes for guests, visitors and events with a printable slip; change or cut off a code), `App\Services\Network\NetworkService`, `App\Models\Network\*`. Every checked-in guest gets a code on the plan marked *At check-in*; it ends at check-out time plus `HOTEL_WIFI_GRACE_MINUTES` and shows on the guest's booking page and in the guest app (`wifi` in the stay JSON). Paid plans are added to the room bill per day. A line that drops opens an IT alert and closes it when back. `network:poll` (every minute) reads the lines and codes; `network:prune` keeps `HOTEL_NETWORK_RETENTION_DAYS` of readings. The router is reached through a driver (`App\Services\Network\Gateways\Gateway`; `HOTEL_NETWORK_DRIVER=demo` for made-up readings, `manual` for none). `GET /it/network/summary` (and `NetworkService::consoleSummary()`) give the lines' state as JSON for dashboards. Demo: `php artisan db:seed --class=NetworkDemoSeeder`. Permissions: `View network`, `Manage network`, `Give Wi-Fi codes`. |
 | Seeders | `PermissionTableSeeder` (core permissions), `RoleTableSeeder` (the 13 hotel roles from the spec), `UserTableSeeder` (first Super Admin) |
 
 The **Super Admin** role passes every permission check (`AppServiceProvider`)
@@ -86,6 +87,24 @@ goes to the sign-in page again.
 - Guest app: `GET /api/v1/guest/website` gives the same content for the app's home screen;
   `POST /api/v1/guest/website/enquiries` and `/subscribe` take its forms.
 - Sample content: `php artisan db:seed --class=WebsiteDemoSeeder` (uses the admin theme's pictures).
+
+## Call console (IT Control Room → Call console)
+
+A cockpit-style screen for IT and security operators: every guest call ringing or on, with sound waves and a
+timer; **Pick up** for calls nobody answers (choose a headset under the ⚙ button); **Transfer** to a person or a
+section (the guest hears it ring and reconnects to whoever answers); **Listen** (permission *Listen to guest calls*:
+a reason is asked, every listen and every voice message played is in the audit trail, the person on the call sees
+it, and callers are told at the start of each call — `HOTEL_CALL_MONITORING`, `HOTEL_CALL_MONITORING_NOTICE`).
+Listening works when the hotel side answered on the website (its browser sends the sound); not from the staff app.
+It also shows voice messages, network strength (IT monitors, plus Network/Starlink lines when installed), the
+weather, warning lights, and the on/off board of every room's and area's equipment.
+
+Equipment is listed under **Room & Area Equipment** ("Add the usual to every room" adds A/C, lights, TV, minibar,
+water heater and door lock). Hardware can report states itself: create a hub key there, then the hub sends
+`POST /api/v1/facility/report` with `Authorization: Bearer <key>` and
+`{"devices":[{"code":"R101-AC","state":"on","reading":"22°C"}]}` (on/off/fault, or 1/0, running/stopped, alarm)
+at least every 15 minutes; `GET /api/v1/facility/devices` lists the codes. Demo: `php artisan db:seed
+--class=CallConsoleDemoSeeder`, then `php artisan facility:simulate --loop`.
 
 ## Adding a module
 

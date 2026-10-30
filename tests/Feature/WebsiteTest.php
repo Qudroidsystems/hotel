@@ -185,3 +185,57 @@ test('each hotel has its own website content', function () {
     $this->get('/offers?hotel=river-house')->assertOk()->assertSee('River offer only');
     $this->get('/?hotel=river-house')->assertSee('The river house welcome');
 });
+
+test('a manager uploads the apps and sets store links; guests download them from the website', function () {
+    // Nothing set yet: no app section, no app page.
+    $this->get('/')->assertOk()->assertDontSee('Get our app');
+    $this->get('/app')->assertNotFound();
+
+    // A file that is not an Android app is refused.
+    $this->actingAs($this->gm)->post(route('website.settings.save', 'apps'), [
+        'apps__show' => '1', 'apps__guest__apk' => UploadedFile::fake()->create('menu.pdf', 20, 'application/pdf'),
+    ])->assertSessionHasErrors('apps__guest__apk');
+
+    $this->post(route('website.settings.save', 'apps'), [
+        'apps__show' => '1', 'apps__title' => 'Take us with you',
+        'apps__guest__play' => 'https://play.google.com/store/apps/details?id=com.example.guest',
+        'apps__guest__ios' => 'https://apps.apple.com/app/id123456',
+        'apps__guest__apk' => UploadedFile::fake()->create('guest-release.apk', 300, 'application/vnd.android.package-archive'),
+        'apps__guest__version' => '1.4.0',
+        'apps__staff__apk' => UploadedFile::fake()->create('staff.apk', 100),
+    ])->assertSessionHasNoErrors()->assertRedirect(route('website.settings', 'apps'));
+
+    $guest = Website::get('apps.guest.apk');
+    expect($guest['name'])->toBe('guest-release.apk')->and(is_file(storage_path('app/' . $guest['path'])))->toBeTrue()
+        ->and(str_starts_with(Website::get('apps.staff.apk')['path'], 'website-apps/'))->toBeTrue();
+    $this->get(route('website.settings', 'apps'))->assertOk()->assertSee('guest-release.apk');
+
+    auth()->logout();
+    $this->get('/')->assertOk()->assertSee('Take us with you')->assertSee('https://apps.apple.com/app/id123456', false)
+        ->assertSee(route('site.app.download', 'guest'), false)->assertSee(route('site.app'), false);
+    $this->get('/app')->assertOk()->assertSee('Google Play')->assertSee('version 1.4.0')->assertDontSee('Staff app');
+
+    $res = $this->get(route('site.app.download', 'guest'))->assertOk()->assertHeader('Content-Type', 'application/vnd.android.package-archive');
+    expect($res->headers->get('Content-Disposition'))->toContain('-guest-1.4.0.apk');
+
+    // The staff app stays hidden until it is switched on.
+    $this->get(route('site.app.download', 'staff'))->assertNotFound();
+    Website::save(['apps.staff.show' => true]);
+    $this->get('/app')->assertSee('Staff app');
+    $this->get(route('site.app.download', 'staff'))->assertOk();
+
+    // Removing the file deletes it; the store links stay.
+    $this->actingAs($this->gm)->post(route('website.settings.save', 'apps'), [
+        'apps__show' => '1', 'apps__guest__play' => 'https://play.google.com/store/apps/details?id=com.example.guest', 'apps__guest__apk__remove' => '1',
+    ])->assertSessionHasNoErrors();
+    expect(is_file(storage_path('app/' . $guest['path'])))->toBeFalse();
+    $this->get(route('site.app.download', 'guest'))->assertNotFound();
+    $this->get('/app')->assertOk()->assertSee('Google Play');
+
+    // Front desk cannot change the apps.
+    $this->actingAs($this->desk)->post(route('website.settings.save', 'apps'), ['apps__show' => '0'])->assertForbidden();
+
+    foreach (glob(storage_path('app/website-apps/*.apk')) ?: [] as $f) {
+        @unlink($f);
+    }
+});

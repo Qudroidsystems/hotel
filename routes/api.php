@@ -19,6 +19,12 @@ use Illuminate\Support\Facades\Route;
 | /app/config says so (staff_api: false).
 */
 
+// Hardware: a building-management system or IoT hub reports room / area equipment states with its key.
+Route::prefix('facility')->middleware('throttle:120,1')->controller(\App\Http\Controllers\Api\V1\FacilityReportController::class)->group(function () {
+    Route::post('/report', 'report');
+    Route::get('/devices', 'devices');
+});
+
 // Guests: their own booking, opened with the reference + e-mail/phone or the private link (no staff sign-in).
 Route::prefix('guest')->group(function () {
     // Chat and calls with the hotel's sections (the booking's token is the key)
@@ -57,8 +63,14 @@ Route::prefix('guest')->group(function () {
         Route::get('/website', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'show']);
         Route::get('/booking', [GuestBookingController::class, 'options']);
         Route::get('/search', [GuestBookingController::class, 'search']);
+        // Browsing without a booking, as on the website: events with tickets, the halls and when they are free
+        Route::get('/events', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'events']);
+        Route::get('/venues', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'venues']);
+        Route::get('/venues/requests', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'myRequests']);
+        Route::get('/venues/{hall}/availability', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'availability'])->whereNumber('hall');
     });
     Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
+    Route::post('/venues/requests', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'request'])->middleware('throttle:booking-actions');
     Route::post('/website/enquiries', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'enquiry'])->middleware('throttle:booking-actions');
     Route::post('/website/subscribe', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'subscribe'])->middleware('throttle:booking-actions');
     // The guest's luggage list (optional), ticked off when packing to leave
@@ -135,6 +147,9 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         Route::post('/calls/{uuid}/answer', 'answer')->whereUuid('uuid');
         Route::post('/calls/{uuid}/signal', 'signal')->whereUuid('uuid');
         Route::post('/calls/{uuid}/end', 'end')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/transfer', 'transfer')->whereUuid('uuid');
+        Route::get('/calls/{uuid}/targets', 'targets')->whereUuid('uuid');
+        Route::post('/calls/{uuid}/tap/{listen}', 'tap')->whereUuid('uuid')->whereNumber('listen');
     });
     Route::get('/report/options', [WorkController::class, 'reportOptions']);
     Route::post('/report', [WorkController::class, 'report']);

@@ -219,12 +219,14 @@ class StaffAlerts
             return;   // before `php artisan migrate`, or nobody to tell
         }
         // A record saved twice in one go (number filled in afterwards ...) alerts once.
-        static $sent = [];
+        // (Kept on the app container, not in a static, so it lasts one request / job and never leaks into the next.)
+        $sent = app()->bound('staff-alerts.sent') ? app('staff-alerts.sent') : [];
         $once = ($data['thread'] ?? '') . '|' . $data['title'] . '|' . $users->pluck('id')->implode(',');
         if (isset($sent[$once])) {
             return;
         }
         $sent[$once] = true;
+        app()->instance('staff-alerts.sent', $sent);
         try {
             Notification::send($users, new StaffAlert($data));
         } catch (\Throwable $e) {
