@@ -29,6 +29,12 @@
         <div class="notice warn"><i class="ri-time-line"></i><div>We’re holding your room until <strong>{{ $r->hold_expires_at->format('D j M, g:i A') }}</strong>. Pay the {{ $m($depositDue) }} deposit before then to confirm it — otherwise the room is released.</div></div>
     @endif
 
+    @if ($feedback['can_rate'])
+        <a class="notice ok fb-nudge" href="{{ route('stay.feedback', $r->guest_token) }}"><i class="ri-star-smile-line"></i><div>{{ $feedback['note'] }} <strong>Rate my stay</strong></div></a>
+    @elseif ($feedback['given'])
+        <div class="notice ok"><i class="ri-star-fill"></i><div>Thank you for rating your stay {{ $feedback['given']['overall'] }} of 5. <a href="{{ route('stay.feedback', $r->guest_token) }}">See what you sent</a></div></div>
+    @endif
+
     @if ($luggage['check_now'])
         <a class="notice warn luggage-nudge" href="#luggage"><i class="ri-suitcase-3-line"></i><div>{{ $luggage['note'] }} <strong>Open my luggage list</strong></div></a>
     @endif
@@ -331,7 +337,7 @@
     .order-cta > i { font-size: 28px; color: var(--lagoon); }
     .order-cta h2 { margin: 0; } .order-cta p { margin: 2px 0 0; }
     .keep { margin-top: 26px; }
-    .luggage-nudge { text-decoration: none; color: inherit; }
+    .luggage-nudge, .fb-nudge { text-decoration: none; color: inherit; }
     .luggage.due { border-color: #f2b84b; box-shadow: 0 0 0 3px rgba(242,184,75,.18); }
     .wifi h2 i { color: var(--lagoon); }
     .wifi-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 6px 0 8px; }

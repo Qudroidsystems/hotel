@@ -83,6 +83,26 @@ class GuestStayController extends ApiController
         ]);
     }
 
+    /** GET /guest/stays/{token}/feedback — whether the guest can rate this stay, the parts to score, and what they said. */
+    public function feedbackForm(string $token, \App\Services\Booking\FeedbackService $feedback)
+    {
+        return $this->ok($feedback->forGuest($this->reservation($token)));
+    }
+
+    /** POST /guest/stays/{token}/feedback  {overall: 1–5, ratings: {room, cleanliness, staff, food, value}, recommend: 0–10, comment, contact_ok, may_quote} */
+    public function feedback(Request $request, string $token, \App\Services\Booking\FeedbackService $feedback)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(\App\Http\Controllers\Booking\StayFeedbackController::rules());
+        try {
+            $feedback->submit($r, $data, 'app');
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($feedback->forGuest($r), 'Thank you! Your feedback has been sent to our managers.', status: 201);
+    }
+
     /** GET /guest/stays/{token}/events — events at the hotel with tickets on sale, and the guest's tickets. */
     public function events(string $token, \App\Services\Events\TicketService $tickets)
     {
@@ -366,6 +386,7 @@ class GuestStayController extends ApiController
             'orders'       => $orderSvc->forGuest($r),
             'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)
             'wifi'         => app(\App\Services\Network\NetworkService::class)->forGuest($r),   // the guest's Wi-Fi code while checked in, else null
+            'feedback'     => app(\App\Services\Booking\FeedbackService::class)->forGuest($r),   // rating the stay after check-out (…/feedback to send it)
             'requests'     => $r->guestRequests->map(fn (GuestRequest $q) => [
                 'id'           => $q->id,
                 'type'         => $q->type,

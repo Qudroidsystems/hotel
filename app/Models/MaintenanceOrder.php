@@ -66,6 +66,11 @@ class MaintenanceOrder extends Model
         return $this->belongsTo(User::class, 'reported_by');
     }
 
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(MaintenancePlan::class, 'maintenance_plan_id');
+    }
+
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by');

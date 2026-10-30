@@ -100,12 +100,14 @@ class HotelSettings
                     'messaging.send_thank_you'       => ['type' => 'bool', 'label' => 'After check-out (thank you, with their points)'],
                     'messaging.send_request_updates' => ['type' => 'bool', 'label' => 'When staff answer a guest request'],
                     'messaging.send_luggage_reminder' => ['type' => 'bool', 'label' => 'On check-out day, when the guest\'s luggage list isn\'t all ticked off'],
+                    'messaging.send_feedback_request' => ['type' => 'bool', 'label' => 'A few hours after check-out, the link to rate their stay'],
                     'messaging.templates.booking_confirmed' => ['type' => 'textarea', 'label' => 'Booking confirmed', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Words in {braces} are filled in: {first_name} {guest} {hotel} {reference} {check_in} {check_out} {nights} {link} {amount} {points} {phone}.'],
                     'messaging.templates.payment_link'      => ['type' => 'textarea', 'label' => 'Deposit needed', 'rules' => ['required', 'string', 'max:640']],
                     'messaging.templates.arrival_reminder'  => ['type' => 'textarea', 'label' => 'Arrival reminder', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Also {check_in_time}.'],
                     'messaging.templates.thank_you'         => ['type' => 'textarea', 'label' => 'Thank you after check-out', 'rules' => ['required', 'string', 'max:640']],
                     'messaging.templates.request_update'    => ['type' => 'textarea', 'label' => 'Guest request answered', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Also {request}, {status} and {note}.'],
                     'messaging.templates.luggage_reminder'  => ['type' => 'textarea', 'label' => 'Luggage reminder on check-out day', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Also {items} (how many are not ticked off) and {check_out_time}.'],
+                    'messaging.templates.feedback_request'  => ['type' => 'textarea', 'label' => 'Feedback request after check-out', 'rules' => ['required', 'string', 'max:640'], 'help' => 'Put {survey} where the link to the survey goes.'],
                 ],
             ],
             'loyalty' => [
@@ -243,6 +245,27 @@ class HotelSettings
                     'call_console.monitoring_notice'    => ['type' => 'text', 'label' => 'What callers are told at the start of each call', 'rules' => ['required', 'string', 'max:200'], 'help' => 'Shown on the guest’s call screen while listening in is on.'],
                     'call_console.escalate_after'       => ['type' => 'int', 'label' => 'Alarm on the console when a call is not picked up after (seconds)', 'min' => 5, 'max' => 40],
                     'call_console.device_stale_minutes' => ['type' => 'int', 'label' => 'Show “No signal” when hardware has not reported for (minutes)', 'min' => 2, 'max' => 240],
+                ],
+            ],
+            'feedback' => [
+                'title' => 'Guest Feedback', 'icon' => 'ri-star-smile-line',
+                'intro' => 'The short survey guests get after they check out (Front Desk → Guest Feedback). The text it is sent with is under Guest Messages.',
+                'fields' => [
+                    'feedback.enabled'            => ['type' => 'bool', 'label' => 'Ask guests to rate their stay'],
+                    'feedback.invite'             => ['type' => 'bool', 'label' => 'Send the survey link by text and e-mail after check-out', 'help' => 'Guests can also rate their stay from their booking page and the app.'],
+                    'feedback.invite_after_hours' => ['type' => 'int', 'label' => 'Send it this many hours after check-out', 'min' => 0, 'max' => 48],
+                    'feedback.window_days'        => ['type' => 'int', 'label' => 'Keep the survey open for (days)', 'min' => 1, 'max' => 180],
+                    'feedback.alert_below'        => ['type' => 'int', 'label' => 'Alert the managers at this many stars or fewer', 'min' => 1, 'max' => 4],
+                    'feedback.review_url'         => ['type' => 'text', 'label' => 'Your review page (Google, TripAdvisor…)', 'rules' => ['nullable', 'url', 'max:500'], 'help' => 'Offered to guests who gave 4 or 5 stars. Leave empty to not ask.'],
+                ],
+            ],
+            'reports' => [
+                'title' => 'Report E-mails', 'icon' => 'ri-mail-send-line',
+                'intro' => 'The management report sent by e-mail: last week every Monday, last month on the 1st. The daily report goes with the night audit (Night Audit settings).',
+                'fields' => [
+                    'reports.weekly_emails'  => ['type' => 'email_list', 'label' => 'Send the weekly report to', 'help' => 'One address per line.', 'max_items' => 10],
+                    'reports.monthly_emails' => ['type' => 'email_list', 'label' => 'Send the monthly report to', 'help' => 'One address per line.', 'max_items' => 10],
+                    'reports.send_at'        => ['type' => 'text', 'label' => 'Send at', 'rules' => ['required', 'date_format:H:i']],
                 ],
             ],
             'security' => [

@@ -105,6 +105,32 @@ return [
     ],
 
     /*
+    | Guest feedback after check-out (Front Desk → Guest Feedback). The survey
+    | link goes out invite_after_hours after check-out and stays open for
+    | window_days. A score at or below alert_below (of 5) alerts the managers.
+    | Happy guests (4–5 stars) are offered review_url (Google, TripAdvisor…).
+    */
+    'feedback' => [
+        'enabled'            => true,
+        'invite'             => true,
+        'invite_after_hours' => 3,
+        'window_days'        => 30,
+        'alert_below'        => 2,
+        'review_url'         => env('HOTEL_REVIEW_URL'),
+    ],
+
+    /*
+    | Report e-mails: the management report for last week (Mondays) and last
+    | month (on the 1st), sent at send_at. The daily figures go out with the
+    | night audit (night_audit.report_emails).
+    */
+    'reports' => [
+        'weekly_emails'  => [],
+        'monthly_emails' => [],
+        'send_at'        => '07:00',
+    ],
+
+    /*
     | Stock analysis (advanced inventory reports): average usage is taken over
     | usage_days; suggested orders cover cover_days of usage; an item with no
     | use for slow_moving_days is called slow-moving.
@@ -179,6 +205,7 @@ return [
         'send_thank_you'    => true,
         'send_request_updates' => false,
         'send_luggage_reminder' => true,
+        'send_feedback_request' => true,
         'templates' => [
             'booking_confirmed' => 'Hi {first_name}, your stay at {hotel} is confirmed: {check_in} to {check_out}, ref {reference}. Your booking page: {link}',
             'payment_link'      => 'Hi {first_name}, we are holding your room at {hotel} ({check_in}, ref {reference}). Pay the {amount} deposit to confirm: {link}',
@@ -186,6 +213,7 @@ return [
             'thank_you'         => 'Thank you for staying at {hotel}, {first_name}. You have {points} loyalty points. We hope to see you again soon.',
             'request_update'    => '{hotel}: {request} — {status}. {note}',
             'luggage_reminder'  => 'Hi {first_name}, you check out of {hotel} today by {check_out_time}. Before you go, check your luggage list ({items} item(s) not ticked off yet) so nothing is left behind: {link}',
+            'feedback_request'  => 'Thank you for staying at {hotel}, {first_name}. How was it? Tell us in a minute: {survey}',
         ],
     ],
 

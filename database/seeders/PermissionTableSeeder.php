@@ -51,6 +51,10 @@ class PermissionTableSeeder extends Seeder
             'Report maintenance issues',
             'Manage maintenance',
         ],
+        'Guest Feedback' => [
+            'View guest feedback',
+            'Handle guest feedback',
+        ],
         'Security' => [
             'View visitors',
             'Manage visitors',

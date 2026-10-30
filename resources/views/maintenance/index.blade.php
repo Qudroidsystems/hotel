@@ -12,6 +12,7 @@
             @canany(['Report maintenance issues', 'Manage maintenance'])
                 <button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#faultModal"><i class="ri-add-line"></i> Report a fault</button>
             @endcanany
+            @if ($seeAll)<a class="cb-hero-btn" href="{{ route('maintenance.plans.index') }}"><i class="ri-calendar-schedule-line"></i> Servicing plans</a>@endif
             @if ($seeAll)<a class="cb-hero-btn" href="{{ route('maintenance.index', ['mine' => $mine ? 0 : 1] + $q) }}"><i class="ri-user-line"></i> {{ $mine ? 'Everyone' : 'My jobs' }}</a>@endif
         </x-slot:actions>
     </x-cb.hero>

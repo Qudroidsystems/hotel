@@ -108,6 +108,11 @@ class Reservation extends Model
         return $this->hasMany(\App\Models\Booking\LuggageItem::class)->orderBy('position')->orderBy('id');
     }
 
+    public function feedback(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\Booking\GuestFeedback::class);
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(ReservationEvent::class)->latest('created_at')->latest('id');

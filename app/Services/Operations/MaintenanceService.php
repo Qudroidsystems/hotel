@@ -91,6 +91,9 @@ class MaintenanceService
             Audit::record('rooms.fault_fixed', "Completed {$order->number} at {$order->where}: {$order->title}" . ($cost ? ' (cost ' . config('hotel.currency_symbol') . number_format($cost, 2) . ')' : ''),
                 $order->room, new: ['work_order' => $order->number, 'cost' => $cost], reason: $note, by: $by);
             $this->releaseRoom($order, 'Repair finished');
+            if ($order->maintenance_plan_id) {
+                app(MaintenancePlanService::class)->jobClosed($order);   // servicing plans: set the next due date
+            }
         });
     }
 
@@ -101,6 +104,9 @@ class MaintenanceService
             $order->forceFill(['status' => MaintenanceOrder::CANCELLED, 'cancel_reason' => $reason])->save();
             Audit::record('rooms.fault_cancelled', "Cancelled {$order->number}: {$order->title}", $order->room, reason: $reason);
             $this->releaseRoom($order, 'Work order cancelled');
+            if ($order->maintenance_plan_id) {
+                app(MaintenancePlanService::class)->jobClosed($order);   // servicing plans: set the next due date
+            }
         });
     }
 

@@ -704,6 +704,7 @@
                                     @endcanany
                                     @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])
                                         <li class="nav-item"><a href="{{ route('maintenance.index') }}" class="nav-link">Maintenance Jobs</a></li>
+                                        @canany(['View maintenance', 'Manage maintenance'])<li class="nav-item"><a href="{{ route('maintenance.plans.index') }}" class="nav-link">Servicing Plans</a></li>@endcanany
                                     @endcanany
                                 </ul>
                             </div>
@@ -803,6 +804,15 @@
                             </a>
                         </li>
                     @endcan
+                    @canany(['View guest feedback', 'Handle guest feedback'])
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="{{ route('feedback.index') }}">
+                                <i class="ri-star-smile-line"></i> <span>Guest Feedback</span>
+                                @php $feedbackOpen = \Illuminate\Support\Facades\Schema::hasTable('guest_feedback') ? \App\Models\Booking\GuestFeedback::where('status', 'follow_up')->count() : 0; @endphp
+                                @if ($feedbackOpen)<span class="badge bg-danger ms-auto">{{ $feedbackOpen }}</span>@endif
+                            </a>
+                        </li>
+                    @endcanany
                     {{-- Staff App: the phone version for everyone --}}
                     <li class="nav-item">
                         <a class="nav-link menu-link" href="{{ route('staff.home') }}">
@@ -1605,6 +1615,8 @@
         @endcanany
         @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])
         {title:'Maintenance Jobs',                      url:'{{ route("maintenance.index") }}',                              icon:'mdi-wrench',                  category:'Rooms',               keywords:['maintenance','repair','fault','work order','ac','plumbing','broken','technician']},
+        {title:'Servicing Plans',                       url:'{{ route("maintenance.plans.index") }}',                        icon:'mdi-calendar-sync',           category:'Rooms',               keywords:['preventive','maintenance','servicing','schedule','generator','ac service','recurring']},
+        {title:'Guest Feedback',                        url:'{{ route("feedback.index") }}',                                 icon:'mdi-star-face',               category:'Front Desk',          keywords:['feedback','survey','rating','review','stars','nps','complaint','satisfaction']},
         @endcanany
         @can('View visitors')
         {title:'Visitors',                              url:'{{ route("visitors.index") }}',                                 icon:'mdi-badge-account',           category:'Security',            keywords:['visitor','sign in','gate','pass','guest visitor','contractor','delivery','badge']},

@@ -54,6 +54,7 @@ Route::prefix('guest')->group(function () {
         Route::get('/stays/{token}/menu', [GuestStayController::class, 'menu']);
         Route::get('/stays/{token}/rides', [GuestStayController::class, 'rides']);
         Route::get('/stays/{token}/events', [GuestStayController::class, 'events']);
+        Route::get('/stays/{token}/feedback', [GuestStayController::class, 'feedbackForm']);
         Route::get('/stays/{token}/weather', [GuestStayController::class, 'weather']);
         Route::get('/stays/{token}/places', [GuestStayController::class, 'places']);
         Route::get('/stays/{token}/places/{id}', [GuestStayController::class, 'place'])->where('id', '[A-Za-z0-9_-]{10,300}');
@@ -90,6 +91,7 @@ Route::prefix('guest')->group(function () {
         Route::post('/stays/{token}/cancel', [GuestStayController::class, 'cancel']);
         Route::post('/stays/{token}/orders', [GuestStayController::class, 'order']);
         Route::post('/stays/{token}/tickets', [GuestStayController::class, 'buyTickets']);
+        Route::post('/stays/{token}/feedback', [GuestStayController::class, 'feedback']);
         Route::post('/stays/{token}/rides', [GuestStayController::class, 'bookRide']);
         Route::post('/stays/{token}/rides/{ride}/cancel', [GuestStayController::class, 'cancelRide'])->whereNumber('ride');
         Route::post('/stays/{token}/orders/{order}/cancel', [GuestStayController::class, 'cancelOrder'])->whereNumber('order');

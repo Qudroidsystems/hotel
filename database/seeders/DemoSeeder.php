@@ -31,6 +31,7 @@ class DemoSeeder extends Seeder
             TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
             WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
             NetworkDemoSeeder::class,       // Starlink dishes, guest Wi-Fi plans and codes
+            FeedbackPlansDemoSeeder::class, // guest feedback after check-out, servicing plans
         ]);
     }
 }

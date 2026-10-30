@@ -130,6 +130,23 @@ Artisan::command('luggage:checkout-reminders', $eachHotel(function (\App\Service
     $this->info($luggage->sendReminders() . ' luggage reminder(s) sent.');
 }))->purpose('Remind guests leaving today to check their luggage list');
 
+// Guest feedback: a few hours after check-out, send the guest the link to rate their stay (once).
+Artisan::command('feedback:invite', $eachHotel(function (\App\Services\Booking\FeedbackService $feedback) {
+    $this->info($feedback->sendInvites() . ' feedback request(s) sent.');
+}))->purpose('Ask guests who checked out a few hours ago to rate their stay');
+
+// Servicing plans: open the work orders of planned servicing that is coming due.
+Artisan::command('maintenance:plans', $eachHotel(function (\App\Services\Operations\MaintenancePlanService $plans) {
+    $this->info($plans->openDue() . ' servicing job(s) opened.');
+}))->purpose('Open work orders for preventive maintenance coming due');
+
+// The management report by e-mail: last week (Mondays) or last month (the 1st).
+Artisan::command('reports:email {period=week : week or month}', $eachHotel(function (\App\Services\Reports\ReportEmails $emails) {
+    $period = $this->argument('period') === 'month' ? 'month' : 'week';
+    $n = $emails->send($period);
+    $this->info($n ? "The {$period}ly report went to {$n} address(es)." : "Nobody to send the {$period}ly report to (Hotel Settings → Report E-mails).");
+}))->purpose('E-mail the weekly or monthly management report');
+
 // Night audit: remind staff when a finished day hasn't been closed, and close it by itself when that is switched on.
 Artisan::command('night-audit:auto', $eachHotel(function (\App\Services\NightAudit\NightAuditService $audits) {
     $closed = 0;
@@ -199,6 +216,10 @@ Schedule::command('folios:night-audit')->dailyAt('02:00');
 Schedule::command('security:prune-visitors')->dailyAt('03:00');
 Schedule::command('loyalty:sync')->dailyAt('04:00')->withoutOverlapping();
 Schedule::command('luggage:checkout-reminders')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('feedback:invite')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('maintenance:plans')->hourly()->withoutOverlapping();
+Schedule::command('reports:email week')->weeklyOn(1, (string) config('hotel.reports.send_at', '07:00'));
+Schedule::command('reports:email month')->monthlyOn(1, (string) config('hotel.reports.send_at', '07:00'));
 Schedule::command('messages:arrival-reminders')->dailyAt((string) config('hotel.messaging.reminder_time', '10:00'))->withoutOverlapping();
 
 // Call console demo: the demo hardware hub flips a few equipment states (php artisan facility:simulate --loop).

@@ -14,6 +14,7 @@
             <span class="cb-meta-pill">{{ $order->status_label }}</span>
             <span class="cb-meta-pill">{{ $order->priority_label }} priority</span>
             @if ($order->blocks_room)<span class="cb-meta-pill">Room off sale</span>@endif
+            @if ($order->maintenance_plan_id)<a class="cb-meta-pill text-reset" href="{{ route('maintenance.plans.index') }}"><i class="ri-calendar-schedule-line"></i> Planned servicing</a>@endif
         </x-slot:pills>
     </x-cb.hero>
 

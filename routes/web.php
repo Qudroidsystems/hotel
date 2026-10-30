@@ -137,6 +137,9 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::get('/stay/{token}/order', [GuestPortalController::class, 'order'])->name('stay.order');
     Route::post('/stay/{token}/order', [GuestPortalController::class, 'placeOrder'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.place');
     Route::post('/stay/{token}/orders/{order}/cancel', [GuestPortalController::class, 'cancelOrder'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.cancel');
+    // Rating the stay after check-out (the link texted and e-mailed to the guest)
+    Route::get('/stay/{token}/feedback', [\App\Http\Controllers\Booking\StayFeedbackController::class, 'show'])->name('stay.feedback');
+    Route::post('/stay/{token}/feedback', [\App\Http\Controllers\Booking\StayFeedbackController::class, 'store'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.feedback.store');
     // The QR card in each room: the guest confirms their surname once, then orders / opens their booking.
     Route::get('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'show'])->name('room.card');
     Route::post('/room/{code}', [\App\Http\Controllers\Booking\RoomCardController::class, 'verify'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('room.card.verify');
@@ -274,6 +277,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/tasks/{task}/finish', 'finish')->name('finish');
         Route::post('/tasks/{task}/inspect', 'inspect')->name('inspect');
         Route::post('/tasks/{task}/cancel', 'cancel')->name('cancel');
+    });
+    // Preventive maintenance: servicing that repeats (a work order opens a few days before each due date)
+    Route::prefix('maintenance/plans')->name('maintenance.plans.')->controller(\App\Http\Controllers\Operations\MaintenancePlanController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{plan}', 'update')->name('update');
+        Route::post('/{plan}/toggle', 'toggle')->name('toggle');
+        Route::post('/{plan}/now', 'now')->name('now');
+        Route::delete('/{plan}', 'destroy')->name('destroy');
+    });
+    // Guest feedback after check-out
+    Route::prefix('feedback')->name('feedback.')->controller(\App\Http\Controllers\Booking\GuestFeedbackController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{feedback}', 'show')->name('show');
+        Route::post('/{feedback}/handle', 'handle')->name('handle');
+        Route::post('/{feedback}/publish', 'publish')->name('publish');
     });
     Route::prefix('maintenance')->name('maintenance.')->controller(MaintenanceController::class)->group(function () {
         Route::get('/', 'index')->name('index');

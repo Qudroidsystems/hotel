@@ -29,6 +29,7 @@ class GuestMessage extends Model
         'arrival_reminder'  => 'Arrival reminder',
         'thank_you'         => 'Thank you',
         'luggage_reminder'  => 'Luggage reminder',
+        'feedback_request'  => 'Feedback request',
         'request_update'    => 'Request update',
         'manual'            => 'Written by staff',
         'reply'             => 'Guest reply',
