@@ -158,6 +158,21 @@ class BookingController extends Controller
         }
         $event = $request->json('event');
         $reference = (string) $request->json('data.reference');
+        // Event tickets bought online (references start with TK).
+        if (str_starts_with($reference, 'TK') && ($order = \App\Models\Events\EventTicketOrder::withoutGlobalScope('hotel')->where('gateway_reference', $reference)->first())) {
+            \App\Support\Tenancy\CurrentHotel::get()->adopt($order);
+            if ($event === 'charge.success') {
+                try {
+                    app(\App\Services\Events\TicketService::class)->settle($reference);
+                } catch (Throwable $e) {
+                    Log::error("Paystack webhook: tickets {$reference}: " . $e->getMessage());
+
+                    return response()->json(['ok' => false], 500);   // Paystack retries
+                }
+            }
+
+            return response()->json(['ok' => true]);
+        }
         $known = OnlinePayment::withoutGlobalScope('hotel')->where('reference', $reference)->first();
         \App\Support\Tenancy\CurrentHotel::get()->adopt($known);
         if ($event === 'charge.success' && $known) {

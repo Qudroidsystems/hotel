@@ -81,6 +81,9 @@ Route::middleware(['throttle:booking-pages', \App\Http\Middleware\WebsiteOn::cla
     Route::get('/about', 'about')->name('about');
     Route::get('/contact', 'contact')->name('contact');
     Route::get('/page/{slug}', 'page')->name('page');
+    // Get our app: store links, and the Android file to download
+    Route::get('/app', 'app')->name('app');
+    Route::get('/app/download/{app}', 'download')->whereIn('app', ['guest', 'staff'])->name('app.download');
     Route::post('/contact', 'send')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('send');
     Route::post('/newsletter', 'subscribe')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('subscribe');
 });
@@ -129,7 +132,14 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
     Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
+    Route::get('/tickets/paystack/callback', [\App\Http\Controllers\Events\TicketShopController::class, 'callback'])->name('tickets.callback');
     Route::get('/tickets/{code}', [\App\Http\Controllers\Events\TicketController::class, 'public'])->name('tickets.public');
+    // Tickets for anyone: an event's ticket page, buying online, and the buyer's page with their QR codes
+    Route::get('/events/{event}/tickets', [\App\Http\Controllers\Events\TicketShopController::class, 'show'])->whereNumber('event')->name('tickets.shop');
+    Route::post('/events/{event}/tickets/quote', [\App\Http\Controllers\Events\TicketShopController::class, 'quote'])->whereNumber('event')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:60,1')->name('tickets.quote');
+    Route::post('/events/{event}/tickets', [\App\Http\Controllers\Events\TicketShopController::class, 'buy'])->whereNumber('event')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('tickets.buy');
+    Route::get('/my-tickets/{token}', [\App\Http\Controllers\Events\TicketShopController::class, 'mine'])->where('token', '[A-Za-z0-9]{48}')->name('tickets.mine');
+    Route::get('/my-tickets/{token}/pay', [\App\Http\Controllers\Events\TicketShopController::class, 'pay'])->where('token', '[A-Za-z0-9]{48}')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('tickets.pay');
     Route::get('/stay/{token}/weather', [GuestPortalController::class, 'weather'])->name('stay.weather');
     Route::post('/stay/{token}/arrival', [GuestPortalController::class, 'arrival'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:arrival')->name('stay.arrival');
     Route::post('/stay/{token}/rides', [GuestPortalController::class, 'bookRide'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.rides.book');
@@ -678,6 +688,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/{event}/tickets/types', 'storeType')->name('types.store');
             Route::put('/{event}/tickets/types/{type}', 'updateType')->name('types.update');
             Route::post('/{event}/tickets/sell', 'sell')->middleware('throttle:60,1')->name('sell');
+            Route::post('/{event}/tickets/promos', 'storePromo')->name('promos.store');
+            Route::post('/{event}/tickets/promos/{promo}/toggle', 'togglePromo')->name('promos.toggle');
+            Route::post('/tickets/orders/{order}/email', 'resend')->middleware('throttle:10,1')->name('email');
         });
         Route::controller(\App\Http\Controllers\Events\EventController::class)->group(function () {
             Route::get('/', 'index')->name('index');
@@ -711,6 +724,25 @@ Route::middleware('auth')->group(function () {
         Route::post('/{expense}/void', [ExpenseController::class, 'void'])->name('void');
         Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])->name('attach');
         Route::get('/{expense}/files/{index}', [ExpenseController::class, 'file'])->whereNumber('index')->name('file');
+    });
+
+    // Energy Saver (control room): what to switch off and on, which generator to run
+    Route::prefix('energy')->name('energy.')->controller(\App\Http\Controllers\Energy\EnergyController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/check', 'sync')->middleware('throttle:12,1')->name('sync');
+        Route::post('/actions/{action}/done', 'done')->whereNumber('action')->name('done');
+        Route::post('/actions/{action}/skip', 'skip')->whereNumber('action')->name('skip');
+        Route::post('/actions/done', 'doneMany')->name('done-many');
+        Route::post('/grid', 'grid')->name('grid');
+        Route::post('/sources/{source}/running', 'running')->whereNumber('source')->name('running');
+        Route::post('/sources/{source}/fuel', 'fuel')->whereNumber('source')->name('fuel');
+        Route::get('/setup', 'setup')->name('setup');
+        Route::post('/zones', 'saveZone')->name('zones.store');
+        Route::put('/zones/{zone}', 'saveZone')->whereNumber('zone')->name('zones.update');
+        Route::delete('/zones/{zone}', 'deleteZone')->whereNumber('zone')->name('zones.destroy');
+        Route::post('/sources', 'saveSource')->name('sources.store');
+        Route::put('/sources/{source}', 'saveSource')->whereNumber('source')->name('sources.update');
+        Route::delete('/sources/{source}', 'deleteSource')->whereNumber('source')->name('sources.destroy');
     });
 
     // IT control room & service desk (spec §11)

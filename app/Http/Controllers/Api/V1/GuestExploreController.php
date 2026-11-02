@@ -36,12 +36,88 @@ class GuestExploreController extends ApiController
         return $this->ok($this->site->upcomingEvents(30)->map(fn (Event $e) => [
             'id' => $e->id, 'title' => $e->title, 'type' => $e->type_label, 'hall' => $e->hall?->name, 'when' => $e->when,
             'starts_at' => $e->starts_at->toIso8601String(), 'ends_at' => $e->ends_at->toIso8601String(), 'info' => $e->ticket_info,
-            'from_label' => $e->ticketTypes->isEmpty() ? null : $money($e->ticketTypes->min('price')),
+            'from_label' => $e->ticketTypes->isEmpty() ? null : $money($e->ticketTypes->min(fn ($t) => $t->priceNow())),
+            'has_promos' => $e->ticketPromos()->where('is_active', true)->exists(),
             'ticket_types' => $e->ticketTypes->map(fn (EventTicketType $t) => [
-                'id' => $t->id, 'name' => $t->name, 'description' => $t->description, 'price' => (float) $t->price, 'price_label' => $money($t->price),
+                'id' => $t->id, 'name' => $t->name, 'description' => $t->description, 'price' => $t->priceNow(), 'price_label' => $money($t->priceNow()),
+                'full_price_label' => $t->isEarlyBird() ? $money($t->price) : null, 'early_until' => $t->isEarlyBird() ? $t->early_until->format('D j M') : null,
                 'admits' => $t->admits, 'max_per_order' => $t->max_per_order, 'left' => $t->left(), 'available' => $t->closedReason() === null, 'note' => $t->closedReason(),
             ])->values(),
-        ])->values(), meta: ['currency' => $sym]);
+        ])->values(), meta: ['currency' => $sym, 'pay_online' => app(\App\Services\Booking\PaystackService::class)->enabled()]);
+    }
+
+    /** POST /guest/events/{event}/quote {lines: [{ticket_type_id, quantity}], promo} — the price, live. */
+    public function ticketQuote(Request $request, int $event, \App\Http\Controllers\Events\TicketShopController $shop)
+    {
+        $d = $request->validate(['lines' => 'required|array|min:1|max:20', 'lines.*.ticket_type_id' => 'required|integer', 'lines.*.quantity' => 'required|integer|min:0|max:500', 'promo' => 'nullable|string|max:30']);
+        $e = Event::where('is_ticketed', true)->find($event);
+        if (! $e) {
+            return $this->fail('That event isn’t on sale.', 404);
+        }
+        try {
+            return $this->ok($shop->quoteFor($e, $this->lines($d['lines']), $d['promo'] ?? null));
+        } catch (BookingException $ex) {
+            return $this->fail($ex->getMessage());
+        }
+    }
+
+    /**
+     * POST /guest/events/{event}/orders {lines, name, email, phone, promo} — buy online. Answers the order and, unless
+     * the tickets are free, Paystack's payment page (open it in the browser; the order page shows the tickets once paid).
+     */
+    public function ticketOrder(Request $request, int $event, \App\Services\Events\TicketService $tickets)
+    {
+        $d = $request->validate([
+            'lines' => 'required|array|min:1|max:20', 'lines.*.ticket_type_id' => 'required|integer', 'lines.*.quantity' => 'required|integer|min:0|max:500',
+            'name' => 'required|string|max:120', 'email' => 'required|email|max:150', 'phone' => 'nullable|string|max:40', 'promo' => 'nullable|string|max:30',
+        ]);
+        $e = Event::where('is_ticketed', true)->find($event);
+        if (! $e) {
+            return $this->fail('That event isn’t on sale.', 404);
+        }
+        try {
+            $r = $tickets->startOnline($e, $this->lines($d['lines']), ['name' => $d['name'], 'email' => $d['email'], 'phone' => $d['phone'] ?? null], $d['promo'] ?? null, route('tickets.callback'), 'app');
+        } catch (BookingException $ex) {
+            return $this->fail($ex->getMessage());
+        }
+        Audit::record('guest.tickets_online', "Ticket order {$r['order']->number} started in the guest app", $e);
+
+        return $this->ok($this->orderJson($r['order']->fresh()) + ['pay_url' => $r['pay_url']], $r['pay_url'] ? 'Pay to get your tickets.' : 'Your tickets are ready.', status: 201);
+    }
+
+    /** GET /guest/ticket-orders/{token} — an order bought online, with its tickets once paid. */
+    public function ticketOrderShow(string $token)
+    {
+        $o = \App\Models\Events\EventTicketOrder::withoutGlobalScope('hotel')->where('token', $token)->first();
+        if (! $o) {
+            return $this->fail('Order not found.', 404);
+        }
+        \App\Support\Tenancy\CurrentHotel::get()->adopt($o);
+
+        return $this->ok($this->orderJson($o));
+    }
+
+    private function lines(array $rows): array
+    {
+        $lines = [];
+        foreach ($rows as $l) {
+            $lines[$l['ticket_type_id']] = ($lines[$l['ticket_type_id']] ?? 0) + (int) $l['quantity'];
+        }
+
+        return $lines;
+    }
+
+    private function orderJson(\App\Models\Events\EventTicketOrder $o): array
+    {
+        $o->loadMissing('event.hall', 'tickets.type');
+        $sym = config('hotel.currency_symbol');
+
+        return [
+            'token' => $o->token, 'number' => $o->number, 'status' => $o->status, 'event' => $o->event->title, 'when' => $o->event->when, 'hall' => $o->event->hall?->name,
+            'quantity' => $o->quantity, 'total_label' => (float) $o->total > 0 ? $sym . number_format((float) $o->total, 2) : 'Free',
+            'held_until' => $o->status === 'pending' ? $o->expires_at?->format('g:i A') : null, 'url' => $o->url,
+            'tickets' => $o->status === 'paid' ? $o->tickets->map(fn ($t) => ['code' => $t->code, 'type' => $t->type->name, 'status' => $t->status, 'url' => $t->url])->values() : [],
+        ];
     }
 
     /** GET /guest/venues — the halls, their layouts and rates, packages, and the kinds of event. */

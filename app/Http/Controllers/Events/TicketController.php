@@ -22,8 +22,8 @@ class TicketController extends Controller
     public function __construct(private TicketService $tickets)
     {
         $this->middleware('auth')->except('public');
-        $this->middleware('permission:Manage events', ['only' => ['configure', 'sales', 'storeType', 'updateType']]);
-        $this->middleware('permission:Sell event tickets', ['only' => ['sell', 'cancel']]);
+        $this->middleware('permission:Manage events', ['only' => ['configure', 'sales', 'storeType', 'updateType', 'storePromo', 'togglePromo']]);
+        $this->middleware('permission:Sell event tickets', ['only' => ['sell', 'cancel', 'resend']]);
         $this->middleware('permission:Sell event tickets|View events', ['only' => ['index', 'order']]);
         $this->middleware('permission:Check event tickets|Sell event tickets', ['only' => ['door', 'admit']]);
     }
@@ -84,16 +84,59 @@ class TicketController extends Controller
             'reference'       => 'nullable|string|max:100',
             'bank_account_id' => 'nullable|integer|exists:hotel_bank_accounts,id',
             'key'             => 'nullable|string|max:64',
+            'promo'           => 'nullable|string|max:30',
         ]);
         $room = $data['method'] === EventTicketOrder::ROOM ? Reservation::find($data['reservation_id']) : null;
         try {
             $order = $this->tickets->sell($event, $data['lines'], ['name' => $data['buyer_name'], 'phone' => $data['buyer_phone'] ?? null, 'email' => $data['buyer_email'] ?? null],
-                $data['method'], $data['reference'] ?? null, $data['bank_account_id'] ?? null, $room, 'desk', $data['key'] ?? null);
+                $data['method'], $data['reference'] ?? null, $data['bank_account_id'] ?? null, $room, 'desk', $data['key'] ?? null, $data['promo'] ?? null);
         } catch (BookingException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('events.tickets.order', $order)->with('success', "{$order->number}: {$order->quantity} " . str('ticket')->plural($order->quantity) . ' sold. Print them or send the links.');
+        return redirect()->route('events.tickets.order', $order)->with('success', "{$order->number}: {$order->quantity} " . str('ticket')->plural($order->quantity) . ' sold. ' . ($order->emailed_at ? "They were e-mailed to {$order->buyer_email}." : 'Print them or send the links.'));
+    }
+
+    public function storePromo(Request $request, Event $event)
+    {
+        $d = $request->validate([
+            'code' => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9_-]+$/'], 'kind' => 'required|in:percent,amount',
+            'value' => 'required|numeric|min:0.01|max:100000000', 'max_uses' => 'nullable|integer|min:1|max:1000000',
+            'starts_at' => 'nullable|date', 'ends_at' => 'nullable|date|after:starts_at',
+        ]);
+        $d['code'] = strtoupper($d['code']);
+        if ($d['kind'] === 'percent' && $d['value'] > 100) {
+            return back()->withInput()->with('error', 'A percentage can be at most 100.');
+        }
+        if ($event->ticketPromos()->where('code', $d['code'])->exists()) {
+            return back()->withInput()->with('error', "There is already a code {$d['code']} for this event.");
+        }
+        $p = $event->ticketPromos()->create($d);
+        \App\Support\Audit::record('events.ticket_promo', "Promo code {$p->code} ({$p->label}) for event {$event->number}", $event);
+
+        return back()->with('success', "Code {$p->code} added: {$p->label}.");
+    }
+
+    public function togglePromo(Event $event, \App\Models\Events\EventTicketPromo $promo)
+    {
+        abort_unless($promo->event_id === $event->id, 404);
+        $promo->update(['is_active' => ! $promo->is_active]);
+
+        return back()->with('success', "Code {$promo->code} " . ($promo->is_active ? 'works again.' : 'stopped.'));
+    }
+
+    /** E-mail the tickets to the buyer (again). */
+    public function resend(Request $request, EventTicketOrder $order)
+    {
+        $data = $request->validate(['email' => 'nullable|email|max:150']);
+        if (! empty($data['email'])) {
+            $order->update(['buyer_email' => $data['email']]);
+        }
+        if (! $order->buyer_email) {
+            return back()->with('error', 'Enter the buyer’s e-mail address.');
+        }
+
+        return $this->tickets->email($order, true) ? back()->with('success', "Tickets e-mailed to {$order->buyer_email}.") : back()->with('error', 'The e-mail could not be sent. Check Hotel Settings → Email.');
     }
 
     /** The order's tickets, to print or send. */
@@ -155,6 +198,8 @@ class TicketController extends Controller
             'max_per_order'  => 'nullable|integer|min:1|max:500',
             'sales_start_at' => 'nullable|date',
             'sales_end_at'   => 'nullable|date|after:sales_start_at',
+            'early_price'    => 'nullable|numeric|min:0|lt:price',
+            'early_until'    => 'nullable|required_with:early_price|date',
             'is_active'      => 'nullable|boolean',
         ]);
         $data['is_active'] = $request->has('is_active') ? $request->boolean('is_active') : true;

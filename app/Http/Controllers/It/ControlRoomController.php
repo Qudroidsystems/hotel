@@ -76,7 +76,7 @@ class ControlRoomController extends Controller
     public function report(Request $request, ServiceReport $service)
     {
         try {
-            $month = $request->query('month') ? Carbon::createFromFormat('Y-m', $request->query('month'))->startOfMonth() : today()->startOfMonth();
+            $month = $request->query('month') ? Carbon::createFromFormat('!Y-m', $request->query('month'))->startOfMonth() : today()->startOfMonth();
         } catch (\Throwable) {
             $month = today()->startOfMonth();
         }

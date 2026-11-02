@@ -24,6 +24,7 @@ class Room extends Model
         'features'          => 'array',
         'is_active'         => 'boolean',
         'status_changed_at' => 'datetime',
+        'presence_at'       => 'datetime',   // Energy Saver: last word from the room's sensor
     ];
 
     protected static function booted(): void

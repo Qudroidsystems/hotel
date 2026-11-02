@@ -23,6 +23,8 @@ class MobileUser
         'driver'     => ['Drive guests'],
         'transport'  => ['Manage transport'],
         'chat'       => ['Chat with guests', 'Manage guest chat'],
+        'energy'     => ['View energy saver', 'Manage energy saver'],
+        'tickets'    => ['Check event tickets', 'Sell event tickets'],
     ];
 
     public static function toArray(User $user): array

@@ -66,11 +66,14 @@ Route::prefix('guest')->group(function () {
         Route::get('/search', [GuestBookingController::class, 'search']);
         // Browsing without a booking, as on the website: events with tickets, the halls and when they are free
         Route::get('/events', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'events']);
+        Route::post('/events/{event}/quote', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'ticketQuote'])->whereNumber('event');
+        Route::get('/ticket-orders/{token}', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'ticketOrderShow'])->where('token', '[A-Za-z0-9]{48}');
         Route::get('/venues', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'venues']);
         Route::get('/venues/requests', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'myRequests']);
         Route::get('/venues/{hall}/availability', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'availability'])->whereNumber('hall');
     });
     Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
+    Route::post('/events/{event}/orders', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'ticketOrder'])->whereNumber('event')->middleware('throttle:booking-actions');
     Route::post('/venues/requests', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'request'])->middleware('throttle:booking-actions');
     Route::post('/website/enquiries', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'enquiry'])->middleware('throttle:booking-actions');
     Route::post('/website/subscribe', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'subscribe'])->middleware('throttle:booking-actions');
@@ -100,6 +103,8 @@ Route::prefix('guest')->group(function () {
 
 // The hotel's name, logo and colour, for both apps. `staff_api` says whether staff can sign in yet.
 Route::get('/app/config', [AppController::class, 'config'])->middleware('throttle:mobile-public');
+// Sensors and switches report to Energy Saver: room presence, grid on/off, generators, fuel (X-Device-Key).
+Route::post('/energy/device', [\App\Http\Controllers\Api\V1\EnergyApiController::class, 'device'])->middleware('throttle:120,1');
 // Lets a socket listen on a private channel: guests with their booking token, staff with their sign-in.
 Route::post('/realtime/auth', [\App\Http\Controllers\Chat\RealtimeController::class, 'auth'])->middleware('throttle:guest-chat');
 
@@ -136,6 +141,18 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         ->whereIn('kind', array_merge(\App\Services\Mobile\StaffActions::WORK_KINDS, \App\Services\Mobile\StaffActions::APPROVAL_KINDS))
         ->whereNumber('id')->where('action', '[a-z_]+');
     // Guest chat and calls (the sections this person answers)
+    // The door: tonight's ticketed events, scanning tickets in
+    Route::get('/tickets/door', [\App\Http\Controllers\Api\V1\TicketDoorController::class, 'index']);
+    Route::post('/tickets/scan', [\App\Http\Controllers\Api\V1\TicketDoorController::class, 'scan'])->middleware('throttle:240,1');
+    // Energy Saver: rooms and places to switch off, the generator to run
+    Route::controller(\App\Http\Controllers\Api\V1\EnergyApiController::class)->group(function () {
+        Route::get('/energy', 'index');
+        Route::post('/energy/actions/{action}/done', 'done')->whereNumber('action');
+        Route::post('/energy/actions/{action}/skip', 'skip')->whereNumber('action');
+        Route::post('/energy/grid', 'grid');
+        Route::post('/energy/sources/{source}/running', 'running')->whereNumber('source');
+        Route::post('/energy/sources/{source}/fuel', 'fuel')->whereNumber('source');
+    });
     Route::controller(\App\Http\Controllers\Chat\StaffChatController::class)->group(function () {
         Route::get('/chats', 'index');
         Route::get('/chats/{conversation}', 'show')->whereNumber('conversation');

@@ -47,16 +47,19 @@
     @endforeach
 
     @auth
+        @if ($order->emailed_at)<p class="muted">E-mailed to {{ $order->buyer_email }} {{ $order->emailed_at->diffForHumans() }}.</p>@endif
         <div class="acts">
             @if ($order->buyer_phone)<a href="https://wa.me/{{ preg_replace('/\D/', '', $order->buyer_phone) }}?text={{ rawurlencode('Your tickets for ' . $e->title . ' (' . $e->when . '): ' . $order->tickets->pluck('url')->implode(' ')) }}" target="_blank" rel="noopener">Send on WhatsApp</a>@endif
-            @if ($order->buyer_email)<a href="mailto:{{ $order->buyer_email }}?subject={{ rawurlencode('Your tickets: ' . $e->title) }}&body={{ rawurlencode('Your tickets for ' . $e->title . ', ' . $e->when . ":\n\n" . $order->tickets->pluck('url')->implode("\n")) }}">Send by e-mail</a>@endif
             @can('Sell event tickets')
-                @if (! $order->isCancelled())
+                @if ($order->status === 'paid')
+                    <form method="POST" action="{{ route('events.tickets.email', $order) }}" @unless ($order->buyer_email) onsubmit="var m = prompt('E-mail address for the tickets:'); if (!m) return false; this.email.value = m;" @endunless>@csrf<input type="hidden" name="email"><button type="submit">{{ $order->emailed_at ? 'E-mail again' : 'E-mail the tickets' }}</button></form>
+                @endif
+                @if ($order->status === 'paid')
                     <form method="POST" action="{{ route('events.tickets.cancel', $order) }}" onsubmit="var r = prompt('Why is this order cancelled?'); if (!r) return false; this.reason.value = r;">@csrf<input type="hidden" name="reason"><button type="submit">Cancel order{{ $order->isRoomCharge() ? ' (voids the room charge)' : ' and refund' }}</button></form>
                 @endif
             @endcan
         </div>
-        <p class="muted">Sold by {{ $order->seller?->name ?? ($order->channel === 'app' ? 'the guest, in the app' : '—') }}, {{ $order->paid_at->format('j M Y, g:i A') }}{{ $order->reservation ? ' · charged to booking ' . $order->reservation->reference : '' }}</p>
+        <p class="muted">Sold by {{ $order->seller?->name ?? ($order->channel === 'app' ? 'the guest, in the app' : ($order->channel === 'web' ? 'online (Paystack)' : '—')) }}, {{ $order->paid_at?->format('j M Y, g:i A') ?? ($order->status === 'pending' ? 'waiting for payment' : 'not paid in time') }}{{ (float) $order->discount > 0 ? ' · promo ' . ($order->promo?->code ?? '') . ' saved ' . config('hotel.currency_symbol') . number_format((float) $order->discount, 2) : '' }}{{ $order->reservation ? ' · charged to booking ' . $order->reservation->reference : '' }}</p>
     @endauth
 
     <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>

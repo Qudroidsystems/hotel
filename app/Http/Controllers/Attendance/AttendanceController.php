@@ -151,7 +151,7 @@ class AttendanceController extends Controller
     private function month($value): Carbon
     {
         try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : today()->startOfMonth();
+            return $value ? Carbon::createFromFormat('!Y-m', $value)->startOfMonth() : today()->startOfMonth();
         } catch (\Throwable) {
             return today()->startOfMonth();
         }

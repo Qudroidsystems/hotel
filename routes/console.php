@@ -198,7 +198,23 @@ Artisan::command('channels:sync {--full : Read every calendar now}', $eachHotel(
     }
 }))->purpose('Read the room calendars (iCal) from Airbnb, Vrbo …');
 
+// Energy Saver: re-plan rooms, places and generators; tell the control room what's new.
+Artisan::command('energy:check', $eachHotel(function (\App\Services\Energy\EnergyAdvisor $energy) {
+    if (! $energy->enabled()) {
+        return $this->line('Energy Saver is off.');
+    }
+    $r = $energy->sync();
+    $this->info("{$r['new']} new suggestion(s), {$r['open']} open, {$r['closed']} closed.");
+}))->purpose('Energy Saver: what can be switched off or on now, and which generator to run');
+
+// Event tickets bought online but never paid let their tickets go.
+Artisan::command('tickets:expire', $eachHotel(function (\App\Services\Events\TicketService $tickets) {
+    $this->info($tickets->expire() . ' unpaid ticket order(s) let go.');
+}))->purpose('Release tickets held by online orders that were never paid');
+
 Schedule::command('events:tomorrow')->dailyAt('16:00');
+Schedule::command('tickets:expire')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('energy:check')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('channels:sync')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('bookings:expire-holds')->everyFifteenMinutes()->withoutOverlapping();

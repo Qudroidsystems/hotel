@@ -329,6 +329,22 @@ class HotelSettings
                     'accounts.webrtc.turn_pass'     => ['type' => 'secret', 'config' => 'services.webrtc.turn_pass', 'label' => 'TURN password (paid service)'],
                 ],
             ],
+            'energy' => [
+                'title' => 'Energy Saver', 'icon' => 'ri-flashlight-line',
+                'intro' => 'Energy Saver (in the control room) works out which rooms and places can be switched off, which rooms to switch on before guests arrive and which generator is the smallest that carries the hotel. The places, generators and their fuel use are set up on the Energy Saver page; these are the general numbers.',
+                'fields' => [
+                    'energy.enabled'          => ['type' => 'bool', 'label' => 'Use Energy Saver'],
+                    'energy.alerts'           => ['type' => 'bool', 'label' => 'Tell the control room about new suggestions (app notifications)'],
+                    'energy.room_watts'       => ['type' => 'int', 'label' => 'A guest room uses (watts, with someone in)', 'min' => 100, 'max' => 20000, 'help' => 'Air conditioner, lights, TV, fridge and water heater together. About 1,500–2,500 W for a room with one split AC.'],
+                    'energy.standby_watts'    => ['type' => 'int', 'label' => 'A room switched off still uses (watts)', 'min' => 0, 'max' => 5000, 'help' => 'What stays on at the key-card switch: the fridge, sockets.'],
+                    'energy.precool_minutes'  => ['type' => 'int', 'label' => 'Switch a room on this many minutes before its guest is expected', 'min' => 0, 'max' => 240],
+                    'energy.hall_setup_hours' => ['type' => 'int', 'label' => 'Halls: hours of power before an event (setting up)', 'min' => 0, 'max' => 12],
+                    'energy.empty_minutes'    => ['type' => 'int', 'label' => 'Room sensors: suggest eco mode when a booked room has been empty for (minutes)', 'min' => 5, 'max' => 600],
+                    'energy.headroom'         => ['type' => 'percent', 'label' => 'Run a generator at no more than', 'max' => 100, 'help' => 'Of its rated power, so a lift or a pump starting does not trip it. 75–85% is usual.'],
+                    'energy.grid_price'       => ['type' => 'money', 'label' => 'Grid electricity: price per kWh'],
+                    'energy.diesel_price'     => ['type' => 'money', 'label' => 'Diesel: price per litre'],
+                ],
+            ],
             'maps' => [
                 'title' => 'Maps & Directions', 'icon' => 'ri-map-2-line',
                 'intro' => 'The maps guests and drivers see, and how travel times are worked out (arrival sharing, the car service). OpenStreetMap is free and needs nothing. Google Maps gives real road routes, live traffic times and address search: create a key in Google Cloud with the Directions, Distance Matrix, Places, Geocoding and Map Tiles APIs switched on.',

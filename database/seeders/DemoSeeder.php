@@ -29,6 +29,7 @@ class DemoSeeder extends Seeder
             GuestServicesDemoSeeder::class, // loyalty, guest requests, messages
             CommercialDemoSeeder::class,    // rates & seasons, company accounts, halls & events
             TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
+            EnergyDemoSeeder::class,        // generators, places, and the control room's first list
             WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
             NetworkDemoSeeder::class,       // Starlink dishes, guest Wi-Fi plans and codes
             FeedbackPlansDemoSeeder::class, // guest feedback after check-out, servicing plans

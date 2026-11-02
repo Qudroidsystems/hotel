@@ -819,6 +819,16 @@
                             <i class="ph-device-mobile"></i> <span>Staff App (phone)</span>
                         </a>
                     </li>
+                    {{-- Energy Saver: the control room's list of what to switch off and which generator to run --}}
+                    @canany(['View energy saver', 'Manage energy saver'])
+                        @php $energyOpen = config('hotel.energy.enabled', true) ? \App\Models\Energy\EnergyAction::where('status', 'open')->count() : 0; @endphp
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="{{ route('energy.index') }}">
+                                <i class="ph-lightning"></i> <span>Energy Saver</span>
+                                @if ($energyOpen)<span class="badge bg-success ms-auto">{{ $energyOpen }}</span>@endif
+                            </a>
+                        </li>
+                    @endcanany
                     {{-- IT control room & service desk: everyone can raise IT tickets --}}
                     <li class="nav-item">
                         <a class="nav-link menu-link collapsed" href="#sidebarIt" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarIt">
@@ -1563,6 +1573,7 @@
         @can('Manage rates'){title:'Revenue & Pricing',                     url:'{{ route("rates.revenue") }}',                              icon:'mdi-chart-line',              category:'Front Desk',          keywords:['revenue','pricing','suggested','occupancy','pickup','yield','dynamic pricing']},@endcan
         @can('Manage rates'){title:'Rates & Seasons',                       url:'{{ route("rates.index") }}',                                icon:'mdi-tag-multiple-outline',    category:'Front Desk',          keywords:['rates','prices','season','promo','discount','rate plan','calendar','peak']},@endcan
         @can('View company accounts'){title:'Company Accounts',             url:'{{ route("companies.index") }}',                            icon:'mdi-domain',                  category:'Front Desk',          keywords:['company','corporate','city ledger','account','statement','invoice','credit']},@endcan
+        @canany(['View energy saver', 'Manage energy saver']){title:'Energy Saver',   url:'{{ route("energy.index") }}',                               icon:'ri-flashlight-line',          category:'Control Room',        keywords:['energy','power','generator','diesel','fuel','light','switch off','electricity','nepa','grid']},@endcanany
         @canany(['View events', 'Manage events']){title:'Events & Halls',   url:'{{ route("events.index") }}',                               icon:'mdi-party-popper',            category:'Front Desk',          keywords:['event','hall','conference','wedding','banquet','meeting']},@endcanany
         @canany(['View events', 'Manage events']){title:'Hall Usage',       url:'{{ route("events.usage") }}',                               icon:'mdi-chart-bar',               category:'Front Desk',          keywords:['hall','usage','utilisation','occupancy','overtime','damage','attendance']},@endcanany
         @canany(['Sell event tickets', 'View events']){title:'Event Tickets', url:'{{ route("events.tickets.index") }}',                     icon:'mdi-ticket-confirmation-outline', category:'Front Desk',      keywords:['ticket','tickets','sell','concert','show','gala','order']},@endcanany

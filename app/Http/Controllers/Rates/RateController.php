@@ -325,7 +325,7 @@ class RateController extends Controller
     private function month(?string $m): Carbon
     {
         try {
-            return $m ? Carbon::createFromFormat('Y-m', $m)->startOfMonth()->startOfDay() : today()->startOfMonth();
+            return $m ? Carbon::createFromFormat('!Y-m', $m)->startOfMonth()->startOfDay() : today()->startOfMonth();
         } catch (\Throwable) {
             return today()->startOfMonth();
         }

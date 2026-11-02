@@ -135,6 +135,19 @@ class Event extends Model
             ->join('event_ticket_types', 'event_ticket_types.id', '=', 'event_tickets.ticket_type_id')->sum('event_ticket_types.admits');
     }
 
+    /** People held by online orders waiting for payment. */
+    public function ticketSeatsHeld(): int
+    {
+        $admits = $this->ticketTypes()->pluck('admits', 'id');
+
+        return (int) $this->ticketOrders()->holding()->get(['lines'])->sum(fn ($o) => collect($o->lines ?? [])->sum(fn ($q, $id) => (int) $q * (int) ($admits[$id] ?? 1)));
+    }
+
+    public function ticketPromos()
+    {
+        return $this->hasMany(EventTicketPromo::class)->latest('id');
+    }
+
     public function ticketRevenue(): float
     {
         return round((float) $this->ticketOrders()->where('status', 'paid')->sum('total'), 2);

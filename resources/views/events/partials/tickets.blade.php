@@ -4,7 +4,9 @@
     $types = $e->ticketTypes;
     $seatsSold = $e->ticketSeatsSold();
     $cap = $e->ticketCapacity();
-    $ticketOrders = $e->ticketOrders()->with('reservation')->limit(15)->get();
+    $ticketOrders = $e->ticketOrders()->with('reservation')->whereIn('status', ['paid', 'cancelled'])->limit(15)->get();
+    $promos = $e->ticketPromos;
+    $chan = ['app' => ' · guest app', 'web' => ' · online', 'desk' => ''];
     $blocker = $e->ticketSalesBlocker();
 @endphp
 <x-cb.card title="Tickets" icon="ri-coupon-3-line" :flush="true">
@@ -28,6 +30,7 @@
             <span><strong>{{ $e->tickets()->where('status', 'used')->count() }}</strong> in at the door</span>
             <span>Ticket money <strong>{{ $fmt($e->ticketRevenue()) }}</strong> <span class="text-muted">(not part of the hall bill)</span></span>
             <span class="{{ $blocker ? 'text-warning-emphasis' : 'text-success' }}"><i class="{{ $blocker ? 'ri-lock-line' : 'ri-checkbox-circle-line' }}"></i> {{ $blocker ?? 'On sale' }}</span>
+            @unless ($blocker)<span><i class="ri-links-line"></i> Online: <a href="{{ route('tickets.shop', $e->id) }}" target="_blank" rel="noopener">{{ route('tickets.shop', $e->id) }}</a></span>@endunless
         </div>
         <div class="table-responsive">
             <table class="cb-table stack">
@@ -37,7 +40,7 @@
                         <tr style="{{ $t->is_active ? '' : 'opacity:.55' }}">
                             <td data-label="Ticket"><strong>{{ $t->name }}</strong>{{ $t->admits > 1 ? ' · admits ' . $t->admits : '' }}@if ($t->description)<div class="small text-muted">{{ $t->description }}</div>@endif
                                 @if ($t->sales_start_at || $t->sales_end_at)<div class="small text-muted">On sale {{ $t->sales_start_at ? 'from ' . $t->sales_start_at->format('j M g:i A') : '' }} {{ $t->sales_end_at ? 'until ' . $t->sales_end_at->format('j M g:i A') : '' }}</div>@endif</td>
-                            <td data-label="Price" class="num">{{ $fmt($t->price) }}</td>
+                            <td data-label="Price" class="num">{{ $fmt($t->priceNow()) }}@if ($t->isEarlyBird())<div class="small text-muted">early bird until {{ $t->early_until->format('j M') }}, then {{ $fmt($t->price) }}</div>@endif</td>
                             <td data-label="Sold" class="num">{{ $t->sold() }}</td>
                             <td data-label="Left" class="num">{{ $t->left() ?? '—' }}</td>
                             <td class="text-end">@can('Manage events')<button type="button" class="action-btn btn-more" data-bs-toggle="modal" data-bs-target="#typeModal{{ $t->id }}" title="Edit"><i class="ri-pencil-line"></i></button>@endcan</td>
@@ -49,13 +52,25 @@
             </table>
         </div>
         @can('Manage events')<div class="px-3 pb-2"><button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#typeModal0"><i class="ri-add-line"></i> Add a ticket type</button></div>@endcan
+        <div class="px-3 pb-3 border-top pt-2">
+            <div class="d-flex justify-content-between align-items-center"><strong class="small">Promo codes</strong>
+                @can('Manage events')<button type="button" class="btn btn-sm btn-link p-0" data-bs-toggle="modal" data-bs-target="#promoModal"><i class="ri-add-line"></i> Add a code</button>@endcan</div>
+            @forelse ($promos as $p)
+                <div class="d-flex justify-content-between align-items-center small py-1 {{ $p->closedReason() ? 'text-muted' : '' }}">
+                    <span><code class="fw-bold">{{ $p->code }}</code> · {{ $p->label }} · used {{ $p->used }}{{ $p->max_uses !== null ? ' of ' . $p->max_uses : '' }}{{ $p->ends_at ? ' · until ' . $p->ends_at->format('j M') : '' }}{{ $p->closedReason() ? ' · ' . rtrim($p->closedReason(), '.') : '' }}</span>
+                    @can('Manage events')<form method="POST" action="{{ route('events.tickets.promos.toggle', [$e, $p]) }}">@csrf<button class="btn btn-sm btn-link p-0">{{ $p->is_active ? 'Stop' : 'Restart' }}</button></form>@endcan
+                </div>
+            @empty
+                <div class="small text-muted">None. A code gives money off an order (a percentage or an amount), online, in the app and at the desk.</div>
+            @endforelse
+        </div>
         @if ($ticketOrders->isNotEmpty())
             <div class="table-responsive border-top">
                 <table class="cb-table stack">
                     <tbody>
                         @foreach ($ticketOrders as $o)
                             <tr style="{{ $o->isCancelled() ? 'opacity:.5' : '' }}">
-                                <td data-label="Order" class="small"><a href="{{ route('events.tickets.order', $o) }}">{{ $o->number }}</a> · {{ $o->paid_at->format('j M, g:i A') }}<div class="text-muted">{{ $o->buyer_name }}{{ $o->channel === 'app' ? ' · guest app' : '' }}</div></td>
+                                <td data-label="Order" class="small"><a href="{{ route('events.tickets.order', $o) }}">{{ $o->number }}</a> · {{ $o->paid_at?->format('j M, g:i A') }}<div class="text-muted">{{ $o->buyer_name }}{{ $chan[$o->channel] ?? '' }}</div></td>
                                 <td data-label="Paid" class="small">{{ $o->quantity }} × · {{ $o->method_label }}{{ $o->reservation ? ' (' . $o->reservation->reference . ')' : '' }}@if ($o->isCancelled())<div class="text-danger">Cancelled: {{ $o->cancel_reason }}</div>@endif</td>
                                 <td data-label="Total" class="num fw-semibold">{{ $fmt($o->total) }}</td>
                             </tr>
@@ -94,6 +109,8 @@
                 <div class="col-4"><label>Admits</label><input type="number" min="1" name="admits" class="form-control" value="{{ $t->admits ?? 1 }}"></div>
                 <div class="col-4"><label>For sale</label><input type="number" min="1" name="quantity" class="form-control" value="{{ $t->quantity }}" placeholder="No limit"></div>
                 <div class="col-4"><label>Max per order</label><input type="number" min="1" name="max_per_order" class="form-control" value="{{ $t->max_per_order ?? 10 }}"></div>
+                <div class="col-sm-6"><label>Early-bird price</label><div class="input-group"><span class="input-group-text">{{ $sym }}</span><input type="number" step="0.01" min="0" name="early_price" class="form-control" value="{{ $t->early_price !== null ? number_format((float) $t->early_price, 2, '.', '') : '' }}" placeholder="None"></div></div>
+                <div class="col-sm-6"><label>Early bird until</label><input type="datetime-local" name="early_until" class="form-control" value="{{ $t->early_until?->format('Y-m-d\TH:i') }}"></div>
                 <div class="col-sm-6"><label>Sales start</label><input type="datetime-local" name="sales_start_at" class="form-control" value="{{ $t->sales_start_at?->format('Y-m-d\TH:i') }}"></div>
                 <div class="col-sm-6"><label>Sales end</label><input type="datetime-local" name="sales_end_at" class="form-control" value="{{ $t->sales_end_at?->format('Y-m-d\TH:i') }}"></div>
                 <div class="col-12"><input type="hidden" name="is_active" value="0"><label class="form-check"><input type="checkbox" class="form-check-input" name="is_active" value="1" @checked($t->is_active ?? true)> On sale</label></div>
@@ -103,6 +120,21 @@
     </div>
 </div>
 @endforeach
+<div class="modal fade" id="promoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content rm-form" method="POST" action="{{ route('events.tickets.promos.store', $e) }}">@csrf
+            <div class="modal-header"><h5 class="modal-title">New promo code</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body row g-3">
+                <div class="col-sm-6"><label>Code</label><input name="code" class="form-control text-uppercase" maxlength="30" required pattern="[A-Za-z0-9_-]+" placeholder="EARLY10"></div>
+                <div class="col-sm-6"><label>Money off</label><div class="input-group"><input type="number" step="0.01" min="0.01" name="value" class="form-control" required><select name="kind" class="form-select" style="max-width:110px"><option value="percent">%</option><option value="amount">{{ $sym }} off</option></select></div></div>
+                <div class="col-sm-4"><label>Orders it works for</label><input type="number" min="1" name="max_uses" class="form-control" placeholder="No limit"></div>
+                <div class="col-sm-4"><label>From</label><input type="datetime-local" name="starts_at" class="form-control"></div>
+                <div class="col-sm-4"><label>Until</label><input type="datetime-local" name="ends_at" class="form-control"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Add code</button></div>
+        </form>
+    </div>
+</div>
 @endif
 @endcan
 
@@ -119,15 +151,16 @@
                     @foreach ($types->where('is_active', true) as $t)
                         @php $why = $t->closedReason(); @endphp
                         <div class="d-flex align-items-center justify-content-between border-bottom py-2 gap-2">
-                            <div><strong>{{ $t->name }}</strong> <span class="text-muted">{{ $fmt($t->price) }}{{ $t->admits > 1 ? ' · admits ' . $t->admits : '' }}</span>@if ($why)<div class="small text-warning-emphasis">{{ ucfirst($why) }}</div>@elseif ($t->left() !== null)<div class="small text-muted">{{ $t->left() }} left</div>@endif</div>
-                            <input type="number" min="0" max="{{ min($t->max_per_order, $t->left() ?? $t->max_per_order) }}" name="lines[{{ $t->id }}]" class="form-control form-control-sm tk-qty" style="width:90px" value="0" data-price="{{ (float) $t->price }}" @disabled($why)>
+                            <div><strong>{{ $t->name }}</strong> <span class="text-muted">{{ $fmt($t->priceNow()) }}{{ $t->isEarlyBird() ? ' early bird' : '' }}{{ $t->admits > 1 ? ' · admits ' . $t->admits : '' }}</span>@if ($why)<div class="small text-warning-emphasis">{{ ucfirst($why) }}</div>@elseif ($t->left() !== null)<div class="small text-muted">{{ $t->left() }} left</div>@endif</div>
+                            <input type="number" min="0" max="{{ min($t->max_per_order, $t->left() ?? $t->max_per_order) }}" name="lines[{{ $t->id }}]" class="form-control form-control-sm tk-qty" style="width:90px" value="0" data-price="{{ $t->priceNow() }}" @disabled($why)>
                         </div>
                     @endforeach
                     <div class="text-end mt-2 fw-bold">Total <span id="tkTotal">{{ $sym }}0.00</span>@if (! config('hotel.prices_include_tax') && config('hotel.taxes')) <span class="small text-muted fw-normal">+ tax</span>@endif</div>
                 </div>
+                @if ($promos->isNotEmpty())<div class="col-sm-4"><label>Promo code</label><input name="promo" class="form-control text-uppercase" maxlength="30" value="{{ old('promo') }}"><div class="small text-muted">Taken off the total when sold.</div></div><div class="w-100"></div>@endif
                 <div class="col-sm-4"><label>Buyer</label><input name="buyer_name" class="form-control" maxlength="120" required value="{{ old('buyer_name') }}"></div>
                 <div class="col-sm-4"><label>Phone</label><input name="buyer_phone" class="form-control" maxlength="40" value="{{ old('buyer_phone') }}"></div>
-                <div class="col-sm-4"><label>E-mail</label><input type="email" name="buyer_email" class="form-control" maxlength="150" value="{{ old('buyer_email') }}"></div>
+                <div class="col-sm-4"><label>E-mail</label><input type="email" name="buyer_email" class="form-control" maxlength="150" value="{{ old('buyer_email') }}"><div class="small text-muted">The tickets are e-mailed here.</div></div>
                 <div class="col-sm-4"><label>Paid by</label><select name="method" class="form-select" id="tkMethod">@foreach (PaymentMethod::takeable() as $m)<option value="{{ $m->value }}">{{ $m->label() }}</option>@endforeach @if ($inHouse->isNotEmpty())<option value="room">Charge to a room</option>@endif</select></div>
                 <div class="col-sm-4" id="tkRoom" style="display:none"><label>Guest staying</label><select name="reservation_id" class="form-select">@foreach ($inHouse as $r)<option value="{{ $r->id }}">{{ $r->rooms->pluck('room.number')->filter()->implode(', ') }} · {{ $r->guest?->full_name }}</option>@endforeach</select></div>
                 <div class="col-sm-4" id="tkRef"><label>Reference</label><input name="reference" class="form-control" maxlength="100"></div>

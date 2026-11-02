@@ -12,9 +12,9 @@ class EventTicketType extends Model
 
     protected $attributes = ['price' => 0, 'admits' => 1, 'max_per_order' => 10, 'is_active' => true, 'sort_order' => 0];
 
-    protected $fillable = ['event_id', 'name', 'description', 'price', 'admits', 'quantity', 'max_per_order', 'sales_start_at', 'sales_end_at', 'is_active', 'sort_order'];
+    protected $fillable = ['event_id', 'name', 'description', 'price', 'early_price', 'early_until', 'admits', 'quantity', 'max_per_order', 'sales_start_at', 'sales_end_at', 'is_active', 'sort_order'];
 
-    protected $casts = ['price' => 'decimal:2', 'sales_start_at' => 'datetime', 'sales_end_at' => 'datetime', 'is_active' => 'boolean'];
+    protected $casts = ['price' => 'decimal:2', 'sales_start_at' => 'datetime', 'sales_end_at' => 'datetime', 'is_active' => 'boolean', 'early_price' => 'decimal:2', 'early_until' => 'datetime'];
 
     public function event()
     {
@@ -32,10 +32,27 @@ class EventTicketType extends Model
         return $this->tickets()->where('status', '!=', 'void')->count();
     }
 
+    /** Tickets held by online orders waiting for payment. */
+    public function held(): int
+    {
+        return (int) EventTicketOrder::where('event_id', $this->event_id)->holding()->get(['lines'])->sum(fn ($o) => (int) (($o->lines ?? [])[$this->id] ?? 0));
+    }
+
     /** Tickets left of this type (null = no limit of its own). */
     public function left(): ?int
     {
-        return $this->quantity === null ? null : max(0, (int) $this->quantity - $this->sold());
+        return $this->quantity === null ? null : max(0, (int) $this->quantity - $this->sold() - $this->held());
+    }
+
+    /** The price now: the early-bird price until its date, else the price. */
+    public function priceNow(): float
+    {
+        return $this->early_price !== null && $this->early_until && $this->early_until->isFuture() ? (float) $this->early_price : (float) $this->price;
+    }
+
+    public function isEarlyBird(): bool
+    {
+        return $this->priceNow() < (float) $this->price;
     }
 
     /** Why it can't be sold now, or null. */
@@ -45,7 +62,7 @@ class EventTicketType extends Model
             ! $this->is_active => 'not on sale',
             $this->sales_start_at && $this->sales_start_at->isFuture() => 'on sale from ' . $this->sales_start_at->format('D j M, g:i A'),
             $this->sales_end_at && $this->sales_end_at->isPast() => 'sales ended',
-            $this->left() === 0 => 'sold out',
+            $this->left() === 0 => $this->held() > 0 ? 'all taken while other buyers pay — some may come back in a few minutes' : 'sold out',
             default => null,
         };
     }

@@ -16,6 +16,7 @@ class AppPreferences
         'it'        => 'IT alerts',
         'chat'      => 'Guest chat messages',
         'calls'     => 'Calls from guests',
+        'energy'    => 'Energy Saver (rooms to switch off, generators)',
     ];
 
     private function __construct(private User $user, private array $prefs)

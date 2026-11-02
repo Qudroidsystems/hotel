@@ -227,6 +227,23 @@ return [
         'provider' => env('MAPS_PROVIDER', 'osm'),   // osm or google
     ],
 
+    /*
+    | Energy Saver: what a guest room draws, how early to cool a room before a guest arrives, and the prices used
+    | to show what switching off saves (Hotel Settings → Energy Saver).
+    */
+    'energy' => [
+        'enabled'         => env('ENERGY_SAVER', true),
+        'room_watts'      => 1800,    // AC, lights, TV, fridge, water heater (average while someone is in)
+        'standby_watts'   => 120,     // a room switched off at the key-card switch: fridge and sockets only
+        'precool_minutes' => 40,      // switch a room on this long before its guest is expected
+        'hall_setup_hours' => 2,      // halls: on this long before an event for setting up, and an hour after
+        'headroom'        => 80,      // run a generator at no more than this % of what it can give
+        'grid_price'      => 225,     // per kWh
+        'diesel_price'    => 1250,    // per litre
+        'alerts'          => true,    // tell the control room about new suggestions
+        'empty_minutes'   => 30,      // a room sensor says "empty" this long: suggest eco mode for an in-house room
+    ],
+
     'transport' => [
         'enabled'            => true,   // guests can book the hotel's cars (once there is a driver)
         'base_fare'          => 2000,

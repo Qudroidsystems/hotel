@@ -92,6 +92,8 @@ class PermissionMeta
         'Manage expense categories' => ['Manage', 'Set up expense categories and their monthly budgets.'],
         'View IT control room'      => ['View',   'See the IT control room: network, systems and backup status, alerts and the service desk queue.'],
         'Manage IT monitoring'      => ['Manage', 'Set up what is monitored, the equipment register and planned maintenance; acknowledge and close alerts.'],
+        'View energy saver'         => ['View',   'See the Energy Saver: empty rooms and places that can be switched off, rooms to switch on before guests arrive, and which generator to run. Tick off what was done.'],
+        'Manage energy saver'       => ['Manage', 'Set up the Energy Saver: places and their power, generators and fuel use, prices; record grid and generator changes.'],
         'Manage IT tickets'         => ['Manage', 'Work on every IT support ticket: assign, update, resolve and close. (Any staff member can raise a ticket.)'],
         'View network'              => ['View', 'See the internet lines (Starlink dishes and others), their speed, signal and data used, and the guest Wi-Fi codes.'],
         'Manage network'            => ['Manage', 'Add and change internet lines and guest Wi-Fi speed plans.'],

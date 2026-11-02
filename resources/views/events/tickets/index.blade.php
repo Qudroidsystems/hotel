@@ -33,7 +33,7 @@
                     <tbody>
                         @foreach ($orders as $o)
                             <tr style="{{ $o->isCancelled() ? 'opacity:.55' : '' }}">
-                                <td data-label="Order" class="small"><a href="{{ route('events.tickets.order', $o) }}" class="fw-semibold">{{ $o->number }}</a><div class="text-muted">{{ $o->paid_at->format('D j M, g:i A') }}</div></td>
+                                <td data-label="Order" class="small"><a href="{{ route('events.tickets.order', $o) }}" class="fw-semibold">{{ $o->number }}</a><div class="text-muted">{{ $o->paid_at?->format('D j M, g:i A') ?? ($o->status === 'pending' ? 'Waiting for payment' : 'Not paid in time') }}</div></td>
                                 <td data-label="Event" class="small"><a href="{{ route('events.show', $o->event) }}">{{ $o->event->title }}</a><div class="text-muted">{{ $o->event->starts_at->format('D j M Y') }}</div></td>
                                 <td data-label="Buyer" class="small">{{ $o->buyer_name }}<div class="text-muted">{{ $o->buyer_phone }}{{ $o->channel === 'app' ? ' · guest app' : '' }}</div></td>
                                 <td data-label="Tickets" class="num">{{ $o->quantity }}</td>

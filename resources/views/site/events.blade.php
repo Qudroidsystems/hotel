@@ -33,13 +33,13 @@
 @if ($events->isNotEmpty())
 <section class="section dark">
     <div class="wrap">
-        <div class="head"><div><div class="eyebrow" data-reveal="up">What's on</div><h2 class="h2 split">Upcoming events</h2><p class="lede" data-reveal="up">Tickets are sold at reception, and staying guests can buy them in the guest app and add them to their room bill.</p></div></div>
+        <div class="head"><div><div class="eyebrow" data-reveal="up">What's on</div><h2 class="h2 split">Upcoming events</h2><p class="lede" data-reveal="up">Buy tickets here and pay online, at reception, or — staying with us — in the guest app on your room bill. Your tickets come by e-mail with their QR codes.</p></div></div>
         <div class="ev-list" data-stagger>
             @foreach ($events as $ev)
                 <div class="ev">
                     <div class="d"><b>{{ $ev->starts_at->format('d') }}</b><span>{{ $ev->starts_at->format('M') }}</span></div>
                     <div><h3>{{ $ev->title }}</h3><p>{{ $ev->when }}{{ $ev->hall ? ' · ' . $ev->hall->name : '' }}</p>@if ($ev->ticket_info)<p style="margin-top:6px">{{ \Illuminate\Support\Str::limit($ev->ticket_info, 160) }}</p>@endif</div>
-                    @if ($ev->ticketTypes->isNotEmpty())<div class="from"><small>Tickets from</small>{{ (float) $ev->ticketTypes->first()->price > 0 ? $sym . number_format((float) $ev->ticketTypes->first()->price) : 'Free' }}</div>@endif
+                    @if ($ev->ticketTypes->isNotEmpty())<a class="from" href="{{ route('tickets.shop', $ev->id) }}" style="text-decoration:none;color:inherit"><small>Tickets from</small>{{ (float) $ev->ticketTypes->min(fn ($t) => $t->priceNow()) > 0 ? $sym . number_format((float) $ev->ticketTypes->min(fn ($t) => $t->priceNow())) : 'Free' }}<small style="text-decoration:underline">Buy tickets</small></a>@endif
                 </div>
             @endforeach
         </div>

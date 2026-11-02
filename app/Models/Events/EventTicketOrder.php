@@ -22,9 +22,32 @@ class EventTicketOrder extends Model
     protected $fillable = [
         'number', 'event_id', 'channel', 'status', 'buyer_name', 'buyer_phone', 'buyer_email', 'reservation_id', 'folio_charge_id',
         'quantity', 'total', 'method', 'reference', 'bank_account_id', 'sold_by', 'paid_at', 'idempotency_key',
+        'token', 'lines', 'prices', 'discount', 'promo_id', 'gateway_reference', 'expires_at', 'emailed_at',
     ];
 
-    protected $casts = ['total' => 'decimal:2', 'paid_at' => 'datetime', 'cancelled_at' => 'datetime'];
+    protected $casts = ['total' => 'decimal:2', 'discount' => 'decimal:2', 'paid_at' => 'datetime', 'cancelled_at' => 'datetime', 'expires_at' => 'datetime', 'emailed_at' => 'datetime', 'lines' => 'array', 'prices' => 'array'];
+
+    /** An online order waiting for its payment holds its tickets until it expires. */
+    public function scopeHolding($q)
+    {
+        return $q->where('status', 'pending')->where('expires_at', '>', now());
+    }
+
+    public function promo()
+    {
+        return $this->belongsTo(EventTicketPromo::class, 'promo_id');
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    /** The buyer's page with all their tickets (QR codes). */
+    public function getUrlAttribute(): ?string
+    {
+        return $this->token ? route('tickets.mine', $this->token) : null;
+    }
 
     public function event()
     {

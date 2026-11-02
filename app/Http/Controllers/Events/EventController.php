@@ -41,7 +41,7 @@ class EventController extends Controller
         ];
 
         if ($view === 'calendar') {
-            $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->query('month'))->startOfMonth()->startOfDay() : today()->startOfMonth();
+            $month = $request->filled('month') ? Carbon::createFromFormat('!Y-m', $request->query('month'))->startOfMonth()->startOfDay() : today()->startOfMonth();
             $days = collect(range(0, $month->daysInMonth - 1))->map(fn ($i) => $month->copy()->addDays($i));
             $events = Event::with('hall')->where('status', '!=', 'cancelled')->overlapping($month, $month->copy()->endOfMonth()->addDay())->orderBy('starts_at')->get();
 
