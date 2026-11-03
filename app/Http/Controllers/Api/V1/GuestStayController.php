@@ -83,6 +83,47 @@ class GuestStayController extends ApiController
         ]);
     }
 
+    /** GET /guest/stays/{token}/laundry — the price list, times, and this stay's laundry. */
+    public function laundry(string $token, \App\Services\Laundry\LaundryService $laundry)
+    {
+        return $this->ok($laundry->forGuestScreen($this->reservation($token)));
+    }
+
+    /** POST /guest/stays/{token}/laundry  {lines: [{item_id, service, quantity}] (optional), express, note} */
+    public function requestLaundry(Request $request, string $token, \App\Services\Laundry\LaundryService $laundry)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate([
+            'lines'            => 'nullable|array|max:' . \App\Services\Laundry\LaundryService::MAX_LINES,
+            'lines.*.item_id'  => 'required|integer',
+            'lines.*.service'  => 'required|string|in:' . implode(',', array_keys(\App\Models\Laundry\LaundryItem::SERVICES)),
+            'lines.*.quantity' => 'required|integer|min:1|max:' . \App\Services\Laundry\LaundryService::MAX_QUANTITY,
+            'express'          => 'nullable|boolean',
+            'note'             => 'nullable|string|max:300',
+        ]);
+        try {
+            $order = $laundry->request($r, $data['lines'] ?? [], (bool) ($data['express'] ?? false), $data['note'] ?? null, 'app');
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($laundry->forGuestScreen($r->fresh()), "Laundry {$order->number}: we’ll collect it" . ($laundry->collectingNow() ? ' shortly.' : ' when collection starts (' . $laundry->hoursLabel() . ').') . ' You pay for what we count.', status: 201);
+    }
+
+    /** POST /guest/stays/{token}/laundry/{order}/cancel — only before it's collected. */
+    public function cancelLaundry(string $token, int $order, \App\Services\Laundry\LaundryService $laundry)
+    {
+        $r = $this->reservation($token);
+        $o = \App\Models\Laundry\LaundryOrder::where('reservation_id', $r->id)->findOrFail($order);
+        try {
+            $laundry->cancelByGuest($o);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($laundry->forGuestScreen($r->fresh()), "Laundry {$o->number} cancelled.");
+    }
+
     /** GET /guest/stays/{token}/feedback — whether the guest can rate this stay, the parts to score, and what they said. */
     public function feedbackForm(string $token, \App\Services\Booking\FeedbackService $feedback)
     {
@@ -384,6 +425,9 @@ class GuestStayController extends ApiController
             'can_order'    => $orderSvc->canOrder($r),
             'order_note'   => $r->status === S::CheckedIn && ! $orderSvc->canOrder($r) && $orderSvc->outlets()->isNotEmpty() ? $orderSvc->blocker($r) : null,
             'orders'       => $orderSvc->forGuest($r),
+            // Laundry (…/laundry for the price list and to send a bag); live bags shown on the stay.
+            'can_laundry'  => ($laundrySvc = app(\App\Services\Laundry\LaundryService::class))->canAsk($r),
+            'laundry'      => collect($laundrySvc->forGuest($r))->where('live', true)->values(),
             'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)
             'wifi'         => app(\App\Services\Network\NetworkService::class)->forGuest($r),   // the guest's Wi-Fi code while checked in, else null
             'feedback'     => app(\App\Services\Booking\FeedbackService::class)->forGuest($r),   // rating the stay after check-out (…/feedback to send it)

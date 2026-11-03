@@ -131,6 +131,8 @@ class PermissionTableSeeder extends Seeder
             'Message guests',
             'Chat with guests',    // answer chats and calls for their sections
             'Manage guest chat',   // every section, and setting sections up
+            'Handle laundry',      // collect and count guests' laundry, mark it ready and returned
+            'Manage laundry',      // the laundry price list
         ],
         'Energy' => [
             'View energy saver',   // the control room's list of rooms and places to switch off, and the generator to run

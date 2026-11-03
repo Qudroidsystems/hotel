@@ -22,5 +22,6 @@ final class HotelTables
         'network_links', 'network_samples', 'network_plans', 'network_passes',
         'call_listens', 'facility_devices', 'facility_hubs',
         'guest_feedback', 'maintenance_plans',
+        'event_ticket_promos', 'laundry_items', 'laundry_orders',
     ];
 }

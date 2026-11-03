@@ -30,6 +30,7 @@ class StaffAlerts
 
         GuestRequest::created(fn (GuestRequest $g) => $self->guestRequest($g));
         \App\Models\Pos\GuestOrder::created(fn ($o) => $self->guestOrder($o));
+        \App\Models\Laundry\LaundryOrder::created(fn ($o) => $o->status === 'requested' && $o->via !== 'desk' ? $self->laundry($o) : null);
         HousekeepingTask::saved(fn (HousekeepingTask $t) => $t->wasChanged('assigned_to') || ($t->wasRecentlyCreated && $t->assigned_to) ? $self->roomAssigned($t) : null);
         MaintenanceOrder::saved(fn (MaintenanceOrder $o) => $self->repair($o));
         ItTicket::saved(fn (ItTicket $t) => $t->wasChanged('assigned_to') || ($t->wasRecentlyCreated && $t->assigned_to) ? $self->ticketAssigned($t) : null);
@@ -59,6 +60,16 @@ class StaffAlerts
             'title' => 'Room ' . ($o->room_number ?? '—') . ' ordered: ' . config('hotel.currency_symbol') . number_format((float) $o->total, 2) . ((bool) $o->reservation?->guest?->is_vip ? ' · VIP' : ''),
             'body'  => $o->outlet?->name . ': ' . $o->summary,
             'group' => 'guests', 'level' => 'urgent', 'url' => 'work', 'thread' => "order:{$o->id}", 'kind' => 'order', 'item_id' => $o->id,
+        ]);
+    }
+
+    private function laundry(\App\Models\Laundry\LaundryOrder $o): void
+    {
+        $o = $o->fresh(['reservation.guest']) ?? $o;
+        $this->send($this->staffWith('Handle laundry'), [
+            'title' => 'Room ' . ($o->room_number ?? '—') . ': laundry to collect' . ($o->express ? ' · EXPRESS' : '') . ((bool) $o->reservation?->guest?->is_vip ? ' · VIP' : ''),
+            'body'  => ($o->lines ? $o->summary : 'No list — count the bag when you collect it.') . ($o->note ? ' “' . $o->note . '”' : ''),
+            'group' => 'guests', 'level' => $o->express ? 'urgent' : 'normal', 'url' => 'work', 'thread' => "laundry:{$o->id}", 'kind' => 'laundry', 'item_id' => $o->id,
         ]);
     }
 

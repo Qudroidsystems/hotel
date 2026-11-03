@@ -64,6 +64,7 @@ class GuestPortalController extends Controller
             'accounts'   => HotelBankAccount::ordered()->where('is_active', true)->where('show_on_invoice', true)->get(),
             'canRequest' => config('hotel.booking.guest_requests', true) && $r->status === ReservationStatus::CheckedIn,
             'canOrder'   => app(GuestOrderService::class)->canOrder($r),
+            'canLaundry' => app(\App\Services\Laundry\LaundryService::class)->canAsk($r) || \App\Models\Laundry\LaundryOrder::where('reservation_id', $r->id)->live()->exists(),
             'chatOn'     => app(\App\Services\Chat\ChatService::class)->blocker($r) === null,
             'chatUnread' => (int) \App\Models\Chat\ChatConversation::where('reservation_id', $r->id)->sum('guest_unread'),
             'arrival'    => app(\App\Services\Booking\ArrivalService::class)->forGuest($r),
@@ -190,6 +191,55 @@ class GuestPortalController extends Controller
         }
 
         return back()->with('success', "Order {$o->number} cancelled.");
+    }
+
+    /** Laundry from the booking page: the price list, the bag to collect, and the guest's bags. */
+    public function laundry(string $token, \App\Services\Laundry\LaundryService $laundry)
+    {
+        $r = $this->reservation($token);
+        $r->load('guest', 'rooms.room');
+
+        return view('booking.laundry', ['r' => $r, 'l' => $laundry->forGuestScreen($r)]);
+    }
+
+    public function requestLaundry(Request $request, string $token, \App\Services\Laundry\LaundryService $laundry)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate([
+            'qty'     => 'nullable|array',
+            'qty.*'   => 'array',
+            'qty.*.*' => 'nullable|integer|min:0|max:' . \App\Services\Laundry\LaundryService::MAX_QUANTITY,
+            'express' => 'nullable|boolean',
+            'note'    => 'nullable|string|max:300',
+        ]);
+        $lines = [];
+        foreach ($data['qty'] ?? [] as $itemId => $services) {
+            foreach ((array) $services as $service => $q) {
+                if ((int) $q > 0) {
+                    $lines[] = ['item_id' => (int) $itemId, 'service' => (string) $service, 'quantity' => (int) $q];
+                }
+            }
+        }
+        try {
+            $order = $laundry->request($r, $lines, (bool) ($data['express'] ?? false), $data['note'] ?? null, 'web');
+        } catch (BookingException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('stay.laundry', $token)->with('success', "Laundry {$order->number}: we’ll collect it" . ($laundry->collectingNow() ? ' shortly.' : ' when collection starts (' . $laundry->hoursLabel() . ').') . ' You pay for what we count.');
+    }
+
+    public function cancelLaundry(string $token, int $order, \App\Services\Laundry\LaundryService $laundry)
+    {
+        $r = $this->reservation($token);
+        $o = \App\Models\Laundry\LaundryOrder::where('reservation_id', $r->id)->findOrFail($order);
+        try {
+            $laundry->cancelByGuest($o);
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Laundry {$o->number} cancelled.");
     }
 
     /** The guest's copy of their bill: every charge and payment, to print or save as PDF. */

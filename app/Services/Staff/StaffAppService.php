@@ -77,6 +77,15 @@ class StaffAppService
                 ]));
         }
 
+        if (app(\App\Services\Laundry\LaundryService::class)->canHandle($user)) {
+            // Guests' laundry: bags to collect first, then clean laundry to take up, then bags at the laundry.
+            \App\Models\Laundry\LaundryOrder::live()->get()
+                ->each(fn ($o) => $items->push((object) [
+                    'kind' => 'laundry', 'model' => $o, 'urgent' => ($o->status === 'requested' && ($o->express || $o->created_at->lt(now()->subHour()))) || $o->isLate(),
+                    'at' => $o->created_at, 'rank' => $o->status === 'requested' ? 1 : ($o->status === 'ready' ? 2 : 3),
+                ]));
+        }
+
         // Cars: new bookings for whoever dispatches; their own rides for a driver.
         $driver = $user->can('Drive guests') ? \App\Models\Transport\Driver::where('user_id', $user->id)->where('is_active', true)->first() : null;
         if ($driver || $user->can('Manage transport')) {

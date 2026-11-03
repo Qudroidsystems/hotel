@@ -147,6 +147,9 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::get('/stay/{token}/order', [GuestPortalController::class, 'order'])->name('stay.order');
     Route::post('/stay/{token}/order', [GuestPortalController::class, 'placeOrder'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.place');
     Route::post('/stay/{token}/orders/{order}/cancel', [GuestPortalController::class, 'cancelOrder'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.cancel');
+    Route::get('/stay/{token}/laundry', [GuestPortalController::class, 'laundry'])->name('stay.laundry');
+    Route::post('/stay/{token}/laundry', [GuestPortalController::class, 'requestLaundry'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.laundry.request');
+    Route::post('/stay/{token}/laundry/{order}/cancel', [GuestPortalController::class, 'cancelLaundry'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.laundry.cancel');
     // Rating the stay after check-out (the link texted and e-mailed to the guest)
     Route::get('/stay/{token}/feedback', [\App\Http\Controllers\Booking\StayFeedbackController::class, 'show'])->name('stay.feedback');
     Route::post('/stay/{token}/feedback', [\App\Http\Controllers\Booking\StayFeedbackController::class, 'store'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.feedback.store');
@@ -724,6 +727,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/{expense}/void', [ExpenseController::class, 'void'])->name('void');
         Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])->name('attach');
         Route::get('/{expense}/files/{index}', [ExpenseController::class, 'file'])->whereNumber('index')->name('file');
+    });
+
+    // Guest laundry: bags to collect, the count sheet (charged to the room), ready and returned; the price list
+    Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\Laundry\LaundryController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/new', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/prices', 'prices')->name('prices');
+        Route::post('/prices', 'savePrices')->name('prices.save');
+        Route::post('/prices/defaults', 'defaults')->name('prices.defaults');
+        Route::get('/{order}/collect', 'collectForm')->whereNumber('order')->name('collect.form');
+        Route::post('/{order}/collect', 'collect')->whereNumber('order')->name('collect');
+        Route::post('/{order}/{action}', 'act')->whereNumber('order')->whereIn('action', ['ready', 'returned', 'decline', 'issue'])->name('act');
     });
 
     // Energy Saver (control room): what to switch off and on, which generator to run

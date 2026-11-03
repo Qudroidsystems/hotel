@@ -216,6 +216,9 @@ class OwnerDashboardService
         if ($n = GuestOrder::where('status', GuestOrder::PLACED)->where('created_at', '<', now()->subMinutes(10))->count()) {
             $add('warning', "{$n} room order" . ($n === 1 ? ' has' : 's have') . ' waited over 10 minutes for the kitchen.', 'work');
         }
+        if ($n = \App\Models\Laundry\LaundryOrder::where('status', 'collected')->where('due_at', '<', now())->count()) {
+            $add('warning', "{$n} guest laundry bag" . ($n === 1 ? ' is' : 's are') . ' late coming back.', 'work');
+        }
         if ($n = GuestRequest::active()->where('created_at', '<', now()->subMinutes(30))->count()) {
             $add('warning', "{$n} guest request" . ($n === 1 ? ' is' : 's are') . ' still open after 30 minutes.', 'work');
         }

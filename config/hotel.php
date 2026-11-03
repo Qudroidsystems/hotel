@@ -244,6 +244,18 @@ return [
         'empty_minutes'   => 30,      // a room sensor says "empty" this long: suggest eco mode for an in-house room
     ],
 
+    /*
+    | Guest laundry (Hotel Settings → Laundry). The price list itself is on the Laundry page.
+    */
+    'laundry' => [
+        'enabled'          => true,
+        'collection_hours' => '07:00-19:00',   // when bags are collected from rooms; empty = any time
+        'standard_hours'   => 24,              // back this many hours after collection
+        'express_hours'    => 4,
+        'express_percent'  => 50,              // express costs this much more
+        'guest_note'       => 'Leave your laundry bag on the door handle or with the room attendant. Please empty all pockets.',
+    ],
+
     'transport' => [
         'enabled'            => true,   // guests can book the hotel's cars (once there is a driver)
         'base_fare'          => 2000,

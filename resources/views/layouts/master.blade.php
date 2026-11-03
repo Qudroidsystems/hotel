@@ -691,7 +691,7 @@
                             </div>
                         </li>
                     @endcan
-                    @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Report maintenance issues', 'Manage maintenance'])
+                    @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping', 'View maintenance', 'Report maintenance issues', 'Manage maintenance', 'Handle laundry', 'Manage laundry'])
                         <li class="nav-item">
                             <a class="nav-link menu-link collapsed" href="#sidebarOps" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarOps">
                                 <i class="ph-paint-brush-household"></i> <span>Housekeeping &amp; Repairs</span>
@@ -705,6 +705,10 @@
                                     @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])
                                         <li class="nav-item"><a href="{{ route('maintenance.index') }}" class="nav-link">Maintenance Jobs</a></li>
                                         @canany(['View maintenance', 'Manage maintenance'])<li class="nav-item"><a href="{{ route('maintenance.plans.index') }}" class="nav-link">Servicing Plans</a></li>@endcanany
+                                    @endcanany
+                                    @canany(['Handle laundry', 'Manage laundry'])
+                                        @php $laundryWaiting = \App\Models\Laundry\LaundryOrder::whereIn('status', ['requested', 'ready'])->count(); @endphp
+                                        <li class="nav-item"><a href="{{ route('laundry.index') }}" class="nav-link">Guest Laundry @if ($laundryWaiting)<span class="badge bg-info ms-1">{{ $laundryWaiting }}</span>@endif</a></li>
                                     @endcanany
                                 </ul>
                             </div>
@@ -1622,6 +1626,12 @@
         {title:'Tasks',                                 url:'{{ route("tasks.index") }}',                                    icon:'mdi-clipboard-check-outline', category:'Operations',          keywords:['task','todo','to do','job','assign','department','overdue','checklist','duty']},
         @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping'])
         {title:'Housekeeping Tablet Board',             url:'{{ route("housekeeping.board") }}',                             icon:'mdi-tablet',                  category:'Rooms',               keywords:['housekeeping','tablet','board','full screen','cleaners']},
+        @endcanany
+        @canany(['Handle laundry', 'Manage laundry'])
+        {title:'Guest Laundry',                         url:'{{ route("laundry.index") }}',                                  icon:'ri-t-shirt-line',             category:'Rooms',               keywords:['laundry','washing','dry clean','ironing','press','bag','clothes']},
+        {title:'Laundry Price List',                    url:'{{ route("laundry.prices") }}',                                 icon:'ri-price-tag-3-line',         category:'Rooms',               keywords:['laundry','prices','dry cleaning','price list']},
+        @endcanany
+        @canany(['View housekeeping', 'Do housekeeping tasks', 'Manage housekeeping'])
         {title:'Housekeeping Board',                    url:'{{ route("housekeeping.index") }}',                             icon:'mdi-broom',                   category:'Rooms',               keywords:['housekeeping','clean','dirty','inspection','turnaround','stay-over','maid']},
         @endcanany
         @canany(['View maintenance', 'Report maintenance issues', 'Manage maintenance'])

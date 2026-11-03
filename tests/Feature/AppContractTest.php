@@ -261,6 +261,17 @@ test('the guest app finds every field it reads', function () {
         $miss[] = 'no outlet takes room orders in the demo data';
     }
 
+    // Laundry: the price list and a bag.
+    $ld = $get("guest/stays/{$t2}/laundry")->json('data');
+    $check('laundry (LaundryInfo)', $ld, ['available', 'blocker', 'collecting_now', 'currency', 'express', 'groups', 'hours', 'note', 'orders', 'standard_hours']);
+    $check('laundry express', $ld['express'] ?? null, ['hours', 'percent']);
+    $check('laundry item (LaundryPriceItem)', $ld['groups'][0]['items'][0] ?? null, ['id', 'name', 'services']);
+    $check('laundry service', $ld['groups'][0]['items'][0]['services'][0] ?? null, ['id', 'label', 'price', 'price_label']);
+    \App\Models\Laundry\LaundryOrder::where('reservation_id', $in->id)->where('status', 'requested')->update(['status' => 'cancelled']);
+    $bag = $this->postJson("/api/v1/guest/stays/{$t2}/laundry", ['express' => true])->assertCreated()->json('data.orders.0');
+    $check('laundry bag (LaundryBag)', $bag, ['can_cancel', 'due', 'express', 'id', 'live', 'note', 'number', 'pieces', 'status', 'status_label', 'summary', 'time', 'total_label']);
+    $check('stay laundry', $get("guest/stays/{$t2}")->json('data'), ['can_laundry', 'laundry']);
+
     // Chat with the hotel's sections.
     $ch = $get("guest/stays/{$t2}/chat")->json('data');
     $check('chat home (ChatHome)', $ch, ['available', 'calls', 'live', 'note', 'sections']);

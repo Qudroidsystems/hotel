@@ -345,6 +345,18 @@ class HotelSettings
                     'energy.diesel_price'     => ['type' => 'money', 'label' => 'Diesel: price per litre'],
                 ],
             ],
+            'laundry' => [
+                'title' => 'Laundry', 'icon' => 'ri-t-shirt-line',
+                'intro' => 'Guests send laundry from the guest app or their booking page; staff collect and count it on the Laundry page, and the count goes on the room bill. The price list is on the Laundry page.',
+                'fields' => [
+                    'laundry.enabled'          => ['type' => 'bool', 'label' => 'Guests can send laundry from the app and their booking page'],
+                    'laundry.collection_hours' => ['type' => 'text', 'label' => 'Bags are collected (hours)', 'rules' => ['nullable', 'regex:/^\d{2}:\d{2}-\d{2}:\d{2}$/'], 'help' => 'e.g. 07:00-19:00. Guests can still ask at other times; the bag is collected when the hours start. Empty = any time.'],
+                    'laundry.standard_hours'   => ['type' => 'int', 'label' => 'Laundry comes back after (hours)', 'min' => 1, 'max' => 168],
+                    'laundry.express_hours'    => ['type' => 'int', 'label' => 'Express laundry comes back after (hours)', 'min' => 1, 'max' => 48],
+                    'laundry.express_percent'  => ['type' => 'percent', 'label' => 'Express costs more by', 'max' => 300],
+                    'laundry.guest_note'       => ['type' => 'textarea', 'label' => 'Note guests see', 'rules' => ['nullable', 'string', 'max:300'], 'help' => 'Where to leave the bag, pockets, what you don\'t wash.'],
+                ],
+            ],
             'maps' => [
                 'title' => 'Maps & Directions', 'icon' => 'ri-map-2-line',
                 'intro' => 'The maps guests and drivers see, and how travel times are worked out (arrival sharing, the car service). OpenStreetMap is free and needs nothing. Google Maps gives real road routes, live traffic times and address search: create a key in Google Cloud with the Directions, Distance Matrix, Places, Geocoding and Map Tiles APIs switched on.',

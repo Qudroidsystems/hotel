@@ -2,9 +2,11 @@
 
 namespace App\Services\Mobile;
 
+use App\Models\Laundry\LaundryOrder;
 use App\Models\Pos\GuestOrder;
 use App\Models\Transport\Ride;
 use App\Services\Transport\RideService;
+use App\Services\Laundry\LaundryService;
 use App\Services\Pos\GuestOrderService;
 use App\Exceptions\BookingException;
 use App\Models\Booking\GuestRequest;
@@ -38,12 +40,13 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffActions
 {
-    public const WORK_KINDS = ['ride', 'order', 'guest', 'housekeeping', 'maintenance', 'ticket'];
+    public const WORK_KINDS = ['ride', 'order', 'laundry', 'guest', 'housekeeping', 'maintenance', 'ticket'];
     public const APPROVAL_KINDS = ['expense', 'po', 'pr', 'shift', 'count'];
 
     private const GROUPS = [
         'ride'         => 'Cars',
         'order'        => 'Room orders',
+        'laundry'      => 'Laundry',
         'guest'        => 'Guest requests',
         'housekeeping' => 'Rooms to clean',
         'maintenance'  => 'Repairs',
@@ -123,6 +126,7 @@ class StaffActions
             'maintenance'  => $this->maintenance($user, $model, $action, $input),
             'guest'        => $this->guest($user, $model, $action, $input),
             'order'        => $this->order($user, $model, $action, $input),
+            'laundry'      => $this->laundry($user, $model, $action, $input),
             'ride'         => $this->ride($user, $model, $action, $input),
             'expense'      => $this->expense($user, $model, $action, $input),
             'po'           => $this->po($user, $model, $action, $input),
@@ -190,6 +194,23 @@ class StaffActions
             'send'    => tap("{$o->number} on its way — the guest can see that.", fn () => $svc->send($o, $user)),
             'deliver' => tap("{$o->number} delivered.", fn () => $svc->deliver($o, $user)),
             'decline' => tap("{$o->number} declined — the guest sees your reason.", fn () => $svc->decline($o, $user, (string) $input)),
+        };
+    }
+
+    private function laundry(User $user, LaundryOrder $o, string $action, ?string $input): string
+    {
+        $svc = app(LaundryService::class);
+
+        return match ($action) {
+            'collect'  => (function () use ($svc, $o, $user, $input) {
+                $o = $svc->collect($o, $user, null, null, $input);
+
+                return "{$o->number} collected — " . config('hotel.currency_symbol') . number_format((float) $o->total, 2) . " on room {$o->room_number}'s bill, due back " . $o->due_at->format('D g:i A') . '.';
+            })(),
+            'ready'    => tap("{$o->number} ready to take up.", fn () => $svc->ready($o, $user)),
+            'returned' => tap("{$o->number} returned to room {$o->room_number}.", fn () => $svc->returned($o, $user)),
+            'decline'  => tap("{$o->number} declined — the guest sees your reason.", fn () => $svc->decline($o, $user, (string) $input)),
+            'issue'    => tap('Problem recorded on the booking.', fn () => $svc->reportIssue($o, $user, (string) $input)),
         };
     }
 
@@ -298,6 +319,20 @@ class StaffActions
                     in_array($m->status, [GuestOrder::ACCEPTED, GuestOrder::ON_THE_WAY], true) ? $b('deliver', 'Delivered', $m->status === GuestOrder::ON_THE_WAY ? 'primary' : '') : null,
                 ]));
 
+            case 'laundry':
+                if (! app(LaundryService::class)->canHandle($user)) {
+                    return [];
+                }
+
+                return array_values(array_filter([
+                    // A bag with the guest's own list can be taken as listed; an unlisted bag is counted on the website.
+                    $m->status === LaundryOrder::REQUESTED && $m->lines ? $b('collect', 'Collected — as listed', 'primary', 'Note to the guest (optional)', false, 'Charge ' . config('hotel.currency_symbol') . number_format((float) $m->total, 2) . ' to the room? If the count differs, count it on the website.') : null,
+                    $m->status === LaundryOrder::REQUESTED ? $b('decline', 'Decline', 'destructive', 'Reason (the guest sees it)', true) : null,
+                    $m->status === LaundryOrder::COLLECTED ? $b('ready', 'Ready', 'primary') : null,
+                    in_array($m->status, [LaundryOrder::COLLECTED, LaundryOrder::READY], true) ? $b('returned', 'Returned to room', $m->status === LaundryOrder::READY ? 'primary' : '') : null,
+                    in_array($m->status, [LaundryOrder::COLLECTED, LaundryOrder::READY], true) ? $b('issue', 'Damaged / missing', 'destructive', 'What happened?', true) : null,
+                ]));
+
             case 'expense':
                 return $user->can('Approve expenses') && $m->status === 'pending' && $m->recorded_by !== $user->id
                     ? [$b('approve', 'Approve', 'primary', null, false, "Approve {$m->number}?"), $b('reject', 'Reject', 'destructive', 'Reason', true)] : [];
@@ -325,6 +360,7 @@ class StaffActions
             'maintenance'  => $user->canAny(['View maintenance', 'Manage maintenance']),
             'guest'        => $user->can('Handle guest requests'),
             'order'        => app(GuestOrderService::class)->canHandle($user),
+            'laundry'      => app(LaundryService::class)->canHandle($user),
             'ride'         => $user->canAny(['Manage transport', 'Drive guests']),
             'ticket'       => $user->can('Manage IT tickets'),
             'expense'      => $user->can('Approve expenses'),
@@ -370,6 +406,15 @@ class StaffActions
                 'meta'         => collect($m->lines)->filter(fn ($l) => ! empty($l['note']))->map(fn ($l) => $l['name'] . ': ' . $l['note'])->implode(' · ') ?: null,
                 'status'       => $m->status, 'status_label' => $m->staff_label, 'tone' => $this->tone($m->status_pill),
                 'url'          => route('pos.room-orders'),
+            ],
+            'laundry' => [
+                'badge'        => $m->room_number,
+                'title'        => 'Laundry ' . $m->number . ($m->express ? ' · express' : ''),
+                'subtitle'     => ($m->guest_name ?? 'Guest') . ($m->lines ? ' · ' . $m->pieces . ' pcs · ' . config('hotel.currency_symbol') . number_format((float) $m->total, 2) : ' · no list'),
+                'detail'       => ($m->lines ? $m->summary : 'Count the bag on the website when you collect it.') . ($m->note ? ' — “' . $m->note . '”' : ''),
+                'meta'         => $m->due_at && $m->status !== LaundryOrder::REQUESTED ? ($m->isLate() ? 'Overdue — was due ' : 'Due back ') . $m->due_at->format('D g:i A') . ($m->issue ? ' · ' . $m->issue : '') : null,
+                'status'       => $m->status, 'status_label' => $m->staff_label, 'tone' => $this->tone($m->status_pill),
+                'url'          => $m->status === LaundryOrder::REQUESTED ? route('laundry.collect.form', $m) : route('laundry.index'),
             ],
             'housekeeping' => [
                 'badge'        => $m->room?->number,
@@ -457,6 +502,7 @@ class StaffActions
             'maintenance'  => MaintenanceOrder::class,
             'guest'        => GuestRequest::class,
             'order'        => GuestOrder::class,
+            'laundry'      => LaundryOrder::class,
             'ride'         => Ride::class,
             'ticket'       => ItTicket::class,
             'expense'      => Expense::class,

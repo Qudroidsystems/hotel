@@ -84,6 +84,8 @@ class PermissionMeta
         'Handle guest requests'     => ['Manage', 'See and answer requests guests send from their booking page (towels, repairs, room service…).'],
         'Chat with guests'          => ['Manage', 'Answer guests\' chats and calls for the hotel sections they work in (Reception, Restaurant, Bar …).'],
         'Manage guest chat'         => ['Manage', 'See every section\'s chats and calls, and set sections up: who answers, hours, phone numbers.'],
+        'Handle laundry'            => ['Manage', 'Collect and count guests\' laundry (the count goes on the room bill), mark it ready and returned, record damaged or missing pieces.'],
+        'Manage laundry'            => ['Manage', 'Set the laundry price list: items, and the price of washing, dry cleaning and pressing each.'],
         'Message guests'            => ['Manage', 'Send SMS / WhatsApp messages to guests and read their replies.'],
         'Record expenses'           => ['Create', 'Record running costs (diesel, repairs, supplies…) with receipts. Small ones are approved automatically.'],
         'View expenses'             => ['View',   'See every expense, budgets and spending by department — not only your own.'],
