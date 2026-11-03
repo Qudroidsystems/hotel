@@ -57,6 +57,18 @@
         <tr><td style="{{ $td }}">Servicing plans overdue</td><td style="{{ $td }};text-align:right">{{ $repairs['plans_overdue'] }}</td></tr>
     </table>
 
+    @if (! empty($energy))
+    <h3 style="font-size: 15px; margin: 18px 0 6px">Power &amp; diesel</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+        @if ($energy['grid_availability'] !== null)<tr><td style="{{ $td }}">Grid power available</td><td style="{{ $td }};text-align:right">{{ $energy['grid_availability'] }}% ({{ $energy['outages'] }} outage(s), {{ $energy['grid_off_hours'] }} h off)</td></tr>@endif
+        <tr><td style="{{ $td }}">Generator hours</td><td style="{{ $td }};text-align:right">{{ $energy['generator_hours'] }} h · about {{ number_format($energy['expected_litres']) }} L burned</td></tr>
+        <tr><td style="{{ $td }}">Diesel delivered</td><td style="{{ $td }};text-align:right">{{ number_format($energy['delivered_litres']) }} L ({{ $fmt($energy['delivered_cost']) }})</td></tr>
+        <tr><td style="{{ $td }}">Energy per occupied room-night</td><td style="{{ $td }};text-align:right">{{ $energy['per_room_night'] !== null ? $fmt($energy['per_room_night']) : '—' }}</td></tr>
+        <tr><td style="{{ $td }}">Saved by switching off</td><td style="{{ $td }};text-align:right">{{ number_format($energy['saved_kwh'], 1) }} kWh (about {{ $fmt($energy['saved_value']) }} of diesel)</td></tr>
+        @foreach ($energy['flags'] as $flag)<tr><td colspan="2" style="{{ $td }};color:#b42318">Diesel check — {{ $flag }}</td></tr>@endforeach
+    </table>
+    @endif
+
     <p style="margin-top: 18px"><a href="{{ route('reports.index', ['from' => $from->toDateString(), 'to' => $to->toDateString()]) }}" style="color: #0f766e">Open the full report</a></p>
     <p style="color: #94a3b8; font-size: 12px">Sent because this address is under Hotel Settings → Report E-mails. Powered by Qlouds · Developed by Qudroid Systems</p>
 </div>

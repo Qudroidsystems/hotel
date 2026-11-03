@@ -106,6 +106,24 @@ test('the staff app finds every field it reads', function () {
     }
     $check('home counts', $home['counts'] ?? null, ['approvals', 'chats', 'unread_notifications', 'urgent', 'work']);
 
+    // Energy Saver (lib/data/energy.dart).
+    $en = ($this->api)('energy')->json('data');
+    $check('energy (EnergyHome)', $en, ['actions', 'all_on_kw', 'at', 'can_manage', 'counts', 'forecast', 'now_kw', 'peak24_kw', 'power', 'switched_off', 'week']);
+    $check('energy power (EnergyPower)', $en['power'] ?? null, ['choice', 'grid_on', 'line', 'litres_per_hour', 'plan', 'plan_litres', 'plan_saves_litres', 'sources', 'state', 'urgent']);
+    $check('energy source (EnergySourceInfo)', $en['power']['sources'][0] ?? null, ['capacity_kw', 'fuel_litres', 'hours_left', 'id', 'kind', 'name', 'run_hours_today', 'running', 'since', 'tank_litres']);
+    $check('energy action (EnergyActionItem)', $en['actions'][0] ?? null, ['action', 'done_by', 'id', 'kw', 'reason', 'saves', 'target', 'title', 'until']);
+    $check('energy week', $en['week'] ?? null, ['label']);
+
+    // The door (lib/data/tickets.dart): tonight's ticketed event and a scan.
+    $ev = contractTicketedEvent();
+    $door = ($this->api)('tickets/door')->json('data');
+    $check('tickets/door (DoorEvent)', collect($door)->firstWhere('id', $ev->id), ['capacity', 'doors_at', 'doors_open', 'hall', 'id', 'in', 'people_in', 'sold', 'title', 'when']);
+    $sold = app(\App\Services\Events\TicketService::class)->sell($ev, [$ev->ticketTypes()->first()->id => 1], ['name' => 'Door Test'], 'cash');
+    app('auth')->forgetGuards();
+    $scan = $this->withToken($this->token)->postJson('/api/v1/tickets/scan', ['code' => $sold->tickets()->first()->code])->assertOk()->json('data');
+    $check('tickets/scan (ScanResult)', $scan, ['message', 'ok', 'state', 'ticket']);
+    $check('scan ticket', $scan['ticket'] ?? null, ['admits', 'code', 'event', 'name', 'type', 'used_at']);
+
     // Driver mode, as the demo driver (a ride assigned to him).
     $musa = User::where('email', 'driver.musa@smarthotel.com')->first();
     if ($musa) {
@@ -211,6 +229,21 @@ test('the guest app finds every field it reads', function () {
         $miss[] = 'no demo ride';
     }
 
+    // Event tickets bought online (lib/data/explore_models.dart).
+    $ev = contractTicketedEvent();
+    $list = $get('guest/events')->json();
+    $pe = collect($list['data'])->firstWhere('id', $ev->id);
+    $check('guest/events (PublicEvent)', $pe, ['ends_at', 'from_label', 'hall', 'has_promos', 'id', 'info', 'starts_at', 'ticket_types', 'title', 'type', 'when']);
+    $check('event ticket type (TicketType)', $pe['ticket_types'][0] ?? null, ['admits', 'available', 'description', 'early_until', 'full_price_label', 'id', 'left', 'max_per_order', 'name', 'note', 'price', 'price_label']);
+    $check('guest/events meta', $list['meta'] ?? null, ['currency', 'pay_online']);
+    $tq = $this->postJson("/api/v1/guest/events/{$ev->id}/quote", ['lines' => [['ticket_type_id' => $pe['ticket_types'][0]['id'], 'quantity' => 2]], 'promo' => 'CONTRACT'])->assertOk()->json('data');
+    $check('ticket quote (TicketQuote)', $tq, ['count', 'discount_label', 'promo', 'rows', 'total', 'total_label']);
+    $check('ticket quote row', $tq['rows'][0] ?? null, ['amount_label', 'early_bird', 'name', 'quantity']);
+    $free = $ev->ticketTypes()->create(['name' => 'Guest list', 'price' => 0]);
+    $to = $this->postJson("/api/v1/guest/events/{$ev->id}/orders", ['lines' => [['ticket_type_id' => $free->id, 'quantity' => 1]], 'name' => 'Ada', 'email' => 'ada@example.com'])->assertCreated()->json('data');
+    $check('ticket order (TicketOrder)', $to, ['event', 'hall', 'held_until', 'number', 'pay_url', 'quantity', 'status', 'tickets', 'token', 'total_label', 'url', 'when']);
+    $check('ticket order ticket (GuestTicket)', $get("guest/ticket-orders/{$to['token']}")->json('data.tickets.0'), ['code', 'status', 'type', 'url']);
+
     // Room orders: an in-house guest's menu, and an order on their stay.
     $in = \App\Models\Reservation::where('status', 'checked_in')->first();
     $t2 = app(\App\Services\Booking\OnlineBookingService::class)->ensureToken($in);
@@ -243,3 +276,20 @@ test('the guest app finds every field it reads', function () {
 
     expect($miss)->toBe([]);
 });
+
+/** A confirmed event tonight with tickets on sale (an early-bird type and a promo code), for the contract checks. */
+function contractTicketedEvent(): \App\Models\Events\Event
+{
+    if ($e = \App\Models\Events\Event::where('title', 'Contract Night')->first()) {
+        return $e;
+    }
+    $hall = \App\Models\Events\Hall::first() ?? \App\Models\Events\Hall::create(['name' => 'Contract Hall', 'capacity_theatre' => 100, 'capacity_banquet' => 80]);
+    $e = \App\Models\Events\Event::create(['number' => 'EV-CONTRACT', 'title' => 'Contract Night', 'hall_id' => $hall->id, 'status' => 'confirmed', 'event_type' => 'other', 'setup' => 'theatre',
+        'starts_at' => now()->addHour(), 'ends_at' => now()->addHours(5), 'guests_expected' => 50, 'organiser_name' => 'Hotel', 'subtotal' => 0, 'total' => 0,
+        'is_ticketed' => true, 'ticket_sales_open' => true]);
+    $e->forceFill(['is_ticketed' => true, 'ticket_sales_open' => true])->save();
+    $e->ticketTypes()->create(['name' => 'Regular', 'price' => 5000, 'early_price' => 4000, 'early_until' => now()->addDay()]);
+    $e->ticketPromos()->create(['code' => 'CONTRACT', 'kind' => 'percent', 'value' => 10]);
+
+    return $e;
+}

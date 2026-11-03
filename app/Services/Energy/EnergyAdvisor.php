@@ -7,6 +7,8 @@ use App\Enums\RoomStatus;
 use App\Models\Booking\GuestArrival;
 use App\Models\Energy\EnergyAction;
 use App\Models\Energy\EnergyEvent;
+use App\Models\Energy\EnergyFuelDelivery;
+use App\Models\Energy\EnergySample;
 use App\Models\Energy\EnergySource;
 use App\Models\Energy\EnergyZone;
 use App\Models\Events\Event;
@@ -18,6 +20,7 @@ use App\Models\Room;
 use App\Models\User;
 use App\Services\Facility\FacilityService;
 use App\Services\Mobile\StaffAlerts;
+use App\Support\Audit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -577,12 +580,46 @@ class EnergyAdvisor
             }
         });
 
+        $this->sample($snap, $now);
         $fresh = EnergyAction::where('status', EnergyAction::OPEN)->whereNull('alerted_at')->get();
         if ($alert && $fresh->isNotEmpty()) {
             $this->alert($fresh, $snap);
         }
 
         return ['new' => $fresh->count(), 'open' => EnergyAction::where('status', EnergyAction::OPEN)->count(), 'closed' => $closed];
+    }
+
+    /** Note the hotel's power now, at most every 10 minutes (the reports and the diesel check are made from these). */
+    private function sample(array $snap, Carbon $now): void
+    {
+        if (! Schema::hasTable('energy_samples') || EnergySample::where('at', '>', $now->copy()->subMinutes(10))->exists()) {
+            return;
+        }
+        $p = $snap['power'];
+        EnergySample::create([
+            'at' => $now, 'kw' => $snap['now_kw'], 'grid_on' => $p['grid_on'],
+            'source_id' => $p['grid_on'] ? null : $p['running']->sortByDesc('capacity_kw')->first()?->id,
+            'litres_per_hour' => $p['litres_per_hour'], 'rooms_in_use' => $snap['counts']['in_use'],
+            'waste_kw' => round(collect($snap['suggestions'])->filter(fn ($x) => in_array($x['action'], ['off', 'low', 'eco'], true))->sum('watts') / 1000, 1),
+        ]);
+    }
+
+    /**
+     * Diesel a generator should have burned between two moments, from the samples: each sample's burn rate for
+     * the time until the next one (at most 30 minutes, so a gap in sampling doesn't count as running).
+     */
+    public function expectedLitres(EnergySource $g, Carbon $from, Carbon $to): float
+    {
+        $samples = EnergySample::where('source_id', $g->id)->whereBetween('at', [$from, $to])->orderBy('at')->get(['at', 'litres_per_hour'])->values();
+        $all = EnergySample::whereBetween('at', [$from, $to->copy()->addMinutes(30)])->orderBy('at')->pluck('at')->values();
+        $litres = 0.0;
+        foreach ($samples as $smp) {
+            $next = $all->first(fn ($t) => $t->gt($smp->at));
+            $hours = min(30, $next ? $smp->at->diffInMinutes($next) : 15) / 60;
+            $litres += $smp->litres_per_hour * $hours;
+        }
+
+        return round($litres, 1);
     }
 
     private function kwhSaved(EnergyAction $a, Carbon $until): float
@@ -683,10 +720,91 @@ class EnergyAdvisor
         EnergyEvent::create(['source_id' => $g->id, 'kind' => $on ? 'on' : 'off', 'user_id' => $user?->id, 'by' => $by, 'note' => $g->name . ($on ? ' started' : ' stopped')]);
     }
 
-    public function fuel(EnergySource $g, float $litres, ?User $user = null, string $by = 'staff'): void
+    /** A reading of the tank. Compared with the last reading, the deliveries since and what the generator should have burned. */
+    public function fuel(EnergySource $g, float $litres, ?User $user = null, string $by = 'staff'): ?array
     {
+        $prev = EnergyEvent::where('source_id', $g->id)->where('kind', 'fuel')->latest('created_at')->latest('id')->first();
         $g->forceFill(['fuel_litres' => max(0, $litres), 'fuel_at' => now()])->save();
         EnergyEvent::create(['source_id' => $g->id, 'kind' => 'fuel', 'value' => $litres, 'user_id' => $user?->id, 'by' => $by, 'note' => "Fuel {$litres} L"]);
+
+        return $prev && $prev->value !== null ? $this->checkFuel($g, (float) $prev->value, $prev->created_at, $litres) : null;
+    }
+
+    /**
+     * Diesel gone between two readings (start + delivered − now) against what the generator should have burned.
+     * Much more gone than burned — a leak, a wrong reading, or diesel taken — tells the control room.
+     *
+     * @return array{used: float, expected: float, delivered: float, hours: float, flagged: bool}
+     */
+    public function checkFuel(EnergySource $g, float $before, Carbon $since, float $now): array
+    {
+        $delivered = (float) EnergyFuelDelivery::where('source_id', $g->id)->whereBetween('delivered_at', [$since, now()])->sum('litres');
+        $used = round($before + $delivered - $now, 1);
+        $expected = $this->expectedLitres($g, $since, now());
+        $hours = round($since->diffInMinutes(now()) / 60, 1);
+        $flagged = $hours >= 6 && $expected > 0 && $used > $expected * 1.25 && $used - $expected >= 20;
+        if ($flagged) {
+            $msg = "{$g->name}: " . number_format($used) . ' L of diesel gone since ' . $since->format('D g:i A') . ', but it should have burned about ' . number_format($expected) . ' L'
+                . ($delivered > 0 ? ' (' . number_format($delivered) . ' L delivered in between)' : '') . '. Check the tank and the readings.';
+            Audit::record('energy.fuel_variance', $msg, $g, flagged: true);
+            $this->alerts->notify('View energy saver', ['title' => 'Diesel: more gone than burned', 'body' => $msg, 'group' => 'energy', 'level' => 'urgent', 'url' => 'energy', 'thread' => "fuel:{$g->id}", 'kind' => 'energy']);
+        }
+
+        return compact('used', 'expected', 'delivered', 'hours', 'flagged');
+    }
+
+    /**
+     * Diesel delivered into a tank: logged once, added to the tank (or the reading taken after filling), and — when
+     * asked — recorded as an expense under "Diesel / generator fuel".
+     * data: litres, price_per_litre, supplier_id, supplier_name, invoice_ref, level_after, notes, delivered_at, expense (bool)
+     */
+    public function delivery(EnergySource $g, array $data, ?User $user = null): EnergyFuelDelivery
+    {
+        $litres = round((float) $data['litres'], 1);
+        if ($litres <= 0) {
+            throw new \App\Exceptions\BookingException('Enter the litres delivered.');
+        }
+        $price = round((float) ($data['price_per_litre'] ?? 0), 2);
+        $supplierName = $data['supplier_name'] ?? null;
+        if (! empty($data['supplier_id']) && Schema::hasTable('suppliers')) {
+            $supplierName = \App\Models\Inventory\Supplier::find($data['supplier_id'])?->name ?? $supplierName;
+        }
+        $d = DB::transaction(function () use ($g, $data, $litres, $price, $supplierName, $user) {
+            $d = EnergyFuelDelivery::create([
+                'source_id' => $g->id, 'delivered_at' => $data['delivered_at'] ?? now(), 'litres' => $litres, 'price_per_litre' => $price,
+                'total' => round($litres * $price, 2), 'supplier_id' => $data['supplier_id'] ?? null, 'supplier_name' => $supplierName,
+                'invoice_ref' => $data['invoice_ref'] ?? null, 'level_after' => isset($data['level_after']) && $data['level_after'] !== '' ? (float) $data['level_after'] : null,
+                'received_by' => $user?->id, 'notes' => $data['notes'] ?? null,
+            ]);
+            EnergyEvent::create(['source_id' => $g->id, 'kind' => 'delivery', 'value' => $litres, 'user_id' => $user?->id, 'by' => $user ? 'staff' : 'device',
+                'note' => number_format($litres) . " L of diesel delivered into {$g->name}" . ($supplierName ? " by {$supplierName}" : '')]);
+
+            return $d;
+        });
+
+        // The tank: a reading after filling is best; otherwise add the delivery to the last known level.
+        if ($d->level_after !== null) {
+            $this->fuel($g, $d->level_after, $user);
+        } elseif ($g->fuel_litres !== null) {
+            $level = $g->fuel_litres + $litres;
+            $g->forceFill(['fuel_litres' => $g->tank_litres ? min($g->tank_litres, $level) : $level, 'fuel_at' => now()])->save();
+        }
+
+        if (! empty($data['expense']) && $user && $d->total > 0) {
+            $cat = \App\Models\Finance\ExpenseCategory::where('is_active', true)->where(fn ($q) => $q->where('name', 'like', '%diesel%')->orWhere('name', 'like', '%fuel%'))->orderBy('sort_order')->first()
+                ?? \App\Models\Finance\ExpenseCategory::where('is_active', true)->where('group', 'utilities')->orderBy('sort_order')->first();
+            if ($cat) {
+                $e = app(\App\Services\Finance\ExpenseService::class)->record([
+                    'category_id' => $cat->id, 'description' => 'Diesel for ' . $g->name . ' (' . number_format($litres) . ' L at ' . config('hotel.currency_symbol') . number_format($price, 2) . ')',
+                    'supplier_id' => $d->supplier_id, 'payee' => $d->supplier_id ? null : $supplierName, 'amount' => $d->total, 'tax_amount' => 0,
+                    'expense_date' => $d->delivered_at->toDateString(), 'invoice_ref' => $d->invoice_ref, 'notes' => 'From Energy Saver → Diesel deliveries',
+                ], [], $user);
+                $d->forceFill(['expense_id' => $e->id])->save();
+            }
+        }
+        Audit::record('energy.diesel_delivered', number_format($litres) . " L of diesel into {$g->name}" . ($d->total > 0 ? ' (' . config('hotel.currency_symbol') . number_format($d->total, 2) . ')' : ''), $g);
+
+        return $d;
     }
 
     /** A room sensor / key-card switch: someone is in, or the room is empty. */
@@ -701,19 +819,20 @@ class EnergyAdvisor
     // ── Figures ─────────────────────────────────────────────────────────
 
     /** What switching off saved: closed actions plus those still off, since a date. */
-    public function savings(Carbon $since): array
+    public function savings(Carbon $since, ?Carbon $until = null): array
     {
         $s = $this->settings();
-        $closed = (float) EnergyAction::whereNotNull('kwh_saved')->where('closed_at', '>=', $since)->sum('kwh_saved');
-        $ongoing = EnergyAction::where('status', EnergyAction::DONE)->whereNull('closed_at')->whereIn('action', ['off', 'low', 'eco'])->get()
+        $closed = (float) EnergyAction::whereNotNull('kwh_saved')->where('closed_at', '>=', $since)->when($until, fn ($q) => $q->where('closed_at', '<=', $until))->sum('kwh_saved');
+        // Still switched off: counted to now (only when the range runs to now).
+        $ongoing = $until && $until->lt(now()->subMinute()) ? 0.0 : EnergyAction::where('status', EnergyAction::DONE)->whereNull('closed_at')->whereIn('action', ['off', 'low', 'eco'])->get()
             ->sum(fn (EnergyAction $a) => $this->kwhSaved($a, now()));
         $kwh = round($closed + $ongoing, 1);
         $litres = round($kwh * 0.3, 1);   // a generator part-loaded uses about 0.3 L per kWh
 
         return [
             'kwh' => $kwh, 'grid_value' => round($kwh * $s['grid_price']), 'litres' => $litres, 'diesel_value' => round($litres * $s['diesel_price']),
-            'done' => EnergyAction::where('status', EnergyAction::DONE)->where('done_at', '>=', $since)->count(),
-            'skipped' => EnergyAction::where('status', EnergyAction::SKIPPED)->where('done_at', '>=', $since)->count(),
+            'done' => EnergyAction::where('status', EnergyAction::DONE)->where('done_at', '>=', $since)->when($until, fn ($q) => $q->where('done_at', '<=', $until))->count(),
+            'skipped' => EnergyAction::where('status', EnergyAction::SKIPPED)->where('done_at', '>=', $since)->when($until, fn ($q) => $q->where('done_at', '<=', $until))->count(),
         ];
     }
 

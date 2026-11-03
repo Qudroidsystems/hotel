@@ -50,6 +50,7 @@ class ReportEmails
             'r'        => $this->reports->build($from, $to),
             'prev'     => $this->reports->previous($from, $to),
             'feedback' => $this->feedback->summary($from, $to),
+            'energy'   => rescue(fn () => app(\App\Services\Energy\EnergyReportService::class)->summary($from, $to), null, false),
             'repairs'  => [
                 'open'          => MaintenanceOrder::active()->count(),
                 'overdue'       => MaintenanceOrder::active()->where('due_at', '<', now())->count(),

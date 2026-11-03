@@ -98,6 +98,7 @@ test('a recovery code signs in once, and too many wrong codes lock the step', fu
     auth()->logout();
     $this->post(route('login'), ['email' => 'ada.desk', 'password' => 'Secret@123']);
     $this->post(route('two-factor.verify'), ['code' => $codes[0]])->assertSessionHasErrors('code');   // used already
+    $this->freezeTime();   // the lock message counts seconds: a tick between requests would read 59
     foreach (range(1, 4) as $i) {
         $this->post(route('two-factor.verify'), ['code' => '111111']);
     }

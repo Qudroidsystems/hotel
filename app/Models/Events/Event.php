@@ -140,7 +140,7 @@ class Event extends Model
     {
         $admits = $this->ticketTypes()->pluck('admits', 'id');
 
-        return (int) $this->ticketOrders()->holding()->get(['lines'])->sum(fn ($o) => collect($o->lines ?? [])->sum(fn ($q, $id) => (int) $q * (int) ($admits[$id] ?? 1)));
+        return (int) $this->ticketOrders()->holding()->get(['lines'])->sum(fn ($o) => collect($o->lines ?? [])->map(fn ($q, $id) => (int) $q * (int) ($admits[$id] ?? 1))->sum());
     }
 
     public function ticketPromos()

@@ -73,7 +73,7 @@ Route::prefix('guest')->group(function () {
         Route::get('/venues/{hall}/availability', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'availability'])->whereNumber('hall');
     });
     Route::post('/bookings', [GuestBookingController::class, 'store'])->middleware('throttle:booking-actions');
-    Route::post('/events/{event}/orders', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'ticketOrder'])->whereNumber('event')->middleware('throttle:booking-actions');
+    Route::post('/events/{event}/orders', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'ticketOrder'])->whereNumber('event')->middleware('throttle:ticket-orders');
     Route::post('/venues/requests', [\App\Http\Controllers\Api\V1\GuestExploreController::class, 'request'])->middleware('throttle:booking-actions');
     Route::post('/website/enquiries', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'enquiry'])->middleware('throttle:booking-actions');
     Route::post('/website/subscribe', [\App\Http\Controllers\Api\V1\GuestWebsiteController::class, 'subscribe'])->middleware('throttle:booking-actions');
@@ -152,6 +152,7 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         Route::post('/energy/grid', 'grid');
         Route::post('/energy/sources/{source}/running', 'running')->whereNumber('source');
         Route::post('/energy/sources/{source}/fuel', 'fuel')->whereNumber('source');
+        Route::post('/energy/sources/{source}/delivery', 'delivery')->whereNumber('source');
     });
     Route::controller(\App\Http\Controllers\Chat\StaffChatController::class)->group(function () {
         Route::get('/chats', 'index');

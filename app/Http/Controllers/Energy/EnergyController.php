@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Energy;
 use App\Http\Controllers\Controller;
 use App\Models\Energy\EnergyAction;
 use App\Models\Energy\EnergyEvent;
+use App\Models\Energy\EnergyFuelDelivery;
 use App\Models\Energy\EnergySource;
 use App\Models\Energy\EnergyZone;
 use App\Models\Events\Hall;
@@ -21,7 +22,7 @@ class EnergyController extends Controller
     public function __construct(private EnergyAdvisor $energy)
     {
         $this->middleware('permission:View energy saver|Manage energy saver');
-        $this->middleware('permission:Manage energy saver')->only(['setup', 'saveZone', 'deleteZone', 'saveSource', 'deleteSource']);
+        $this->middleware('permission:Manage energy saver')->only(['setup', 'saveZone', 'deleteZone', 'saveSource', 'deleteSource', 'storeDelivery']);
     }
 
     public function index(Request $request)
@@ -105,9 +106,59 @@ class EnergyController extends Controller
     public function fuel(Request $request, EnergySource $source)
     {
         $litres = (float) $request->validate(['litres' => 'required|numeric|min:0|max:100000'])['litres'];
-        $this->energy->fuel($source, $litres, $request->user());
+        $check = $this->energy->fuel($source, $litres, $request->user());
 
-        return $this->answer($request, "{$source->name}: {$litres} L recorded.");
+        return $this->answer($request, "{$source->name}: {$litres} L recorded." . ($check && $check['flagged'] ? " More diesel is gone than the generator should have burned ({$check['used']} L against about {$check['expected']} L): check the tank." : ''));
+    }
+
+    // ── Fuel & energy report, diesel deliveries ───────────────────────────
+
+    /** GET /energy/report?from=&to=  (default: this month so far) — ?csv=1 for the days as a spreadsheet. */
+    public function report(Request $request, \App\Services\Energy\EnergyReportService $reports)
+    {
+        $from = $request->filled('from') ? \Illuminate\Support\Carbon::parse($request->query('from')) : today()->startOfMonth();
+        $to = $request->filled('to') ? \Illuminate\Support\Carbon::parse($request->query('to')) : today();
+        if ($to->lt($from)) {
+            [$from, $to] = [$to, $from];
+        }
+        $from = $from->max($to->copy()->subDays(366));
+        $r = $reports->build($from, $to);
+        if ($request->boolean('csv')) {
+            return response($reports->csv($r), 200, ['Content-Type' => 'text/csv', 'Content-Disposition' => 'attachment; filename="energy-' . $from->toDateString() . '-to-' . $to->toDateString() . '.csv"']);
+        }
+
+        return view('energy.report', ['pagetitle' => 'Fuel & energy report', 'r' => $r]);
+    }
+
+    /** GET /energy/fuel — diesel deliveries, and the form to record one. */
+    public function fuelLog(Request $request)
+    {
+        return view('energy.fuel', [
+            'pagetitle' => 'Diesel deliveries',
+            'deliveries' => EnergyFuelDelivery::with('source:id,name', 'receiver:id,name', 'expense:id,number,status')->latest('delivered_at')->paginate(30),
+            'tanks' => EnergySource::where('kind', 'generator')->where('is_active', true)->orderBy('capacity_kw')->get(),
+            'suppliers' => \Illuminate\Support\Facades\Schema::hasTable('suppliers') ? \App\Models\Inventory\Supplier::orderBy('name')->get(['id', 'name']) : collect(),
+            'price' => $this->energy->settings()['diesel_price'],
+            'canExpense' => $request->user()->can('Record expenses'),
+        ]);
+    }
+
+    public function storeDelivery(Request $request)
+    {
+        $d = $request->validate([
+            'source_id' => 'required|integer|exists:energy_sources,id', 'litres' => 'required|numeric|min:1|max:200000',
+            'price_per_litre' => 'nullable|numeric|min:0|max:100000', 'supplier_id' => 'nullable|integer|exists:suppliers,id',
+            'supplier_name' => 'nullable|string|max:120', 'invoice_ref' => 'nullable|string|max:60', 'level_after' => 'nullable|numeric|min:0|max:200000',
+            'delivered_at' => 'nullable|date|before_or_equal:now', 'notes' => 'nullable|string|max:255', 'expense' => 'nullable|boolean',
+        ]);
+        $d['expense'] = $request->boolean('expense') && $request->user()->can('Record expenses');
+        try {
+            $x = $this->energy->delivery(EnergySource::findOrFail($d['source_id']), $d, $request->user());
+        } catch (\App\Exceptions\BookingException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', number_format($x->litres) . ' L recorded' . ($x->expense_id ? ' and added to Expenses (' . $x->expense?->number . ').' : '.'));
     }
 
     // ── Setting up ─────────────────────────────────────────────────────

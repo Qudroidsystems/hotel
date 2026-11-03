@@ -52,6 +52,8 @@ class AppServiceProvider extends ServiceProvider
         // Guests on the hotel Wi-Fi can share one public IP, so per-IP limits stay generous
         // and actions on an existing booking are limited per booking instead.
         RateLimiter::for('booking-actions', fn (Request $r) => Limit::perMinute(30)->by('ba|' . $r->ip()));
+        // Online ticket orders hold tickets while the buyer pays: few per connection, so nobody can hold a whole event.
+        RateLimiter::for('ticket-orders', fn (Request $r) => Limit::perMinutes(20, 6)->by('to|' . $r->ip()));
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
         // Chat and calls: a live conversation asks often (new messages, call signals), so per booking, generously.
         RateLimiter::for('guest-chat', fn (Request $r) => Limit::perMinute(240)->by('gc|' . ($r->route('token') ?: $r->input('token') ?: $r->ip())));

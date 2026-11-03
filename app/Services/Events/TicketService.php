@@ -237,6 +237,10 @@ class TicketService
         if (! $this->paystack->enabled()) {
             throw new BookingException('Online payment isn’t available right now. Buy your tickets at the hotel’s front desk.');
         }
+        // One buyer can't hold more than a couple of unpaid orders at once (tickets held while paying).
+        if (EventTicketOrder::holding()->where('buyer_email', $buyer['email'])->count() >= 2) {
+            throw new BookingException('You already have tickets waiting for payment. Finish paying for those first, or wait a few minutes for them to be released.');
+        }
 
         $order = DB::transaction(function () use ($event, $lines, $buyer, $promo, $channel) {
             $event = Event::whereKey($event->id)->lockForUpdate()->firstOrFail();

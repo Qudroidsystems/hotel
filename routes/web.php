@@ -137,7 +137,7 @@ Route::middleware('throttle:booking-pages')->group(function () {
     // Tickets for anyone: an event's ticket page, buying online, and the buyer's page with their QR codes
     Route::get('/events/{event}/tickets', [\App\Http\Controllers\Events\TicketShopController::class, 'show'])->whereNumber('event')->name('tickets.shop');
     Route::post('/events/{event}/tickets/quote', [\App\Http\Controllers\Events\TicketShopController::class, 'quote'])->whereNumber('event')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:60,1')->name('tickets.quote');
-    Route::post('/events/{event}/tickets', [\App\Http\Controllers\Events\TicketShopController::class, 'buy'])->whereNumber('event')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-actions')->name('tickets.buy');
+    Route::post('/events/{event}/tickets', [\App\Http\Controllers\Events\TicketShopController::class, 'buy'])->whereNumber('event')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:ticket-orders')->name('tickets.buy');
     Route::get('/my-tickets/{token}', [\App\Http\Controllers\Events\TicketShopController::class, 'mine'])->where('token', '[A-Za-z0-9]{48}')->name('tickets.mine');
     Route::get('/my-tickets/{token}/pay', [\App\Http\Controllers\Events\TicketShopController::class, 'pay'])->where('token', '[A-Za-z0-9]{48}')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('tickets.pay');
     Route::get('/stay/{token}/weather', [GuestPortalController::class, 'weather'])->name('stay.weather');
@@ -737,6 +737,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/sources/{source}/running', 'running')->whereNumber('source')->name('running');
         Route::post('/sources/{source}/fuel', 'fuel')->whereNumber('source')->name('fuel');
         Route::get('/setup', 'setup')->name('setup');
+        Route::get('/report', 'report')->name('report');
+        Route::get('/fuel', 'fuelLog')->name('fuel.index');
+        Route::post('/fuel', 'storeDelivery')->name('fuel.store');
         Route::post('/zones', 'saveZone')->name('zones.store');
         Route::put('/zones/{zone}', 'saveZone')->whereNumber('zone')->name('zones.update');
         Route::delete('/zones/{zone}', 'deleteZone')->whereNumber('zone')->name('zones.destroy');

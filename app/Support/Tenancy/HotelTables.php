@@ -9,7 +9,7 @@ final class HotelTables
         'attendance_days', 'attendance_points', 'attendance_punches', 'audit_logs', 'buildings', 'cash_shift_movements', 'cash_shifts', 'chat_conversations', 'chat_sections', 'guest_calls',
         'channel_bookings', 'channel_sync_logs', 'companies', 'company_ledger_entries', 'departments', 'event_items', 'event_packages',
         'event_payments', 'events', 'expense_categories', 'expenses', 'floors', 'folio_charges', 'guest_arrivals', 'folios', 'guest_messages', 'guest_orders', 'guest_requests',
-        'energy_actions', 'energy_events', 'energy_sources', 'energy_zones', 'guests', 'halls', 'hotel_bank_accounts', 'housekeeping_tasks', 'ical_feeds', 'incident_updates', 'incidents', 'it_alerts', 'it_assets',
+        'energy_actions', 'energy_events', 'energy_fuel_deliveries', 'energy_samples', 'energy_sources', 'energy_zones', 'guests', 'halls', 'hotel_bank_accounts', 'housekeeping_tasks', 'ical_feeds', 'incident_updates', 'incidents', 'it_alerts', 'it_assets',
         'it_checks', 'it_maintenance_windows', 'it_monitors', 'it_ticket_updates', 'it_tickets', 'lost_items', 'loyalty_entries',
         'maintenance_orders', 'night_audits', 'online_payments', 'payments', 'pos_categories', 'pos_item_components', 'pos_items',
         'pos_order_items', 'pos_orders', 'pos_outlets', 'purchase_order_lines', 'purchase_orders', 'purchase_request_lines',

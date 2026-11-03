@@ -53,6 +53,8 @@
     <x-cb.hero title="Energy Saver" icon="ri-flashlight-line" subtitle="Rooms and places that can be switched off now, rooms to switch on before guests arrive, and the generator that carries the hotel. Updated every 15 minutes from bookings, arrivals, cleaning, halls and opening hours.">
         <x-slot:actions>
             <form method="POST" action="{{ route('energy.sync') }}">@csrf<button class="cb-hero-btn" type="submit"><i class="ri-refresh-line"></i> Check now</button></form>
+            <a class="cb-hero-btn" href="{{ route('energy.report') }}"><i class="ri-bar-chart-box-line"></i> Report</a>
+            <a class="cb-hero-btn" href="{{ route('energy.fuel.index') }}"><i class="ri-gas-station-line"></i> Diesel</a>
             @can('Manage energy saver')<a class="cb-hero-btn" href="{{ route('energy.setup') }}"><i class="ri-settings-3-line"></i> Places &amp; generators</a>@endcan
         </x-slot:actions>
     </x-cb.hero>

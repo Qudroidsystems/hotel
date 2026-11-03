@@ -96,9 +96,25 @@ class EnergyApiController extends Controller
     {
         $this->can($request);
         $litres = (float) $request->validate(['litres' => 'required|numeric|min:0|max:100000'])['litres'];
-        $this->energy->fuel($source, $litres, $request->user());
+        $check = $this->energy->fuel($source, $litres, $request->user());
 
-        return $this->ok(null, "{$litres} L recorded.");
+        return $this->ok($check, "{$litres} L recorded." . ($check && $check['flagged'] ? " More diesel is gone than {$source->name} should have burned ({$check['used']} L against about {$check['expected']} L)." : ''));
+    }
+
+    /** POST /energy/sources/{source}/delivery {litres, price_per_litre, supplier_name, level_after} — diesel delivered. */
+    public function delivery(Request $request, EnergySource $source)
+    {
+        abort_unless($request->user()?->can('Manage energy saver'), 403, 'Only the people who set up Energy Saver record deliveries.');
+        $d = $request->validate(['litres' => 'required|numeric|min:1|max:200000', 'price_per_litre' => 'nullable|numeric|min:0|max:100000',
+            'supplier_name' => 'nullable|string|max:120', 'invoice_ref' => 'nullable|string|max:60', 'level_after' => 'nullable|numeric|min:0|max:200000', 'expense' => 'nullable|boolean']);
+        $d['expense'] = $request->boolean('expense') && $request->user()->can('Record expenses');
+        try {
+            $x = $this->energy->delivery($source, $d, $request->user());
+        } catch (\App\Exceptions\BookingException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return $this->ok(['id' => $x->id, 'expense' => $x->expense_id !== null], number_format($x->litres) . ' L recorded' . ($x->expense_id ? ' and added to Expenses.' : '.'));
     }
 
     /**

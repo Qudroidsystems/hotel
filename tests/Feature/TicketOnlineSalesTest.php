@@ -95,12 +95,17 @@ test('an order never paid lets its tickets go; free tickets are issued at once',
     expect($this->vip->fresh()->left())->toBe(0);
     $this->post(route('tickets.buy', $e->id), ['lines' => [$this->vip->id => 1], 'name' => 'Kemi', 'email' => 'k@example.com'])->assertSessionHas('error', 'VIP: all taken while other buyers pay — some may come back in a few minutes.');
 
+    // One buyer holds at most two unpaid orders.
+    $this->post(route('tickets.buy', $e->id), ['lines' => [$this->regular->id => 1], 'name' => 'Tunde', 'email' => 't@example.com'])->assertRedirect('https://checkout.paystack.com/abc');
+    $this->post(route('tickets.buy', $e->id), ['lines' => [$this->regular->id => 1], 'name' => 'Tunde', 'email' => 't@example.com'])
+        ->assertSessionHas('error', 'You already have tickets waiting for payment. Finish paying for those first, or wait a few minutes for them to be released.');
+
     $o = EventTicketOrder::first();
     $this->get(route('tickets.callback', ['reference' => $o->gateway_reference]))->assertRedirect();
     expect($o->fresh()->status)->toBe('pending');
 
     $this->travelTo(now()->addMinutes(TicketService::HOLD_MINUTES + 1));
-    expect(app(TicketService::class)->expire())->toBe(1)->and($this->vip->fresh()->left())->toBe(3);
+    expect(app(TicketService::class)->expire())->toBe(2)->and($this->vip->fresh()->left())->toBe(3);
 
     // Free: no payment page.
     $this->actingAs($this->admin);

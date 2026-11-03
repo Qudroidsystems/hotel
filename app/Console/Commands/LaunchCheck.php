@@ -132,6 +132,15 @@ class LaunchCheck extends Command
         $default = $admins->first(fn ($u) => Hash::check((string) env('ADMIN_PASSWORD', 'ChangeMe@123'), $u->password) || Hash::check('ChangeMe@123', $u->password));
         $this->check(! $default, 'Super Admin password has been changed', 'The Super Admin (' . $default?->email . ') still has the starting password: sign in and change it');
 
+        // Two-step sign-in for the roles that must have it (HOTEL_2FA_ROLES).
+        if (class_exists(\App\Support\Auth\TwoFactor::class)) {
+            $missing = User::where('is_disabled', false)->get()->filter(fn ($u) => \App\Support\Auth\TwoFactor::required($u) && ! \App\Support\Auth\TwoFactor::enabled($u));
+            $this->check($missing->isEmpty(), 'Everyone who must use two-step sign-in has it on', $missing->count() . ' account(s) must still set up two-step sign-in (' . $missing->pluck('email')->take(3)->join(', ') . '): they are asked at their next sign-in', warnOnly: true);
+        }
+
+        $demoDriver = User::where('email', 'driver.musa@smarthotel.com')->exists();
+        $this->check(! $demoDriver, 'No demo driver account', 'The demo driver (driver.musa@smarthotel.com) exists: disable or delete it before going live');
+
         $demo = User::where('email', 'like', '%@smarthotel.test')->count();
         $this->check($demo === 0, 'No demo staff accounts', "{$demo} demo staff account(s) (@smarthotel.test) exist: this looks like demo data, not the live hotel");
         $this->check(User::where('is_disabled', false)->count() > 1, User::where('is_disabled', false)->count() . ' active staff accounts', 'Only the Super Admin exists: add staff under Users', warnOnly: true);
@@ -184,6 +193,23 @@ class LaunchCheck extends Command
         if (config('hotel.booking.guest_calls', true)) {
             $turn = filled(config('services.webrtc.turn_urls')) && (filled(config('services.webrtc.turn_secret')) || filled(config('services.webrtc.turn_user')));
             $this->check($turn, 'Calls relay through ' . config('services.webrtc.turn_urls'), 'No TURN server for guest calls: many calls on mobile data will connect but stay silent. Install coturn (deploy/turnserver.conf) or add a TURN service in Hotel Settings → Live Chat & Calls', warnOnly: true);
+        }
+
+        // Energy Saver: generators and places set up, tanks read.
+        if (config('hotel.energy.enabled', true) && \Illuminate\Support\Facades\Schema::hasTable('energy_sources')) {
+            $sets = \App\Models\Energy\EnergySource::where('kind', 'generator')->where('is_active', true)->get();
+            $this->check($sets->isNotEmpty() || \App\Models\Energy\EnergyZone::exists(), 'Energy Saver set up (' . $sets->count() . ' generator(s), ' . \App\Models\Energy\EnergyZone::count() . ' place(s))',
+                'Energy Saver has no generators or places yet: rooms are worked out from bookings, but add them under Energy Saver → Places & generators for generator advice and the diesel check', warnOnly: true);
+            $unread = $sets->filter(fn ($g) => ! $g->fuel_at || $g->fuel_at->lt(now()->subDays(7)));
+            if ($sets->isNotEmpty()) {
+                $this->check($unread->isEmpty(), 'Diesel tanks read in the last week', 'Not read for a week or more: ' . $unread->pluck('name')->join(', ') . '. Read the tanks (Energy Saver → Power sources) so the diesel check can spot losses', warnOnly: true);
+            }
+        }
+
+        // Tickets on sale with no online payment: only desk and room-bill sales work.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'ticket_sales_open') && \App\Models\Events\Event::where('ticket_sales_open', true)->where('ends_at', '>', now())->exists()) {
+            $this->check(app(\App\Services\Booking\PaystackService::class)->enabled(), 'Event tickets can be bought online (Paystack)',
+                'Tickets are on sale but online payment is off: only desk and room-bill sales work. Hotel Settings → Online Payments', warnOnly: true);
         }
 
         $behind = \App\Models\NightAudit::exists() ? \App\Models\NightAudit::businessDate()->diffInDays(today(), false) : 0;

@@ -27,7 +27,8 @@ class TicketShopController extends Controller
     public function show(int $event)
     {
         $e = $this->event($event);
-        abort_if($e->ticketSalesBlocker() && $e->ends_at->isPast(), 404);
+        // Only events on the public calendar: confirmed (or just finished), never an enquiry or a provisional booking.
+        abort_unless(in_array($e->status, ['confirmed', 'completed'], true) && $e->ends_at->gt(now()->subDays(2)), 404);
 
         return view('events.tickets.shop', ['e' => $e->load(['hall', 'ticketTypes' => fn ($q) => $q->where('is_active', true)]), 'blocker' => $e->ticketSalesBlocker(),
             'hasPromos' => $e->ticketPromos()->where('is_active', true)->exists(), 'online' => app(\App\Services\Booking\PaystackService::class)->enabled()]);
