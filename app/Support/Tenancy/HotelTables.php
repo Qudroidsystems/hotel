@@ -24,5 +24,6 @@ final class HotelTables
         'guest_feedback', 'maintenance_plans',
         'event_ticket_promos', 'laundry_items', 'laundry_orders',
         'wellness_venues', 'wellness_services', 'wellness_therapists', 'wellness_bookings',
+        'staff_pay', 'payroll_runs', 'payslips',
     ];
 }

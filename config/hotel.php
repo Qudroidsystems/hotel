@@ -245,6 +245,25 @@ return [
     ],
 
     /*
+    | Payroll (Hotel Settings → Payroll). Tax bands are the Nigeria Tax Act 2025 personal income tax bands (from
+    | January 2026): each "width:rate%", the last "*" is everything above. Check them with your tax adviser.
+    */
+    'payroll' => [
+        'tax_bands'           => '800000:0, 2200000:15, 9000000:18, 13000000:21, 25000000:23, *:25',
+        'rent_relief_percent' => 20,
+        'rent_relief_cap'     => 500000,
+        'pension_employee'    => 8,
+        'pension_employer'    => 10,
+        'nhf'                 => 2.5,     // of basic salary
+        'deduct_absence'      => true,    // monthly staff lose a day's pay for each day absent
+        'deduct_unpaid_leave' => true,
+        'late_fine'           => 0,       // taken off for each late day (0 = none)
+        'pay_overtime'        => false,
+        'overtime_multiplier' => 1.5,
+        'hours_per_day'       => 8,
+    ],
+
+    /*
     | Spa, gym & pool bookings (Hotel Settings → Spa, Gym & Pool). Places, treatments and therapists are on the Spa, Gym & Pool page.
     */
     'wellness' => [

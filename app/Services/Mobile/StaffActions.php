@@ -43,7 +43,7 @@ use Illuminate\Validation\ValidationException;
 class StaffActions
 {
     public const WORK_KINDS = ['ride', 'order', 'laundry', 'wellness', 'guest', 'housekeeping', 'maintenance', 'ticket'];
-    public const APPROVAL_KINDS = ['expense', 'po', 'pr', 'shift', 'count'];
+    public const APPROVAL_KINDS = ['expense', 'po', 'pr', 'payroll', 'shift', 'count'];
 
     private const GROUPS = [
         'ride'         => 'Cars',
@@ -57,6 +57,7 @@ class StaffActions
         'expense'      => 'Expenses',
         'po'           => 'Purchase orders',
         'pr'           => 'Purchase requests',
+        'payroll'      => 'Payroll',
         'shift'        => 'Cash shifts',
         'count'        => 'Stock counts',
     ];
@@ -135,6 +136,9 @@ class StaffActions
             'expense'      => $this->expense($user, $model, $action, $input),
             'po'           => $this->po($user, $model, $action, $input),
             'pr'           => $this->pr($user, $model, $action, $input),
+            'payroll'      => $action === 'approve'
+                ? tap("Payroll {$model->month_label} approved.", fn () => app(\App\Services\Payroll\PayrollService::class)->approve($model, $user))
+                : tap("Payroll {$model->month_label} sent back.", fn () => app(\App\Services\Payroll\PayrollService::class)->reject($model, $user, (string) $input)),
             'shift'        => $this->shift($model, $input),
             default        => throw new BookingException('Open this on the website to deal with it.'),
         };
@@ -373,6 +377,10 @@ class StaffActions
                 return $user->can('Approve purchases') && $m->status === 'submitted' && $m->requested_by !== $user->id
                     ? [$b('approve', 'Approve', 'primary', 'Note (optional)'), $b('reject', 'Reject', 'destructive', 'Reason', true)] : [];
 
+            case 'payroll':
+                return $user->can('Approve payroll') && $m->status === 'submitted' && ($m->submitted_by !== $user->id || $user->hasRole('Super Admin'))
+                    ? [$b('approve', 'Approve', 'primary', null, false, 'Approve ' . config('hotel.currency_symbol') . number_format((float) $m->net, 2) . " net pay for {$m->staff_count} staff?"), $b('reject', 'Send back', 'destructive', 'Reason', true)] : [];
+
             case 'shift':
                 return $user->can('Review cash shifts') && $m->status === CashShift::CLOSED && ($m->user_id !== $user->id || $user->hasRole('Super Admin'))
                     ? [$b('signoff', 'Sign off', 'primary', 'Note (optional)')] : [];
@@ -394,6 +402,7 @@ class StaffActions
             'ticket'       => $user->can('Manage IT tickets'),
             'expense'      => $user->can('Approve expenses'),
             'po', 'pr'     => $user->can('Approve purchases'),
+            'payroll'      => $user->can('Approve payroll'),
             'shift'        => $user->can('Review cash shifts'),
             'count'        => $user->can('Post stock counts'),
             default        => false,
@@ -491,6 +500,7 @@ class StaffActions
         $money = fn ($v) => $v === null ? null : config('hotel.currency_symbol') . number_format((float) $v, 2);
         $at = match ($kind) {
             'po'    => $m->submitted_at ?? $m->created_at,
+            'payroll' => $m->submitted_at,
             'shift' => $m->closed_at,
             'count' => $m->updated_at,
             default => $m->created_at,
@@ -516,6 +526,12 @@ class StaffActions
                 'meta'     => 'From ' . ($m->requester?->name ?? '—') . ($m->needed_by ? ' · needed ' . $m->needed_by->format('j M') : ''),
                 'amount'   => (float) $m->estimated_total, 'amount_label' => $money($m->estimated_total) ? 'about ' . $money($m->estimated_total) : null,
                 'url'      => route('inventory.requests.show', $m),
+            ],
+            'payroll' => [
+                'title'    => 'Payroll ' . $m->month_label, 'subtitle' => $m->number . ' · ' . $m->staff_count . ' staff · PAYE ' . $money($m->paye),
+                'meta'     => 'Sent by ' . ($m->submitter?->name ?? '—') . ' · gross ' . $money($m->gross),
+                'amount'   => (float) $m->net, 'amount_label' => $money($m->net),
+                'url'      => route('payroll.show', $m),
             ],
             'shift' => [
                 'title'    => ($m->user?->name ?? 'Cash shift') . ' · ' . $m->station, 'subtitle' => $m->number . ' · closed ' . $m->closed_at?->format('j M g:i A'),
@@ -548,6 +564,7 @@ class StaffActions
             'expense'      => Expense::class,
             'po'           => PurchaseOrder::class,
             'pr'           => PurchaseRequest::class,
+            'payroll'      => \App\Models\Payroll\PayrollRun::class,
             'shift'        => CashShift::class,
             'count'        => StockCount::class,
             default        => null,

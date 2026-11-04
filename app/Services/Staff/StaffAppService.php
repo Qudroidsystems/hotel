@@ -145,6 +145,11 @@ class StaffAppService
             CashShift::where('status', CashShift::CLOSED)->where('user_id', '!=', $user->id)->with('user:id,name')->oldest('closed_at')->get()
                 ->each(fn ($s) => $items->push((object) ['kind' => 'shift', 'model' => $s, 'amount' => (float) $s->variance, 'at' => $s->closed_at]));
         }
+        if ($user->can('Approve payroll')) {
+            \App\Models\Payroll\PayrollRun::where('status', 'submitted')->where(fn ($q) => $user->hasRole('Super Admin') ? $q : $q->where('submitted_by', '!=', $user->id))
+                ->with('submitter:id,name')->oldest('submitted_at')->get()
+                ->each(fn ($r) => $items->push((object) ['kind' => 'payroll', 'model' => $r, 'amount' => (float) $r->net, 'at' => $r->submitted_at]));
+        }
         if ($user->can('Post stock counts')) {
             StockCount::where('status', 'counting')->with(['location:id,name'])->withCount(['lines', 'lines as counted_count' => fn ($q) => $q->whereNotNull('counted_quantity')])->oldest()->get()
                 ->filter(fn ($c) => $c->lines_count > 0 && $c->counted_count === $c->lines_count)   // fully counted, ready to post

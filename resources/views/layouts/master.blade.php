@@ -505,6 +505,11 @@
                                         <i class="ri-user-follow-line me-2"></i> My Attendance
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('payroll.my') }}" class="nav-link">
+                                        <i class="ri-file-user-line me-2"></i> My Payslips
+                                    </a>
+                                </li>
                             </ul>
                         </div>
                     </li>
@@ -616,6 +621,14 @@
                                     @endcanany
                                 </ul>
                             </div>
+                        </li>
+                    @endcanany
+                    @canany(['Manage payroll', 'Approve payroll'])
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="{{ route('payroll.index') }}">
+                                <i class="ri-money-dollar-circle-line"></i> <span>Payroll</span>
+                                @can('Approve payroll')@php $payrollWaiting = \App\Models\Payroll\PayrollRun::where('status', 'submitted')->count(); @endphp @if ($payrollWaiting)<span class="badge bg-warning ms-auto">{{ $payrollWaiting }}</span>@endif @endcan
+                            </a>
                         </li>
                     @endcanany
                     @canany(['Record expenses', 'View expenses', 'Approve expenses', 'Pay expenses', 'Manage expense categories'])
@@ -1565,6 +1578,8 @@
         @can('Run attendance kiosk')
         {title:'Clock-in Kiosk',                        url:'{{ route("attendance.kiosk") }}',                               icon:'mdi-qrcode-scan',             category:'Attendance',          keywords:['kiosk','clock in','scan','badge','qr']},
         @endcan
+        {title:'My Payslips',                           url:'{{ route("payroll.my") }}',                                     icon:'ri-file-user-line',           category:'My Account',          keywords:['payslip','salary','pay','wages','my pay']},
+        @canany(['Manage payroll', 'Approve payroll']){title:'Payroll',                              url:'{{ route("payroll.index") }}',                              icon:'ri-money-dollar-circle-line', category:'Finance',             keywords:['payroll','salary','wages','paye','pension','nhf','payslip','bank schedule']},@endcanany
         {title:'My Attendance',                         url:'{{ route("attendance.my") }}',                                  icon:'mdi-account-check',           category:'My Account',          keywords:['my attendance','clock in','late','badge']},
         @canany(['Record expenses', 'View expenses', 'Approve expenses', 'Pay expenses'])
         {title:'Expenses',                              url:'{{ route("expenses.index") }}',                             icon:'mdi-wallet-outline',          category:'Finance',             keywords:['expense','cost','diesel','spend','petty cash','budget','running cost']},

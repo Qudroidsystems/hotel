@@ -143,6 +143,19 @@ test('the staff app finds every field it reads', function () {
         $miss[] = 'no demo driver';
     }
 
+    // My payslips (someone on last month's demo payroll).
+    $slip = \App\Models\Payroll\Payslip::first();
+    if ($slip) {
+        app('auth')->forgetGuards();
+        $slip->user->forceFill(['must_change_password' => false])->save();
+        \Laravel\Sanctum\Sanctum::actingAs($slip->user->fresh(), ['*']);
+        $ps = $this->getJson('/api/v1/me/payslips')->assertOk()->json('data.0');
+        $check('my payslip (MyPayslip)', $ps, ['attendance', 'bank', 'deductions', 'deductions_label', 'earnings', 'gross_label', 'id', 'month', 'net_label', 'paid', 'url']);
+        $check('payslip line', $ps['earnings'][0] ?? null, ['amount_label', 'name']);
+    } else {
+        $miss[] = 'no payslips in the demo data';
+    }
+
     expect($miss)->toBe([]);
 });
 

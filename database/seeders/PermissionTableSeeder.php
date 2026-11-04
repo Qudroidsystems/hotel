@@ -136,6 +136,10 @@ class PermissionTableSeeder extends Seeder
             'Manage wellness bookings', // the spa, gym & pool diary: book, arrived, done
             'Set up wellness',     // spa, gym & pool places, treatments, therapists and prices
         ],
+        'Payroll' => [
+            'Manage payroll',      // staff pay, run the monthly payroll, mark it paid, payslips
+            'Approve payroll',     // approve (or send back) a payroll someone else prepared
+        ],
         'Energy' => [
             'View energy saver',   // the control room's list of rooms and places to switch off, and the generator to run
             'Manage energy saver', // set up places, generators and prices; record power changes

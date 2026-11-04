@@ -133,6 +133,8 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
     Route::post('/devices', [AuthController::class, 'device']);
     Route::delete('/devices', [AuthController::class, 'forgetDevice']);
 
+    Route::get('/me/payslips', [\App\Http\Controllers\Api\V1\PayslipApiController::class, 'index']);
+    Route::get('/me/payslips/{payslip}', [\App\Http\Controllers\Api\V1\PayslipApiController::class, 'show'])->whereNumber('payslip');
     Route::get('/me/profile', [AppController::class, 'profile']);
     Route::put('/me/profile', [AppController::class, 'saveProfile']);
     Route::get('/me/preferences', [AppController::class, 'preferences']);

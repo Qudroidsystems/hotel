@@ -522,6 +522,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports', [InventoryReportController::class, 'index'])->name('reports');
     });
 
+    // Payroll: staff pay, monthly runs from attendance, approval, bank schedule, payslips; everyone's own payslips
+    Route::get('/my-payslips', [\App\Http\Controllers\Payroll\PayrollController::class, 'my'])->name('payroll.my');
+    Route::get('/my-payslips/{payslip}', [\App\Http\Controllers\Payroll\PayrollController::class, 'myShow'])->whereNumber('payslip')->name('payroll.my.show');
+    Route::prefix('payroll')->name('payroll.')->controller(\App\Http\Controllers\Payroll\PayrollController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'start')->name('start');
+        Route::get('/staff', 'staff')->name('staff');
+        Route::get('/staff/{user}', 'editStaff')->whereNumber('user')->name('staff.edit');
+        Route::post('/staff/{user}', 'saveStaff')->whereNumber('user')->name('staff.save');
+        Route::get('/{run}', 'show')->whereNumber('run')->name('show');
+        Route::post('/{run}/{action}', 'act')->whereNumber('run')->whereIn('action', ['recalculate', 'submit', 'approve', 'reject', 'paid', 'email'])->name('act');
+        Route::get('/{run}/bank.csv', 'bank')->whereNumber('run')->name('bank');
+        Route::get('/{run}/payslips/{payslip?}', 'slip')->whereNumber(['run', 'payslip'])->name('slips');
+        Route::post('/{run}/payslips/{payslip}/adjust', 'adjust')->whereNumber(['run', 'payslip'])->name('adjust');
+        Route::delete('/{run}/payslips/{payslip}/adjust/{index}', 'unadjust')->whereNumber(['run', 'payslip', 'index'])->name('unadjust');
+    });
+
     // Staff attendance. The kiosk (/attendance/kiosk) keeps working offline and sends scans to /attendance/kiosk/sync.
     Route::get('/my-attendance', [AttendanceController::class, 'my'])->name('attendance.my');
     Route::prefix('attendance')->name('attendance.')->group(function () {

@@ -31,6 +31,7 @@ class DemoSeeder extends Seeder
             TransportDemoSeeder::class,     // the hotel's cars, drivers and rides
             LaundryDemoSeeder::class,       // the laundry price list and a few guests' bags
             WellnessDemoSeeder::class,      // the spa, gym and pool, and today's bookings
+            PayrollDemoSeeder::class,       // everyone's pay, and last month's payroll (paid)
             EnergyDemoSeeder::class,        // generators, places, and the control room's first list
             WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
             NetworkDemoSeeder::class,       // Starlink dishes, guest Wi-Fi plans and codes

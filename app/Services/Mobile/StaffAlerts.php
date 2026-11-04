@@ -39,6 +39,10 @@ class StaffAlerts
         Expense::saved(fn (Expense $e) => $self->becomes($e, 'pending') ? $self->expense($e) : null);
         PurchaseOrder::saved(fn (PurchaseOrder $po) => $self->becomes($po, 'pending') ? $self->purchaseOrder($po) : null);
         PurchaseRequest::saved(fn (PurchaseRequest $pr) => $self->becomes($pr, 'submitted') ? $self->purchaseRequest($pr) : null);
+        \App\Models\Payroll\PayrollRun::saved(fn ($r) => $self->becomes($r, 'submitted') ? $self->send($self->staffWith('Approve payroll'), [
+            'title' => "Payroll to approve: {$r->month_label}", 'body' => $r->staff_count . ' staff · net ' . config('hotel.currency_symbol') . number_format((float) $r->net, 2),
+            'group' => 'approvals', 'level' => 'normal', 'url' => 'approvals', 'thread' => "payroll:{$r->id}", 'kind' => 'payroll', 'item_id' => $r->id,
+        ]) : null);
         CashShift::saved(fn (CashShift $s) => $self->becomes($s, CashShift::CLOSED) ? $self->cashShift($s) : null);
     }
 
