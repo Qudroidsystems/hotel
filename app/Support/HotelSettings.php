@@ -345,6 +345,20 @@ class HotelSettings
                     'energy.diesel_price'     => ['type' => 'money', 'label' => 'Diesel: price per litre'],
                 ],
             ],
+            'wellness' => [
+                'title' => 'Spa, Gym & Pool', 'icon' => 'ri-leaf-line',
+                'intro' => 'Guests book treatments and sessions from the guest app and their booking page (charged to the room when they arrive); visitors book on the website (/spa) and pay online. The places, treatments, therapists and prices are on the Spa, Gym & Pool page.',
+                'fields' => [
+                    'wellness.enabled'        => ['type' => 'bool', 'label' => 'Take spa, gym and pool bookings online'],
+                    'wellness.alerts'         => ['type' => 'bool', 'label' => 'Tell staff about new bookings (app notifications)'],
+                    'wellness.step_minutes'   => ['type' => 'int', 'label' => 'Treatments can start every (minutes)', 'min' => 15, 'max' => 120],
+                    'wellness.lead_minutes'   => ['type' => 'int', 'label' => 'Earliest online booking from now (minutes)', 'min' => 0, 'max' => 1440],
+                    'wellness.days_ahead'     => ['type' => 'int', 'label' => 'Bookings open this many days ahead', 'min' => 1, 'max' => 365],
+                    'wellness.cancel_hours'   => ['type' => 'int', 'label' => 'Guests can cancel online up to (hours before)', 'min' => 0, 'max' => 72],
+                    'wellness.max_per_stay'   => ['type' => 'int', 'label' => 'Upcoming bookings one stay can hold', 'min' => 1, 'max' => 50],
+                    'wellness.pay_on_arrival' => ['type' => 'bool', 'label' => 'Visitors can book and pay on arrival when online payment is off'],
+                ],
+            ],
             'laundry' => [
                 'title' => 'Laundry', 'icon' => 'ri-t-shirt-line',
                 'intro' => 'Guests send laundry from the guest app or their booking page; staff collect and count it on the Laundry page, and the count goes on the room bill. The price list is on the Laundry page.',

@@ -3,10 +3,12 @@
 namespace App\Services\Mobile;
 
 use App\Models\Laundry\LaundryOrder;
+use App\Models\Wellness\WellnessBooking;
 use App\Models\Pos\GuestOrder;
 use App\Models\Transport\Ride;
 use App\Services\Transport\RideService;
 use App\Services\Laundry\LaundryService;
+use App\Services\Wellness\WellnessBookings;
 use App\Services\Pos\GuestOrderService;
 use App\Exceptions\BookingException;
 use App\Models\Booking\GuestRequest;
@@ -40,13 +42,14 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffActions
 {
-    public const WORK_KINDS = ['ride', 'order', 'laundry', 'guest', 'housekeeping', 'maintenance', 'ticket'];
+    public const WORK_KINDS = ['ride', 'order', 'laundry', 'wellness', 'guest', 'housekeeping', 'maintenance', 'ticket'];
     public const APPROVAL_KINDS = ['expense', 'po', 'pr', 'shift', 'count'];
 
     private const GROUPS = [
         'ride'         => 'Cars',
         'order'        => 'Room orders',
         'laundry'      => 'Laundry',
+        'wellness'     => 'Spa, gym & pool',
         'guest'        => 'Guest requests',
         'housekeeping' => 'Rooms to clean',
         'maintenance'  => 'Repairs',
@@ -127,6 +130,7 @@ class StaffActions
             'guest'        => $this->guest($user, $model, $action, $input),
             'order'        => $this->order($user, $model, $action, $input),
             'laundry'      => $this->laundry($user, $model, $action, $input),
+            'wellness'     => $this->wellness($user, $model, $action, $input),
             'ride'         => $this->ride($user, $model, $action, $input),
             'expense'      => $this->expense($user, $model, $action, $input),
             'po'           => $this->po($user, $model, $action, $input),
@@ -211,6 +215,18 @@ class StaffActions
             'returned' => tap("{$o->number} returned to room {$o->room_number}.", fn () => $svc->returned($o, $user)),
             'decline'  => tap("{$o->number} declined — the guest sees your reason.", fn () => $svc->decline($o, $user, (string) $input)),
             'issue'    => tap('Problem recorded on the booking.', fn () => $svc->reportIssue($o, $user, (string) $input)),
+        };
+    }
+
+    private function wellness(User $user, WellnessBooking $b, string $action, ?string $input): string
+    {
+        $svc = app(WellnessBookings::class);
+
+        return match ($action) {
+            'arrive'   => tap("{$b->number}: {$b->guest_name} is here" . ($b->payment === 'room' && (float) $b->total > 0 ? ' — on the room bill.' : ($b->payment === 'desk' ? ' — take payment.' : '.')), fn () => $svc->arrive($b, $user)),
+            'complete' => tap("{$b->number} done.", fn () => $svc->complete($b, $user)),
+            'no_show'  => tap("{$b->number} marked as didn't come.", fn () => $svc->noShow($b, $user)),
+            'cancel'   => tap("{$b->number} cancelled.", fn () => $svc->cancel($b, $user, (string) $input)),
         };
     }
 
@@ -333,6 +349,18 @@ class StaffActions
                     in_array($m->status, [LaundryOrder::COLLECTED, LaundryOrder::READY], true) ? $b('issue', 'Damaged / missing', 'destructive', 'What happened?', true) : null,
                 ]));
 
+            case 'wellness':
+                if (! app(WellnessBookings::class)->canManage($user)) {
+                    return [];
+                }
+
+                return array_values(array_filter([
+                    $m->status === WellnessBooking::BOOKED ? $b('arrive', 'Arrived', 'primary', null, false, $m->payment === 'room' && (float) $m->total > 0 ? 'Charge ' . config('hotel.currency_symbol') . number_format((float) $m->total, 2) . ' to the room?' : null) : null,
+                    $m->status === WellnessBooking::ARRIVED ? $b('complete', 'Done', 'primary') : null,
+                    $m->status === WellnessBooking::BOOKED && $m->starts_at->isPast() ? $b('no_show', 'Didn\'t come', '') : null,
+                    $m->status === WellnessBooking::BOOKED ? $b('cancel', 'Cancel', 'destructive', 'Reason (the guest sees it)', true) : null,
+                ]));
+
             case 'expense':
                 return $user->can('Approve expenses') && $m->status === 'pending' && $m->recorded_by !== $user->id
                     ? [$b('approve', 'Approve', 'primary', null, false, "Approve {$m->number}?"), $b('reject', 'Reject', 'destructive', 'Reason', true)] : [];
@@ -361,6 +389,7 @@ class StaffActions
             'guest'        => $user->can('Handle guest requests'),
             'order'        => app(GuestOrderService::class)->canHandle($user),
             'laundry'      => app(LaundryService::class)->canHandle($user),
+            'wellness'     => app(WellnessBookings::class)->canManage($user),
             'ride'         => $user->canAny(['Manage transport', 'Drive guests']),
             'ticket'       => $user->can('Manage IT tickets'),
             'expense'      => $user->can('Approve expenses'),
@@ -406,6 +435,16 @@ class StaffActions
                 'meta'         => collect($m->lines)->filter(fn ($l) => ! empty($l['note']))->map(fn ($l) => $l['name'] . ': ' . $l['note'])->implode(' · ') ?: null,
                 'status'       => $m->status, 'status_label' => $m->staff_label, 'tone' => $this->tone($m->status_pill),
                 'url'          => route('pos.room-orders'),
+            ],
+            'wellness' => [
+                'badge'        => $m->starts_at->format('H:i'),
+                'title'        => $m->what,
+                'subtitle'     => $m->guest_name . ($m->reservation_id ? ' · room guest' : ' · visitor') . ($m->therapist ? ' · ' . $m->therapist->name : ''),
+                'detail'       => trim($m->venue?->name . ' · ' . $m->starts_at->format('g:i') . '–' . $m->ends_at->format('g:i A') . ($m->note ? ' — “' . $m->note . '”' : '')),
+                'meta'         => (float) $m->total > 0 ? config('hotel.currency_symbol') . number_format((float) $m->total, 2) . ' · ' . $m->payment_label : 'Free',
+                'status'       => $m->status, 'status_label' => $m->status_label, 'tone' => $this->tone($m->status_pill),
+                'url'          => route('wellness.index'),
+                'phone'        => $m->reservation_id ? null : $m->phone,
             ],
             'laundry' => [
                 'badge'        => $m->room_number,
@@ -503,6 +542,7 @@ class StaffActions
             'guest'        => GuestRequest::class,
             'order'        => GuestOrder::class,
             'laundry'      => LaundryOrder::class,
+            'wellness'     => WellnessBooking::class,
             'ride'         => Ride::class,
             'ticket'       => ItTicket::class,
             'expense'      => Expense::class,

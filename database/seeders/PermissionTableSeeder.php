@@ -133,6 +133,8 @@ class PermissionTableSeeder extends Seeder
             'Manage guest chat',   // every section, and setting sections up
             'Handle laundry',      // collect and count guests' laundry, mark it ready and returned
             'Manage laundry',      // the laundry price list
+            'Manage wellness bookings', // the spa, gym & pool diary: book, arrived, done
+            'Set up wellness',     // spa, gym & pool places, treatments, therapists and prices
         ],
         'Energy' => [
             'View energy saver',   // the control room's list of rooms and places to switch off, and the generator to run

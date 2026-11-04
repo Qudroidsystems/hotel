@@ -23,5 +23,6 @@ final class HotelTables
         'call_listens', 'facility_devices', 'facility_hubs',
         'guest_feedback', 'maintenance_plans',
         'event_ticket_promos', 'laundry_items', 'laundry_orders',
+        'wellness_venues', 'wellness_services', 'wellness_therapists', 'wellness_bookings',
     ];
 }

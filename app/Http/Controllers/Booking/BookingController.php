@@ -173,6 +173,21 @@ class BookingController extends Controller
 
             return response()->json(['ok' => true]);
         }
+        // Spa, gym & pool bookings paid online (references start with WB).
+        if (str_starts_with($reference, 'WB') && ($b = \App\Models\Wellness\WellnessBooking::withoutGlobalScope('hotel')->where('gateway_reference', $reference)->first())) {
+            \App\Support\Tenancy\CurrentHotel::get()->adopt($b);
+            if ($event === 'charge.success') {
+                try {
+                    app(\App\Services\Wellness\WellnessBookings::class)->settle($reference);
+                } catch (Throwable $e) {
+                    Log::error("Paystack webhook: wellness {$reference}: " . $e->getMessage());
+
+                    return response()->json(['ok' => false], 500);
+                }
+            }
+
+            return response()->json(['ok' => true]);
+        }
         $known = OnlinePayment::withoutGlobalScope('hotel')->where('reference', $reference)->first();
         \App\Support\Tenancy\CurrentHotel::get()->adopt($known);
         if ($event === 'charge.success' && $known) {

@@ -272,6 +272,20 @@ test('the guest app finds every field it reads', function () {
     $check('laundry bag (LaundryBag)', $bag, ['can_cancel', 'due', 'express', 'id', 'live', 'note', 'number', 'pieces', 'status', 'status_label', 'summary', 'time', 'total_label']);
     $check('stay laundry', $get("guest/stays/{$t2}")->json('data'), ['can_laundry', 'laundry']);
 
+    // Spa, gym & pool.
+    $in->update(['check_out_date' => today()->addDays(3)]);
+    $wl = $get("guest/stays/{$t2}/wellness")->json('data');
+    $check('wellness (WellnessInfo)', $wl, ['available', 'blocker', 'bookings', 'cancel_hours', 'currency', 'first_day', 'last_day', 'venues']);
+    $check('wellness place (WellnessPlace)', $wl['venues'][0] ?? null, ['description', 'hours', 'id', 'kind', 'max_people', 'name', 'price', 'price_label', 'services', 'session_minutes', 'treatments']);
+    $spa = collect($wl['venues'])->firstWhere('treatments', true);
+    $check('wellness treatment (WellnessTreatment)', $spa['services'][0] ?? null, ['description', 'id', 'minutes', 'name', 'price', 'price_label']);
+    $ws = $get("guest/stays/{$t2}/wellness/slots?venue_id={$spa['id']}&service_id={$spa['services'][0]['id']}&date=" . today()->addDay()->toDateString())->json('data');
+    $check('wellness slots', $ws, ['slots', 'total_label']);
+    $check('wellness slot (WellnessSlot)', $ws['slots'][0] ?? null, ['label', 'left', 'starts_at', 'time']);
+    $wb = $this->postJson("/api/v1/guest/stays/{$t2}/wellness", ['venue_id' => $spa['id'], 'service_id' => $spa['services'][0]['id'], 'starts_at' => $ws['slots'][0]['starts_at'] ?? null])->assertCreated()->json('data.bookings.0');
+    $check('wellness booking (WellnessBookingInfo)', $wb, ['can_cancel', 'id', 'kind', 'note', 'number', 'payment_label', 'status', 'status_label', 'therapist', 'total_label', 'upcoming', 'venue', 'what', 'when']);
+    $check('stay wellness', $get("guest/stays/{$t2}")->json('data'), ['can_wellness', 'wellness']);
+
     // Chat with the hotel's sections.
     $ch = $get("guest/stays/{$t2}/chat")->json('data');
     $check('chat home (ChatHome)', $ch, ['available', 'calls', 'live', 'note', 'sections']);

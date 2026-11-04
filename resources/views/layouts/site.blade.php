@@ -156,6 +156,7 @@
                     <ul>
                         <li><a href="{{ route('site.dining') }}">Dining</a></li>
                         <li><a href="{{ route('site.experiences') }}">Experiences</a></li>
+                        @if (config('hotel.wellness.enabled', true) && \App\Models\Wellness\WellnessVenue::where('is_active', true)->where('visitors', true)->exists())<li><a href="{{ route('wellness.public') }}">Spa, gym &amp; pool</a></li>@endif
                         <li><a href="{{ route('site.events') }}">Meetings & Events</a></li>
                         <li><a href="{{ route('site.gallery') }}">Gallery</a></li>
                         <li><a href="{{ route('site.journal') }}">Journal</a></li>

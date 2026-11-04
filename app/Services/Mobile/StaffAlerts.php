@@ -30,6 +30,7 @@ class StaffAlerts
 
         GuestRequest::created(fn (GuestRequest $g) => $self->guestRequest($g));
         \App\Models\Pos\GuestOrder::created(fn ($o) => $self->guestOrder($o));
+        \App\Models\Wellness\WellnessBooking::saved(fn ($b) => $b->via !== 'desk' && $b->status === 'booked' && ($b->wasRecentlyCreated || $b->wasChanged('status')) ? $self->wellness($b) : null);
         \App\Models\Laundry\LaundryOrder::created(fn ($o) => $o->status === 'requested' && $o->via !== 'desk' ? $self->laundry($o) : null);
         HousekeepingTask::saved(fn (HousekeepingTask $t) => $t->wasChanged('assigned_to') || ($t->wasRecentlyCreated && $t->assigned_to) ? $self->roomAssigned($t) : null);
         MaintenanceOrder::saved(fn (MaintenanceOrder $o) => $self->repair($o));
@@ -60,6 +61,20 @@ class StaffAlerts
             'title' => 'Room ' . ($o->room_number ?? '—') . ' ordered: ' . config('hotel.currency_symbol') . number_format((float) $o->total, 2) . ((bool) $o->reservation?->guest?->is_vip ? ' · VIP' : ''),
             'body'  => $o->outlet?->name . ': ' . $o->summary,
             'group' => 'guests', 'level' => 'urgent', 'url' => 'work', 'thread' => "order:{$o->id}", 'kind' => 'order', 'item_id' => $o->id,
+        ]);
+    }
+
+    private function wellness(\App\Models\Wellness\WellnessBooking $b): void
+    {
+        if (! config('hotel.wellness.alerts', true)) {
+            return;
+        }
+        $b = $b->fresh(['venue', 'service', 'reservation.rooms.room']) ?? $b;
+        $room = $b->reservation?->rooms->pluck('room.number')->filter()->implode(', ');
+        $this->send($this->staffWith('Manage wellness bookings'), [
+            'title' => "{$b->venue?->name}: {$b->what}",
+            'body'  => $b->guest_name . ($room ? " (room {$room})" : ' (visitor)') . ' · ' . $b->starts_at->format('D j M, g:i A') . ($b->note ? ' — “' . $b->note . '”' : ''),
+            'group' => 'guests', 'level' => $b->starts_at->lt(now()->addHours(2)) ? 'urgent' : 'normal', 'url' => 'work', 'thread' => "wellness:{$b->id}", 'kind' => 'wellness', 'item_id' => $b->id,
         ]);
     }
 

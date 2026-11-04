@@ -143,6 +143,14 @@
                 </a>
             @endif
 
+            @if ($canWellness)
+                <a class="panel order-cta" href="{{ route('stay.wellness', $r->guest_token) }}">
+                    <i class="ri-leaf-line" aria-hidden="true"></i>
+                    <div class="grow"><h2>Spa, gym &amp; pool</h2><p class="muted small">Book a massage or a session — added to your bill.</p></div>
+                    <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                </a>
+            @endif
+
             @if ($canLaundry)
                 <a class="panel order-cta" href="{{ route('stay.laundry', $r->guest_token) }}">
                     <i class="ri-t-shirt-line" aria-hidden="true"></i>

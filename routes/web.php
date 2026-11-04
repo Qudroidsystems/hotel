@@ -132,6 +132,14 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
     Route::get('/stay/{token}/bill', [GuestPortalController::class, 'receipt'])->name('stay.receipt');
+    // Spa, gym & pool for anyone: book and pay online; the booker's page
+    Route::get('/spa', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'index'])->name('wellness.public');
+    Route::get('/spa/times', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'times'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:60,1')->name('wellness.times');
+    Route::post('/spa', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'book'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:ticket-orders')->name('wellness.book');
+    Route::get('/spa/paystack/callback', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'callback'])->name('wellness.callback');
+    Route::get('/my-spa/{token}', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'mine'])->where('token', '[A-Za-z0-9]{48}')->name('wellness.mine');
+    Route::get('/my-spa/{token}/pay', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'pay'])->where('token', '[A-Za-z0-9]{48}')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('wellness.pay');
+    Route::post('/my-spa/{token}/cancel', [\App\Http\Controllers\Wellness\WellnessShopController::class, 'cancel'])->where('token', '[A-Za-z0-9]{48}')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('wellness.cancel');
     Route::get('/tickets/paystack/callback', [\App\Http\Controllers\Events\TicketShopController::class, 'callback'])->name('tickets.callback');
     Route::get('/tickets/{code}', [\App\Http\Controllers\Events\TicketController::class, 'public'])->name('tickets.public');
     // Tickets for anyone: an event's ticket page, buying online, and the buyer's page with their QR codes
@@ -148,6 +156,10 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay/{token}/order', [GuestPortalController::class, 'placeOrder'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.place');
     Route::post('/stay/{token}/orders/{order}/cancel', [GuestPortalController::class, 'cancelOrder'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.cancel');
     Route::get('/stay/{token}/laundry', [GuestPortalController::class, 'laundry'])->name('stay.laundry');
+    Route::get('/stay/{token}/spa', [GuestPortalController::class, 'wellness'])->name('stay.wellness');
+    Route::get('/stay/{token}/spa/times', [GuestPortalController::class, 'wellnessTimes'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:60,1')->name('stay.wellness.times');
+    Route::post('/stay/{token}/spa', [GuestPortalController::class, 'bookWellness'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.wellness.book');
+    Route::post('/stay/{token}/spa/{booking}/cancel', [GuestPortalController::class, 'cancelWellness'])->whereNumber('booking')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.wellness.cancel');
     Route::post('/stay/{token}/laundry', [GuestPortalController::class, 'requestLaundry'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.laundry.request');
     Route::post('/stay/{token}/laundry/{order}/cancel', [GuestPortalController::class, 'cancelLaundry'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.laundry.cancel');
     // Rating the stay after check-out (the link texted and e-mailed to the guest)
@@ -727,6 +739,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/{expense}/void', [ExpenseController::class, 'void'])->name('void');
         Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])->name('attach');
         Route::get('/{expense}/files/{index}', [ExpenseController::class, 'file'])->whereNumber('index')->name('file');
+    });
+
+    // Spa, gym & pool: the day's diary, booking at the desk, set-up
+    Route::prefix('wellness')->name('wellness.')->controller(\App\Http\Controllers\Wellness\WellnessController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/slots', 'slots')->name('slots');
+        Route::post('/', 'store')->name('store');
+        Route::post('/bookings/{booking}/{action}', 'act')->whereNumber('booking')->whereIn('action', ['arrive', 'complete', 'no_show', 'cancel'])->name('act');
+        Route::get('/setup', 'setup')->name('setup');
+        Route::post('/venues', 'saveVenue')->name('venues.store');
+        Route::put('/venues/{venue}', 'saveVenue')->whereNumber('venue')->name('venues.update');
+        Route::post('/venues/{venue}/services', 'saveService')->whereNumber('venue')->name('services.store');
+        Route::put('/venues/{venue}/services/{service}', 'saveService')->whereNumber(['venue', 'service'])->name('services.update');
+        Route::post('/venues/{venue}/therapists', 'saveTherapist')->whereNumber('venue')->name('therapists.store');
+        Route::put('/venues/{venue}/therapists/{therapist}', 'saveTherapist')->whereNumber(['venue', 'therapist'])->name('therapists.update');
     });
 
     // Guest laundry: bags to collect, the count sheet (charged to the room), ready and returned; the price list

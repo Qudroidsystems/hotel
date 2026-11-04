@@ -64,6 +64,7 @@ class GuestPortalController extends Controller
             'accounts'   => HotelBankAccount::ordered()->where('is_active', true)->where('show_on_invoice', true)->get(),
             'canRequest' => config('hotel.booking.guest_requests', true) && $r->status === ReservationStatus::CheckedIn,
             'canOrder'   => app(GuestOrderService::class)->canOrder($r),
+            'canWellness' => app(\App\Services\Wellness\WellnessBookings::class)->blocker($r) === null,
             'canLaundry' => app(\App\Services\Laundry\LaundryService::class)->canAsk($r) || \App\Models\Laundry\LaundryOrder::where('reservation_id', $r->id)->live()->exists(),
             'chatOn'     => app(\App\Services\Chat\ChatService::class)->blocker($r) === null,
             'chatUnread' => (int) \App\Models\Chat\ChatConversation::where('reservation_id', $r->id)->sum('guest_unread'),
@@ -240,6 +241,55 @@ class GuestPortalController extends Controller
         }
 
         return back()->with('success', "Laundry {$o->number} cancelled.");
+    }
+
+    /** Spa, gym & pool from the booking page (the public page's form, at guest prices, charged to the room). */
+    public function wellness(string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+
+        return view('wellness.public', ['venues' => $wellness->catalogue(false), 'days' => (int) config('hotel.wellness.days_ahead', 30), 'stay' => $r->load('guest'),
+            'screen' => $wellness->forGuestScreen($r), 'svc' => $wellness]);
+    }
+
+    public function wellnessTimes(Request $request, string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(['venue_id' => 'required|integer', 'service_id' => 'nullable|integer', 'date' => 'required|date', 'people' => 'nullable|integer|min:1|max:' . \App\Services\Wellness\WellnessBookings::MAX_PEOPLE]);
+        $v = \App\Models\Wellness\WellnessVenue::active()->findOrFail($data['venue_id']);
+        $s = ! empty($data['service_id']) ? \App\Models\Wellness\WellnessService::where('venue_id', $v->id)->where('is_active', true)->find($data['service_id']) : null;
+        $people = (int) ($data['people'] ?? 1);
+
+        return response()->json(['slots' => $wellness->blocker($r) ? [] : $wellness->slots($v, $s, \Illuminate\Support\Carbon::parse($data['date']), $people), 'total' => $wellness->money($wellness->price($v, $s, $people, false))]);
+    }
+
+    public function bookWellness(Request $request, string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(['venue_id' => 'required|integer', 'service_id' => 'nullable|integer', 'date' => 'required|date', 'time' => ['required', 'regex:/^\d{2}:\d{2}$/'],
+            'people' => 'nullable|integer|min:1|max:' . \App\Services\Wellness\WellnessBookings::MAX_PEOPLE, 'note' => 'nullable|string|max:300']);
+        $v = \App\Models\Wellness\WellnessVenue::active()->findOrFail($data['venue_id']);
+        $s = ! empty($data['service_id']) ? \App\Models\Wellness\WellnessService::where('venue_id', $v->id)->find($data['service_id']) : null;
+        try {
+            $b = $wellness->bookForStay($r, $v, $s, \Illuminate\Support\Carbon::parse($data['date'] . ' ' . $data['time']), (int) ($data['people'] ?? 1), $data['note'] ?? null, 'web');
+        } catch (BookingException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('stay.wellness', $token)->with('success', "Booked: {$b->what}, " . $wellness->when($b->starts_at) . '.');
+    }
+
+    public function cancelWellness(string $token, int $booking, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $b = \App\Models\Wellness\WellnessBooking::where('reservation_id', $r->id)->findOrFail($booking);
+        try {
+            $wellness->cancelByGuest($b);
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "{$b->number} cancelled.");
     }
 
     /** The guest's copy of their bill: every charge and payment, to print or save as PDF. */

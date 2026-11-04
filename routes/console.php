@@ -212,8 +212,14 @@ Artisan::command('tickets:expire', $eachHotel(function (\App\Services\Events\Tic
     $this->info($tickets->expire() . ' unpaid ticket order(s) let go.');
 }))->purpose('Release tickets held by online orders that were never paid');
 
+// Spa, gym & pool bookings by visitors never paid let their time go.
+Artisan::command('wellness:expire', $eachHotel(function (\App\Services\Wellness\WellnessBookings $wellness) {
+    $this->info($wellness->expire() . ' unpaid spa/gym/pool booking(s) let go.');
+}))->purpose('Release spa, gym and pool times held by visitors who never paid');
+
 Schedule::command('events:tomorrow')->dailyAt('16:00');
 Schedule::command('tickets:expire')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('wellness:expire')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('energy:check')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('channels:sync')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();

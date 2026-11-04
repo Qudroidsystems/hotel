@@ -86,6 +86,17 @@ class StaffAppService
                 ]));
         }
 
+        if (app(\App\Services\Wellness\WellnessBookings::class)->canManage($user)) {
+            // Spa, gym & pool: who is due in the next two hours, and who is in now.
+            \App\Models\Wellness\WellnessBooking::with('venue', 'service', 'therapist')
+                ->where(fn ($q) => $q->where('status', 'arrived')->orWhere(fn ($b) => $b->where('status', 'booked')->whereBetween('starts_at', [now()->subHours(2), now()->addHours(2)])))
+                ->orderBy('starts_at')->get()
+                ->each(fn ($b) => $items->push((object) [
+                    'kind' => 'wellness', 'model' => $b, 'urgent' => $b->status === 'booked' && $b->starts_at->lt(now()->addMinutes(15)),
+                    'at' => $b->starts_at, 'rank' => $b->status === 'booked' ? 1 : 3,
+                ]));
+        }
+
         // Cars: new bookings for whoever dispatches; their own rides for a driver.
         $driver = $user->can('Drive guests') ? \App\Models\Transport\Driver::where('user_id', $user->id)->where('is_active', true)->first() : null;
         if ($driver || $user->can('Manage transport')) {

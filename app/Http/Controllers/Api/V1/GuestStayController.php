@@ -124,6 +124,61 @@ class GuestStayController extends ApiController
         return $this->ok($laundry->forGuestScreen($r->fresh()), "Laundry {$o->number} cancelled.");
     }
 
+    /** GET /guest/stays/{token}/wellness — the spa, gym and pool, their treatments and prices, and this stay's bookings. */
+    public function wellness(string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        return $this->ok($wellness->forGuestScreen($this->reservation($token)));
+    }
+
+    /** GET /guest/stays/{token}/wellness/slots?venue_id&service_id&date&people — free times that day. */
+    public function wellnessSlots(Request $request, string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(['venue_id' => 'required|integer', 'service_id' => 'nullable|integer', 'date' => 'required|date', 'people' => 'nullable|integer|min:1|max:' . \App\Services\Wellness\WellnessBookings::MAX_PEOPLE]);
+        $v = \App\Models\Wellness\WellnessVenue::active()->findOrFail($data['venue_id']);
+        $s = ! empty($data['service_id']) ? \App\Models\Wellness\WellnessService::where('venue_id', $v->id)->where('is_active', true)->find($data['service_id']) : null;
+        $people = (int) ($data['people'] ?? 1);
+
+        return $this->ok([
+            'slots' => $wellness->blocker($r) ? [] : $wellness->slots($v, $s, \Illuminate\Support\Carbon::parse($data['date']), $people),
+            'total' => $wellness->price($v, $s, $people, false),
+            'total_label' => $wellness->money($wellness->price($v, $s, $people, false)),
+        ]);
+    }
+
+    /** POST /guest/stays/{token}/wellness  {venue_id, service_id?, starts_at, people, note} — charged to the room when they arrive. */
+    public function bookWellness(Request $request, string $token, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $data = $request->validate(['venue_id' => 'required|integer', 'service_id' => 'nullable|integer', 'starts_at' => 'required|date', 'people' => 'nullable|integer|min:1|max:' . \App\Services\Wellness\WellnessBookings::MAX_PEOPLE, 'note' => 'nullable|string|max:300']);
+        $v = \App\Models\Wellness\WellnessVenue::active()->find($data['venue_id']);
+        $s = $v && ! empty($data['service_id']) ? \App\Models\Wellness\WellnessService::where('venue_id', $v->id)->find($data['service_id']) : null;
+        try {
+            if (! $v) {
+                throw new BookingException('That isn’t available any more. Pull down to refresh.');
+            }
+            $b = $wellness->bookForStay($r, $v, $s, \Illuminate\Support\Carbon::parse($data['starts_at'])->setTimezone(config('app.timezone')), (int) ($data['people'] ?? 1), $data['note'] ?? null, 'app');
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($wellness->forGuestScreen($r->fresh()), "Booked: {$b->what}, " . $wellness->when($b->starts_at) . '. ' . ((float) $b->total > 0 ? 'It goes on your bill when you arrive.' : 'See you there.'), status: 201);
+    }
+
+    /** POST /guest/stays/{token}/wellness/{booking}/cancel */
+    public function cancelWellness(string $token, int $booking, \App\Services\Wellness\WellnessBookings $wellness)
+    {
+        $r = $this->reservation($token);
+        $b = \App\Models\Wellness\WellnessBooking::where('reservation_id', $r->id)->findOrFail($booking);
+        try {
+            $wellness->cancelByGuest($b);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok($wellness->forGuestScreen($r->fresh()), "{$b->number} cancelled.");
+    }
+
     /** GET /guest/stays/{token}/feedback — whether the guest can rate this stay, the parts to score, and what they said. */
     public function feedbackForm(string $token, \App\Services\Booking\FeedbackService $feedback)
     {
@@ -428,6 +483,9 @@ class GuestStayController extends ApiController
             // Laundry (…/laundry for the price list and to send a bag); live bags shown on the stay.
             'can_laundry'  => ($laundrySvc = app(\App\Services\Laundry\LaundryService::class))->canAsk($r),
             'laundry'      => collect($laundrySvc->forGuest($r))->where('live', true)->values(),
+            // Spa, gym & pool (…/wellness to book); upcoming bookings shown on the stay.
+            'can_wellness' => ($wellnessSvc = app(\App\Services\Wellness\WellnessBookings::class))->blocker($r) === null,
+            'wellness'     => collect($wellnessSvc->forGuest($r))->where('upcoming', true)->sortBy('starts_at')->values(),
             'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)
             'wifi'         => app(\App\Services\Network\NetworkService::class)->forGuest($r),   // the guest's Wi-Fi code while checked in, else null
             'feedback'     => app(\App\Services\Booking\FeedbackService::class)->forGuest($r),   // rating the stay after check-out (…/feedback to send it)

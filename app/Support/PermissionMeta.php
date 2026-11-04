@@ -86,6 +86,8 @@ class PermissionMeta
         'Manage guest chat'         => ['Manage', 'See every section\'s chats and calls, and set sections up: who answers, hours, phone numbers.'],
         'Handle laundry'            => ['Manage', 'Collect and count guests\' laundry (the count goes on the room bill), mark it ready and returned, record damaged or missing pieces.'],
         'Manage laundry'            => ['Manage', 'Set the laundry price list: items, and the price of washing, dry cleaning and pressing each.'],
+        'Manage wellness bookings'  => ['Manage', 'See the spa, gym and pool diary, book for guests and visitors, mark them arrived (in-house guests are charged to the room), done or didn\'t come, and cancel.'],
+        'Set up wellness'           => ['Manage', 'Set up the spa, gym and pool: hours, how many people at once, treatments, therapists and prices.'],
         'Message guests'            => ['Manage', 'Send SMS / WhatsApp messages to guests and read their replies.'],
         'Record expenses'           => ['Create', 'Record running costs (diesel, repairs, supplies…) with receipts. Small ones are approved automatically.'],
         'View expenses'             => ['View',   'See every expense, budgets and spending by department — not only your own.'],

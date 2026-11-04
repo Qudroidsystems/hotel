@@ -245,6 +245,20 @@ return [
     ],
 
     /*
+    | Spa, gym & pool bookings (Hotel Settings → Spa, Gym & Pool). Places, treatments and therapists are on the Spa, Gym & Pool page.
+    */
+    'wellness' => [
+        'enabled'        => true,
+        'step_minutes'   => 30,     // treatments start every half hour
+        'lead_minutes'   => 30,     // earliest booking from now (guests and visitors)
+        'days_ahead'     => 30,
+        'cancel_hours'   => 2,      // guests cancel online up to this long before
+        'max_per_stay'   => 6,      // upcoming bookings one stay can hold
+        'pay_on_arrival' => true,   // visitors can book without paying online when Paystack is off
+        'alerts'         => true,   // tell staff about bookings from the apps and the website
+    ],
+
+    /*
     | Guest laundry (Hotel Settings → Laundry). The price list itself is on the Laundry page.
     */
     'laundry' => [
