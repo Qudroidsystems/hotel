@@ -212,6 +212,14 @@ Artisan::command('tickets:expire', $eachHotel(function (\App\Services\Events\Tic
     $this->info($tickets->expire() . ' unpaid ticket order(s) let go.');
 }))->purpose('Release tickets held by online orders that were never paid');
 
+// Room keys: end the ones whose time is up, and read the locks' records into the door log.
+Artisan::command('keys:check', $eachHotel(function (\App\Services\Keys\RoomKeyService $keys) {
+    if (! $keys->enabled()) {
+        return $this->line('Room keys are off.');
+    }
+    $this->info($keys->expire() . ' key(s) ended, ' . $keys->syncRecords() . ' door record(s) read.');
+}))->purpose('End room keys whose time is up and read the door locks\' records');
+
 // Spa, gym & pool bookings by visitors never paid let their time go.
 Artisan::command('wellness:expire', $eachHotel(function (\App\Services\Wellness\WellnessBookings $wellness) {
     $this->info($wellness->expire() . ' unpaid spa/gym/pool booking(s) let go.');
@@ -220,6 +228,7 @@ Artisan::command('wellness:expire', $eachHotel(function (\App\Services\Wellness\
 Schedule::command('events:tomorrow')->dailyAt('16:00');
 Schedule::command('tickets:expire')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('wellness:expire')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('keys:check')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('energy:check')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('channels:sync')->everyFiveMinutes()->withoutOverlapping(15);
 Schedule::command('night-audit:auto')->everyFifteenMinutes()->withoutOverlapping();

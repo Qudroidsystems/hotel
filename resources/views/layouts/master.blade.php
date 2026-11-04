@@ -594,6 +594,9 @@
                                     @canany(['Manage wellness bookings', 'Set up wellness'])
                                         <li class="nav-item"><a href="{{ route('wellness.index') }}" class="nav-link">Spa, Gym &amp; Pool</a></li>
                                     @endcanany
+                                    @canany(['Manage room keys', 'View door log'])
+                                        <li class="nav-item"><a href="{{ route('keys.index') }}" class="nav-link">Room Keys</a></li>
+                                    @endcanany
                                     @canany(['View room calendars', 'Manage room calendars'])
                                         <li class="nav-item"><a href="{{ route('channels.index') }}" class="nav-link">Room Calendars</a></li>
                                     @endcanany
@@ -1591,6 +1594,8 @@
         {title:'Expense Categories & Budgets',          url:'{{ route("expenses.categories.index") }}',                  icon:'mdi-folder-cog-outline',      category:'Finance',             keywords:['budget','expense category']},
         @endcan
         @can('Handle guest requests')
+        @canany(['Manage room keys', 'View door log']){title:'Room Keys',                           url:'{{ route("keys.index") }}',                                 icon:'ri-key-2-line',               category:'Front Desk',          keywords:['key','card','door','lock','pin','code','ttlock','unlock','encoder']},
+        {title:'Door Log',                            url:'{{ route("keys.log") }}',                                   icon:'ri-door-open-line',           category:'Security',            keywords:['door','lock','opened','entry','log','who opened']},@endcanany
         @canany(['Manage wellness bookings', 'Set up wellness']){title:'Spa, Gym & Pool',                     url:'{{ route("wellness.index") }}',                             icon:'ri-leaf-line',                category:'Front Desk',          keywords:['spa','massage','gym','pool','fitness','treatment','therapist','wellness','facial','day pass']},@endcanany
         @can('Manage transport'){title:'Car Service',                         url:'{{ route("transport.index") }}',                            icon:'mdi-car',                     category:'Front Desk',          keywords:['car','taxi','driver','pickup','airport','transfer','ride','fleet','uber']},@endcan
         @can('Manage rates'){title:'Revenue & Pricing',                     url:'{{ route("rates.revenue") }}',                              icon:'mdi-chart-line',              category:'Front Desk',          keywords:['revenue','pricing','suggested','occupancy','pickup','yield','dynamic pricing']},@endcan

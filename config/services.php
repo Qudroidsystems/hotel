@@ -93,6 +93,19 @@ return [
         'map_key'    => env('GOOGLE_MAPS_MAP_KEY'),
     ],
 
+    // Digital room keys (Hotel Settings → Room Keys overrides these).
+    'ttlock' => [
+        'api'           => env('TTLOCK_API', 'https://euapi.ttlock.com'),
+        'client_id'     => env('TTLOCK_CLIENT_ID'),
+        'client_secret' => env('TTLOCK_CLIENT_SECRET'),
+        'username'      => env('TTLOCK_USERNAME'),
+        'password'      => env('TTLOCK_PASSWORD'),
+    ],
+    'lock_bridge' => [
+        'url'    => env('LOCK_BRIDGE_URL'),
+        'secret' => env('LOCK_BRIDGE_SECRET'),
+    ],
+
     'paystack' => [
         'active'          => env('PAYSTACK_ACTIVE', true),
         'mode'            => env('PAYSTACK_MODE', 'sandbox'),

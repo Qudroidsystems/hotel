@@ -64,6 +64,7 @@ class GuestPortalController extends Controller
             'accounts'   => HotelBankAccount::ordered()->where('is_active', true)->where('show_on_invoice', true)->get(),
             'canRequest' => config('hotel.booking.guest_requests', true) && $r->status === ReservationStatus::CheckedIn,
             'canOrder'   => app(GuestOrderService::class)->canOrder($r),
+            'keys'       => app(\App\Services\Keys\RoomKeyService::class)->forGuest($r),
             'canWellness' => app(\App\Services\Wellness\WellnessBookings::class)->blocker($r) === null,
             'canLaundry' => app(\App\Services\Laundry\LaundryService::class)->canAsk($r) || \App\Models\Laundry\LaundryOrder::where('reservation_id', $r->id)->live()->exists(),
             'chatOn'     => app(\App\Services\Chat\ChatService::class)->blocker($r) === null,
@@ -241,6 +242,19 @@ class GuestPortalController extends Controller
         }
 
         return back()->with('success', "Laundry {$o->number} cancelled.");
+    }
+
+    public function unlock(string $token, int $key, \App\Services\Keys\RoomKeyService $keys)
+    {
+        $r = $this->reservation($token);
+        $k = \App\Models\Keys\RoomKey::where('reservation_id', $r->id)->findOrFail($key);
+        try {
+            $keys->guestUnlock($k);
+        } catch (BookingException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Room {$k->room->number} is open — push the door within a few seconds.");
     }
 
     /** Spa, gym & pool from the booking page (the public page's form, at guest prices, charged to the room). */

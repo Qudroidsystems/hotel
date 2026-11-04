@@ -157,6 +157,7 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay/{token}/orders/{order}/cancel', [GuestPortalController::class, 'cancelOrder'])->whereNumber('order')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.order.cancel');
     Route::get('/stay/{token}/laundry', [GuestPortalController::class, 'laundry'])->name('stay.laundry');
     Route::get('/stay/{token}/spa', [GuestPortalController::class, 'wellness'])->name('stay.wellness');
+    Route::post('/stay/{token}/keys/{key}/unlock', [GuestPortalController::class, 'unlock'])->whereNumber('key')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:door-unlock')->name('stay.keys.unlock');
     Route::get('/stay/{token}/spa/times', [GuestPortalController::class, 'wellnessTimes'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:60,1')->name('stay.wellness.times');
     Route::post('/stay/{token}/spa', [GuestPortalController::class, 'bookWellness'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.wellness.book');
     Route::post('/stay/{token}/spa/{booking}/cancel', [GuestPortalController::class, 'cancelWellness'])->whereNumber('booking')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.wellness.cancel');
@@ -756,6 +757,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/{expense}/void', [ExpenseController::class, 'void'])->name('void');
         Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])->name('attach');
         Route::get('/{expense}/files/{index}', [ExpenseController::class, 'file'])->whereNumber('index')->name('file');
+    });
+
+    // Room keys: who has which key, door codes and cards, opening a door, linking locks, the door log
+    Route::prefix('keys')->name('keys.')->controller(\App\Http\Controllers\Keys\RoomKeyController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/stays/{reservation}/rooms/{room}/{action}', 'act')->whereNumber(['reservation', 'room'])->whereIn('action', ['pin', 'card', 'unlock'])->middleware('throttle:20,1')->name('act');
+        Route::post('/{key}/revoke', 'revoke')->whereNumber('key')->name('revoke');
+        Route::get('/locks', 'locks')->name('locks');
+        Route::post('/locks', 'saveLocks')->name('locks.save');
+        Route::get('/log', 'log')->name('log');
+        Route::post('/log/sync', 'sync')->middleware('throttle:6,1')->name('sync');
     });
 
     // Spa, gym & pool: the day's diary, booking at the desk, set-up

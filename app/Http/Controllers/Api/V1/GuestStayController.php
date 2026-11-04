@@ -179,6 +179,20 @@ class GuestStayController extends ApiController
         return $this->ok($wellness->forGuestScreen($r->fresh()), "{$b->number} cancelled.");
     }
 
+    /** POST /guest/stays/{token}/keys/{key}/unlock — the phone key opens the room door. */
+    public function unlock(string $token, int $key, \App\Services\Keys\RoomKeyService $keys)
+    {
+        $r = $this->reservation($token);
+        $k = \App\Models\Keys\RoomKey::where('reservation_id', $r->id)->findOrFail($key);
+        try {
+            $keys->guestUnlock($k);
+        } catch (BookingException $e) {
+            return $this->fail($e->getMessage());
+        }
+
+        return $this->ok(['keys' => $keys->forGuest($r)], "Room {$k->room->number} is open — push the door within a few seconds.");
+    }
+
     /** GET /guest/stays/{token}/feedback — whether the guest can rate this stay, the parts to score, and what they said. */
     public function feedbackForm(string $token, \App\Services\Booking\FeedbackService $feedback)
     {
@@ -484,6 +498,7 @@ class GuestStayController extends ApiController
             'can_laundry'  => ($laundrySvc = app(\App\Services\Laundry\LaundryService::class))->canAsk($r),
             'laundry'      => collect($laundrySvc->forGuest($r))->where('live', true)->values(),
             // Spa, gym & pool (…/wellness to book); upcoming bookings shown on the stay.
+            'keys'         => app(\App\Services\Keys\RoomKeyService::class)->forGuest($r),   // door code and phone key while checked in
             'can_wellness' => ($wellnessSvc = app(\App\Services\Wellness\WellnessBookings::class))->blocker($r) === null,
             'wellness'     => collect($wellnessSvc->forGuest($r))->where('upcoming', true)->sortBy('starts_at')->values(),
             'luggage'      => app(\App\Services\Booking\LuggageService::class)->forGuest($r),   // the optional luggage list (…/luggage to change it)

@@ -74,6 +74,22 @@
                 </div>
             @endif
 
+            @if (count($keys))
+                <div class="panel keys" aria-label="Your room key">
+                    <h2>Your room key</h2>
+                    @foreach ($keys as $k)
+                        <div class="keyrow">
+                            @if ($k['kind'] === 'pin')
+                                <div class="grow"><div class="small muted">Room {{ $k['room'] }} · door code</div><div class="pin" aria-label="Door code {{ implode(' ', str_split((string) $k['pin'])) }}">{{ $k['pin'] }}</div><div class="small muted">Type it on the lock, then #. {{ $k['until'] }}.</div></div>
+                            @else
+                                <div class="grow"><div class="small muted">Room {{ $k['room'] }} · phone key</div><div class="small muted">{{ $k['until'] }}. Stand at your door, then tap.</div></div>
+                                @if ($k['can_unlock'])<form method="POST" action="{{ route('stay.keys.unlock', [$r->guest_token, $k['id']]) }}" data-once>@csrf<button class="btn"><i class="ri-door-open-line"></i> Unlock</button></form>@endif
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
             @if ($weatherOn)
                 <div class="panel wx" id="wx" data-url="{{ route('stay.weather', $r->guest_token) }}" aria-live="polite">
                     <h2><i class="ri-sun-cloudy-line"></i> Weather at the hotel</h2>
@@ -349,6 +365,10 @@
     .arrive-live .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--lagoon); box-shadow: 0 0 0 0 rgba(15,118,110,.5); animation: pulse 1.8s infinite; flex: 0 0 auto; }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(15,118,110,.45); } 70% { box-shadow: 0 0 0 12px rgba(15,118,110,0); } 100% { box-shadow: 0 0 0 0 rgba(15,118,110,0); } }
     @media (prefers-reduced-motion: reduce) { .arrive-live .dot { animation: none; } }
+    .keys .keyrow { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+    .keys .keyrow:first-of-type { border-top: 0; }
+    .keys .grow { flex: 1; min-width: 0; }
+    .keys .pin { font: 700 clamp(22px, 7vw, 30px)/1.1 ui-monospace, Menlo, monospace; letter-spacing: 6px; margin: 4px 0; white-space: nowrap; }
     .order-cta { display: flex; gap: 14px; align-items: center; text-decoration: none; color: var(--ink); border-color: var(--lagoon); }
     .order-cta > i { font-size: 28px; color: var(--lagoon); }
     .order-cta h2 { margin: 0; } .order-cta p { margin: 2px 0 0; }

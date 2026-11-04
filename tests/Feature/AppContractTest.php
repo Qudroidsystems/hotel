@@ -297,7 +297,7 @@ test('the guest app finds every field it reads', function () {
     $check('wellness slot (WellnessSlot)', $ws['slots'][0] ?? null, ['label', 'left', 'starts_at', 'time']);
     $wb = $this->postJson("/api/v1/guest/stays/{$t2}/wellness", ['venue_id' => $spa['id'], 'service_id' => $spa['services'][0]['id'], 'starts_at' => $ws['slots'][0]['starts_at'] ?? null])->assertCreated()->json('data.bookings.0');
     $check('wellness booking (WellnessBookingInfo)', $wb, ['can_cancel', 'id', 'kind', 'note', 'number', 'payment_label', 'status', 'status_label', 'therapist', 'total_label', 'upcoming', 'venue', 'what', 'when']);
-    $check('stay wellness', $get("guest/stays/{$t2}")->json('data'), ['can_wellness', 'wellness']);
+    $check('stay wellness', $get("guest/stays/{$t2}")->json('data'), ['can_wellness', 'keys', 'wellness']);
 
     // Chat with the hotel's sections.
     $ch = $get("guest/stays/{$t2}/chat")->json('data');

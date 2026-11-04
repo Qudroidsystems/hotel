@@ -54,6 +54,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('booking-actions', fn (Request $r) => Limit::perMinute(30)->by('ba|' . $r->ip()));
         // Online ticket orders hold tickets while the buyer pays: few per connection, so nobody can hold a whole event.
         RateLimiter::for('ticket-orders', fn (Request $r) => Limit::perMinutes(20, 6)->by('to|' . $r->ip()));
+        // Opening a door from the phone: a few taps a minute per booking is plenty.
+        RateLimiter::for('door-unlock', fn (Request $r) => Limit::perMinute(6)->by('du|' . $r->route('token')));
         RateLimiter::for('stay-actions', fn (Request $r) => Limit::perMinute(8)->by('sa|' . $r->route('token')));
         // Chat and calls: a live conversation asks often (new messages, call signals), so per booking, generously.
         RateLimiter::for('guest-chat', fn (Request $r) => Limit::perMinute(240)->by('gc|' . ($r->route('token') ?: $r->input('token') ?: $r->ip())));
@@ -74,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Alerts for the staff app and phones when work is assigned or something needs approving.
         \App\Services\Mobile\StaffAlerts::register();
+        \App\Services\Keys\RoomKeyService::register();
         // Arrival sharing stops once the guest is checked in (or the booking ends another way).
         \App\Models\Reservation::updated(function (\App\Models\Reservation $r) {
             if ($r->wasChanged('status') && in_array($r->status, [\App\Enums\ReservationStatus::CheckedIn, \App\Enums\ReservationStatus::Cancelled, \App\Enums\ReservationStatus::NoShow], true)

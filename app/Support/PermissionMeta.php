@@ -88,6 +88,8 @@ class PermissionMeta
         'Manage laundry'            => ['Manage', 'Set the laundry price list: items, and the price of washing, dry cleaning and pressing each.'],
         'Manage wellness bookings'  => ['Manage', 'See the spa, gym and pool diary, book for guests and visitors, mark them arrived (in-house guests are charged to the room), done or didn\'t come, and cancel.'],
         'Set up wellness'           => ['Manage', 'Set up the spa, gym and pool: hours, how many people at once, treatments, therapists and prices.'],
+        'Manage room keys'          => ['Manage', 'Give and cancel room keys: new door codes, key cards, reporting a card lost; open a door from the system (always logged); link rooms to their locks.'],
+        'View door log'             => ['View', 'See every door opening: the guest\'s phone key, staff opening a door, and the locks\' own records of codes and cards.'],
         'Manage payroll'            => ['Manage', 'Set each person\'s pay and bank details, run the monthly payroll from attendance, add bonuses or deductions, download the bank schedule and mark it paid.'],
         'Approve payroll'           => ['Approve','Approve the monthly payroll (or send it back) — never one you sent yourself.'],
         'Message guests'            => ['Manage', 'Send SMS / WhatsApp messages to guests and read their replies.'],

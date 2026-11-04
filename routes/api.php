@@ -103,6 +103,7 @@ Route::prefix('guest')->group(function () {
         Route::post('/stays/{token}/orders/{order}/cancel', [GuestStayController::class, 'cancelOrder'])->whereNumber('order');
         Route::post('/stays/{token}/laundry', [GuestStayController::class, 'requestLaundry']);
         Route::post('/stays/{token}/wellness', [GuestStayController::class, 'bookWellness']);
+        Route::post('/stays/{token}/keys/{key}/unlock', [GuestStayController::class, 'unlock'])->whereNumber('key')->withoutMiddleware('throttle:stay-actions')->middleware('throttle:door-unlock');
         Route::post('/stays/{token}/wellness/{booking}/cancel', [GuestStayController::class, 'cancelWellness'])->whereNumber('booking');
         Route::post('/stays/{token}/laundry/{order}/cancel', [GuestStayController::class, 'cancelLaundry'])->whereNumber('order');
     });

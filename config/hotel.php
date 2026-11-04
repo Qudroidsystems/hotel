@@ -245,6 +245,20 @@ return [
     ],
 
     /*
+    | Digital room keys (Hotel Settings → Room Keys). Each room's lock id is set on Room Keys → Link door locks.
+    */
+    'keys' => [
+        'provider'      => env('ROOM_KEYS', 'manual'),   // none, manual (key cards made at the desk), ttlock, bridge
+        'auto_issue'    => true,     // make a door code and phone key at check-in
+        'phone_key'     => true,     // guests open their door from the guest app (locks with a gateway)
+        'show_pin'      => true,     // show the door code in the guest app and booking page
+        'gateway'       => true,     // the locks can be opened remotely (TTLock gateway, or the bridge)
+        'bridge_pins'   => true,     // the bridge makes door codes
+        'early_minutes' => 120,      // keys work this long before check-in time
+        'grace_minutes' => 60,       // and this long after check-out time
+    ],
+
+    /*
     | Payroll (Hotel Settings → Payroll). Tax bands are the Nigeria Tax Act 2025 personal income tax bands (from
     | January 2026): each "width:rate%", the last "*" is everything above. Check them with your tax adviser.
     */
