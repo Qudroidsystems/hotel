@@ -44,7 +44,8 @@ class Ride extends Model
     protected $casts = [
         'pickup_at' => 'datetime', 'assigned_at' => 'datetime', 'started_at' => 'datetime', 'arrived_at' => 'datetime',
         'picked_up_at' => 'datetime', 'completed_at' => 'datetime', 'cancelled_at' => 'datetime',
-        'fare' => 'decimal:2', 'distance_km' => 'float', 'place_lat' => 'float', 'place_lng' => 'float', 'passengers' => 'integer', 'bags' => 'integer',
+        'fare' => 'decimal:2', 'distance_km' => 'float', 'cash_collected' => 'decimal:2', 'cash_handed_at' => 'datetime', 'no_show' => 'boolean',
+        'reminded_at' => 'datetime', 'driver_reminded_at' => 'datetime', 'start_km' => 'integer', 'end_km' => 'integer', 'place_lat' => 'float', 'place_lng' => 'float', 'passengers' => 'integer', 'bags' => 'integer',
     ];
 
     protected static function booted(): void

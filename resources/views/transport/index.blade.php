@@ -89,7 +89,11 @@
                         <td data-label="Car"><span class="fw-semibold">{{ $v->name }}</span> <span class="rs-ref">{{ $v->plate }}</span><div class="small text-muted">{{ $v->color }}{{ $v->notes ? ' · ' . $v->notes : '' }}</div></td>
                         <td data-label="Kind" class="small">{{ Vehicle::KINDS[$v->kind] ?? $v->kind }}</td>
                         <td data-label="Seats" class="num">{{ $v->seats }}</td>
-                        <td data-label="Status">{!! $v->status === 'available' ? '<span class="status-pill st-success">Available</span>' : '<span class="status-pill st-danger">Out of service</span>' !!}</td>
+                        <td data-label="Status">{!! $v->status === 'available' ? '<span class="status-pill st-success">Available</span>' : '<span class="status-pill st-danger">Out of service</span>' !!}
+                            @foreach ($v->expiredPapers() as $p)<span class="status-pill st-danger">{{ $p }} ran out</span>@endforeach
+                            @foreach ($v->papersEnding() as $p)<span class="status-pill st-warning">{{ $p }}</span>@endforeach
+                            @if ($due = $v->serviceDue())<span class="status-pill st-warning">{{ $due }}</span>@endif
+                            <div class="small text-muted">{{ $v->odometer_km !== null ? number_format($v->odometer_km) . ' km' : '' }}{{ $v->checked_at ? ' · checked ' . $v->checked_at->diffForHumans(short: true) : '' }}</div></td>
                         <td class="text-end"><a class="action-btn btn-more" href="{{ route('transport.index', ['tab' => 'cars', 'edit' => $v->id]) }}"><i class="ri-pencil-line"></i></a></td>
                     </tr>
                 @empty <tr><td colspan="5" class="text-muted">No cars yet.</td></tr> @endforelse</tbody>
@@ -109,10 +113,46 @@
                         </div>
                         <div class="mb-2"><label class="form-label">Status</label><select name="status" class="form-select"><option value="available">Available</option><option value="out_of_service" @selected(old('status', $e?->status) === 'out_of_service')>Out of service</option></select></div>
                         <div class="mb-2"><label class="form-label">Notes</label><input name="notes" class="form-control" maxlength="255" value="{{ old('notes', $e?->notes) }}"></div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label">Insurance until</label><input type="date" name="insurance_expires" class="form-control" value="{{ old('insurance_expires', $e?->insurance_expires?->toDateString()) }}"></div>
+                            <div class="col-6"><label class="form-label">Roadworthy until</label><input type="date" name="roadworthy_expires" class="form-control" value="{{ old('roadworthy_expires', $e?->roadworthy_expires?->toDateString()) }}"></div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-4"><label class="form-label">Km now</label><input type="number" name="odometer_km" class="form-control" min="0" value="{{ old('odometer_km', $e?->odometer_km) }}"></div>
+                            <div class="col-4"><label class="form-label">Service every</label><input type="number" name="service_every_km" class="form-control" min="0" placeholder="km" value="{{ old('service_every_km', $e?->service_every_km) }}"></div>
+                            <div class="col-4"><label class="form-label">Last at</label><input type="number" name="last_service_km" class="form-control" min="0" placeholder="km" value="{{ old('last_service_km', $e?->last_service_km) }}"></div>
+                        </div>
+                        <div class="mb-2"><label class="form-label">Next service by</label><input type="date" name="service_due_on" class="form-control" value="{{ old('service_due_on', $e?->service_due_on?->toDateString()) }}"></div>
                         <div class="form-check mb-3"><input type="hidden" name="is_active" value="0"><input type="checkbox" class="form-check-input" name="is_active" value="1" id="v-act" @checked(old('is_active', $e?->is_active ?? true))><label class="form-check-label small" for="v-act">In the fleet</label></div>
                         <button class="action-btn btn-primary-cb w-100"><i class="ri-save-3-line"></i> {{ $e ? 'Save' : 'Add car' }}</button>
                     </form>
                 </x-cb.card>
+                @if ($e)
+                    <x-cb.card title="Fuel, service or a problem" icon="ri-gas-station-line" class="mt-3">
+                        <form method="POST" action="{{ route('transport.cars.log', $e) }}" enctype="multipart/form-data" class="tr-form">@csrf
+                            <div class="mb-2"><select name="kind" class="form-select"><option value="fuel">Fuel</option><option value="service">Service / repair</option><option value="issue">Problem</option></select></div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-4"><input type="number" step="0.1" name="litres" class="form-control" placeholder="Litres"></div>
+                                <div class="col-4"><input type="number" step="0.01" name="cost" class="form-control" placeholder="Cost"></div>
+                                <div class="col-4"><input type="number" name="km" class="form-control" placeholder="Km now"></div>
+                            </div>
+                            <div class="mb-2"><input name="notes" class="form-control" maxlength="500" placeholder="What was done / what's wrong"></div>
+                            <div class="mb-2"><label class="form-label small">Next service by (after a service)</label><input type="date" name="next_service_on" class="form-control"></div>
+                            <div class="form-check mb-2"><input type="checkbox" class="form-check-input" name="back_in_service" value="1" id="v-back"><label class="form-check-label small" for="v-back">Back on the road (after a repair)</label></div>
+                            <div class="mb-3"><input type="file" name="photo" accept="image/*" class="form-control form-control-sm"></div>
+                            <button class="action-btn btn-primary-cb w-100"><i class="ri-add-line"></i> Log it</button>
+                        </form>
+                        @php $logs = $e->logs()->with('driver:id,name', 'user:id,name')->limit(12)->get(); @endphp
+                        @if ($logs->isNotEmpty())
+                            <ul class="list-unstyled small mt-3 mb-0">@foreach ($logs as $l)
+                                <li class="mb-2"><strong>{{ $l->kind_label }}</strong> · {{ $l->created_at->format('j M H:i') }} · {{ $l->driver?->name ?? $l->user?->name }}
+                                    {{ $l->odometer_km ? '· ' . number_format($l->odometer_km) . ' km' : '' }}{{ $l->litres ? ' · ' . $l->litres . ' L' : '' }}{{ $l->cost ? ' · ' . $sym . number_format((float) $l->cost, 0) : '' }}
+                                    @if ($l->failed)<span class="status-pill st-warning">{{ implode(', ', $l->failed) }}</span>@endif
+                                    @if ($l->notes)<div class="text-muted">{{ $l->notes }}</div>@endif</li>
+                            @endforeach</ul>
+                        @endif
+                    </x-cb.card>
+                @endif
             </div>
         </div>
     @else

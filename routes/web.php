@@ -208,6 +208,9 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::post('/stay/{token}/requests', [GuestPortalController::class, 'request'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('stay.request');
 });
 Route::post('/paystack/webhook', [BookingController::class, 'webhook'])->middleware('throttle:paystack-webhook')->name('book.paystack.webhook');
+// Card terminals: Moniepoint and OPay say a terminal payment changed (we then ask them)
+Route::post('/terminals/webhook/moniepoint', [\App\Http\Controllers\Billing\TerminalWebhookController::class, 'moniepoint'])->middleware('throttle:paystack-webhook')->name('terminals.webhook.moniepoint');
+Route::post('/terminals/webhook/opay', [\App\Http\Controllers\Billing\TerminalWebhookController::class, 'opay'])->middleware('throttle:paystack-webhook')->name('terminals.webhook.opay');
 // Twilio: delivery reports and guests' replies to texts (checked by signature).
 Route::post('/twilio/status', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'status'])->middleware('throttle:twilio-webhook')->name('twilio.status');
 Route::post('/twilio/inbound', [\App\Http\Controllers\Messaging\TwilioWebhookController::class, 'inbound'])->middleware('throttle:twilio-webhook')->name('twilio.inbound');
@@ -220,7 +223,7 @@ Route::post('/termii/events', [\App\Http\Controllers\Messaging\TwilioWebhookCont
 // Staff App manifest: fetched by the browser without cookies, so it must be public.
 Route::get('/staff/manifest.webmanifest', [StaffAppController::class, 'manifest'])->name('staff.manifest');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\OfflineReplay::class])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -312,6 +315,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/tasks/{task}/finish', 'finish')->name('finish');
         Route::post('/tasks/{task}/inspect', 'inspect')->name('inspect');
         Route::post('/tasks/{task}/cancel', 'cancel')->name('cancel');
+    });
+    // Card terminals: set-up, every amount sent, and the JSON the bill page and the till use
+    Route::prefix('terminals')->name('terminals.')->controller(\App\Http\Controllers\Billing\TerminalController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{terminal}', 'update')->name('update');
+        Route::post('/{terminal}/test', 'test')->name('test');
+    });
+    Route::prefix('terminal-payments')->name('terminal-payments.')->controller(\App\Http\Controllers\Billing\TerminalController::class)->group(function () {
+        Route::get('/terminals', 'choices')->name('choices');
+        Route::post('/', 'send')->middleware('throttle:30,1')->name('send');
+        Route::get('/{payment}', 'show')->whereNumber('payment')->name('show');
+        Route::post('/{payment}/cancel', 'cancel')->whereNumber('payment')->name('cancel');
     });
     // Preventive maintenance: servicing that repeats (a work order opens a few days before each due date)
     Route::prefix('maintenance/plans')->name('maintenance.plans.')->controller(\App\Http\Controllers\Operations\MaintenancePlanController::class)->group(function () {
@@ -665,6 +681,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/rides/{ride}/auto', 'auto')->name('rides.auto');
         Route::post('/rides/{ride}/cancel', 'cancel')->name('rides.cancel');
         Route::post('/rides/{ride}/status/{action}', 'status')->name('rides.status');
+        Route::post('/rides/{ride}/cash', 'cashIn')->name('rides.cash');
+        Route::post('/cars/{vehicle}/log', 'logVehicle')->name('cars.log');
         Route::post('/cars', 'saveVehicle')->name('cars.store');
         Route::put('/cars/{vehicle}', 'saveVehicle')->name('cars.update');
         Route::post('/drivers', 'saveDriver')->name('drivers.store');

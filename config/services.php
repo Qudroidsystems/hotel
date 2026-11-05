@@ -117,6 +117,24 @@ return [
         'live_public_key' => env('PAYSTACK_LIVE_PUBLIC_KEY'),
     ],
 
+    // Card terminals (Hotel Settings → Card Terminals overrides these).
+    'moniepoint' => [
+        'base_url'       => env('MONIEPOINT_BASE_URL', 'https://channel.moniepoint.com'),
+        'client_id'      => env('MONIEPOINT_CLIENT_ID'),
+        'client_secret'  => env('MONIEPOINT_CLIENT_SECRET'),
+        'webhook_secret' => env('MONIEPOINT_WEBHOOK_SECRET'),
+        'amount_in_kobo' => env('MONIEPOINT_AMOUNT_IN_KOBO', true),
+    ],
+    'opay_pos' => [
+        'base_url'             => env('OPAY_POS_BASE_URL', 'https://payapi.opayweb.com/openApi/order/checkout'),
+        'head_merchant_id'     => env('OPAY_HEAD_MERCHANT_ID'),
+        'merchant_id'          => env('OPAY_MERCHANT_ID'),
+        'client_auth_key'      => env('OPAY_CLIENT_AUTH_KEY'),
+        'sub_scene'            => env('OPAY_SUB_SCENE'),
+        'opay_public_key'      => env('OPAY_PUBLIC_KEY'),
+        'merchant_private_key' => env('OPAY_MERCHANT_PRIVATE_KEY'),
+    ],
+
     // Push notifications for the staff mobile app: path to the Firebase service-account JSON key
     // (keep it outside public/, e.g. storage/app/private/firebase.json).
     'fcm' => [

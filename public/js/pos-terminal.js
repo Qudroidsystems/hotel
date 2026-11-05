@@ -365,6 +365,10 @@
             return;
         }
 
+        if (method === 'card' && S.online === true && S.auth && (S.boot.card_terminals || []).length) {
+            return terminalDialog(p);
+        }
+
         if (method === 'card' || method === 'transfer') {
             var accounts = S.boot.bank_accounts || [];
             openModal(method === 'card' ? 'Card (POS machine)' : 'Bank transfer', due +
@@ -379,6 +383,57 @@
         }
 
         if (method === 'room') roomDialog(p);
+    }
+
+    // Send the amount to a Paystack / Moniepoint / OPay terminal and wait for the
+    // card. Needs the internet; the sale itself is still saved on the till first
+    // and synced like any other, carrying the terminal payment's id.
+    function terminalDialog(p) {
+        var o = outlet(), list = (S.boot.card_terminals || []).slice().sort(function (a, b) {
+            return (b.outlet_id === (o && o.id)) - (a.outlet_id === (o && o.id));
+        });
+        var due = '<div class="due"><span>To pay</span><strong>' + money(p.total) + '</strong></div>', tp = null, timer = null, misses = 0, total = p.total;
+        openModal('Card', due +
+            '<div class="fld"><label for="tmSel">Card terminal</label><select id="tmSel">' + list.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + ' · ' + esc(t.provider) + '</option>'; }).join('') + '</select></div>' +
+            '<div id="tmState" class="sub" aria-live="polite" style="margin-top:10px">The amount will appear on the terminal and the sale completes by itself once the card is paid.</div>',
+            '<button type="button" class="btn" id="tmManual">Key in approval code</button><button type="button" class="btn go" id="tmSend">Send to terminal</button>',
+            { onClose: function () { clearTimeout(timer); if (tp && tp.open) toast('Still waiting on the terminal. If it gets paid, it will show under Card Terminals.', true); } });
+        var state = function (html, bad) { $('tmState').innerHTML = html; $('tmState').style.color = bad ? '#b91c1c' : ''; };
+        var show = function (j) {
+            tp = j;
+            if (j.paid) {
+                clearTimeout(timer);
+                state('<i class="ri-checkbox-circle-fill"></i> Paid' + (j.card ? ' · ' + esc(j.card) : '') + (j.approval ? ' · approval ' + esc(j.approval) : ''));
+                completeSale({ method: 'card', reference: j.approval || j.reference, terminal_payment_id: j.id });
+                return;
+            }
+            $('tmSend').disabled = j.open; $('tmSend').textContent = j.open ? 'Waiting for the card…' : 'Send again';
+            $('tmManual').textContent = j.open ? 'Cancel on the terminal' : 'Key in approval code';
+            state(j.open ? '<i class="ri-loader-4-line"></i> ' + esc(j.status_label) + ' on ' + esc(j.terminal) + '…' : esc(j.status_label + (j.message ? ': ' + j.message : '')), !j.open);
+            if (j.open) timer = setTimeout(poll, 3000);
+        };
+        var poll = function () {
+            request(URLS.cardTerminal + '/' + tp.id, {}, 10000).then(function (r) { return r.json(); })
+                .then(function (j) { misses = 0; show(j.payment); })
+                .catch(function () { misses++; state('Connection is slow, still checking… If the terminal printed a receipt, wait: the sale will complete.', true); timer = setTimeout(poll, Math.min(15000, 3000 * misses)); });
+        };
+        $('tmSend').addEventListener('click', function () {
+            var b = this; b.disabled = true; state('Sending…');
+            postJson(URLS.cardTerminal, { terminal_id: parseInt($('tmSel').value, 10), amount: total, outlet_id: o ? o.id : null }, 20000)
+                .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || 'The terminal could not be reached.'); return j; }); })
+                .then(function (j) { show(j.payment); })
+                .catch(function (e) { b.disabled = false; state(esc(e.message || 'Could not reach the terminal.') + ' You can key the amount on the terminal and enter its approval code instead.', true); });
+        });
+        $('tmManual').addEventListener('click', function () {
+            if (tp && tp.open) {
+                clearTimeout(timer);
+                postJson(URLS.cardTerminal + '/' + tp.id + '/cancel', {}, 15000).then(function (r) { return r.json(); }).then(function (j) { show(j.payment); }).catch(function () { state('Could not cancel; check the terminal.', true); });
+                return;
+            }
+            clearTimeout(timer);
+            var keep = S.boot.card_terminals; S.boot.card_terminals = [];
+            try { payDialog('card'); } finally { S.boot.card_terminals = keep; }
+        });
     }
 
     function roomDialog(p) {
@@ -435,6 +490,7 @@
                 table_label: (c.table || '').trim() || null,
                 reference: pay.reference || null,
                 bank_account_id: pay.bank_account_id || null,
+                terminal_payment_id: pay.terminal_payment_id || null,
                 tendered: pay.method === 'cash' ? round2(pay.tendered) : null,
                 discount_amount: p.discount,
                 discount_reason: p.discount > 0 ? (c.discountReason || null) : null,

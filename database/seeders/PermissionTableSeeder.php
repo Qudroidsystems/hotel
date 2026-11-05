@@ -82,6 +82,7 @@ class PermissionTableSeeder extends Seeder
             'Check out with balance',
             'View finance reports',
             'Review cash shifts',
+            'Manage card terminals',
         ],
         'Bar & Restaurant (POS)' => [
             'Use POS',

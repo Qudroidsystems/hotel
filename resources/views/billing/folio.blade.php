@@ -32,6 +32,7 @@
         <x-slot:actions>
             @can('Receive payments')
                 <button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#paymentModal" style="background:#16a34a;border-color:#16a34a"><i class="ri-bank-card-line"></i> Receive payment</button>
+                @if (app(\App\Services\Billing\TerminalService::class)->available()->isNotEmpty())<button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#terminalModal"><i class="ri-bank-card-2-line"></i> Card terminal</button>@endif
             @elsecan('Issue refunds')
                 <button type="button" class="cb-hero-btn" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="ri-refund-2-line"></i> Refund</button>
             @endcan
@@ -174,4 +175,5 @@
 </div>
 
 @include('billing.partials.modals', ['balance' => $bal, 'paidSoFar' => $summary['paid']])
+@include('billing.partials.terminal-modal', ['balance' => $bal])
 @endsection

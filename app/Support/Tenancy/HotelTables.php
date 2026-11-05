@@ -26,5 +26,6 @@ final class HotelTables
         'wellness_venues', 'wellness_services', 'wellness_therapists', 'wellness_bookings',
         'staff_pay', 'payroll_runs', 'payslips',
         'room_keys', 'door_events',
+        'payment_terminals', 'terminal_payments', 'vehicle_logs',
     ];
 }

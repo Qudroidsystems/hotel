@@ -36,6 +36,7 @@ class DemoSeeder extends Seeder
             WebsiteDemoSeeder::class,       // the public website: slides, dining, offers, gallery, journal
             NetworkDemoSeeder::class,       // Starlink dishes, guest Wi-Fi plans and codes
             FeedbackPlansDemoSeeder::class, // guest feedback after check-out, servicing plans
+            TerminalDemoSeeder::class,      // two demo card terminals that pay by themselves
         ]);
     }
 }

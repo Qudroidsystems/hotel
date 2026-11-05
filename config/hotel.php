@@ -120,6 +120,17 @@ return [
     ],
 
     /*
+    | Card terminals (Billing → Card Terminals): amounts sent to a terminal
+    | wait expire_minutes for the card. Paystack needs a customer e-mail on
+    | every payment: the guest's, or paystack_customer_email for walk-ins.
+    */
+    'terminals' => [
+        'enabled'                 => true,
+        'expire_minutes'          => 10,
+        'paystack_customer_email' => env('HOTEL_TERMINAL_CUSTOMER_EMAIL', 'walk-in@hotel.local'),
+    ],
+
+    /*
     | Report e-mails: the management report for last week (Mondays) and last
     | month (on the 1st), sent at send_at. The daily figures go out with the
     | night audit (night_audit.report_emails).
@@ -320,6 +331,12 @@ return [
         'round_to'           => 500,
         'min_notice_minutes' => 30,     // a booked time sooner than this counts as "as soon as possible"
         'max_km'             => 150,
+        'clash_minutes'        => (int) env('HOTEL_RIDE_CLASH_MINUTES', 90),   // a car or driver can't have two rides closer than this
+        'no_show_wait_minutes' => (int) env('HOTEL_RIDE_NO_SHOW_WAIT', 15),    // a driver waits this long before marking a no-show
+        'no_show_fee'          => (float) env('HOTEL_RIDE_NO_SHOW_FEE', 0),    // put on the guest's bill for a no-show (0 = none)
+        'dispatch_lead_minutes' => (int) env('HOTEL_RIDE_DISPATCH_LEAD', 60),  // a booked car with no driver this close to pick-up alerts the desk
+        'auto_dispatch'        => (bool) env('HOTEL_RIDE_AUTO_DISPATCH', false), // …and is given to the nearest free driver by itself
+        'check_before_duty'    => (bool) env('HOTEL_RIDE_CHECK_BEFORE_DUTY', true), // drivers check their car before going on duty
     ],
 
     'revenue' => [

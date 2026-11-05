@@ -117,6 +117,7 @@
         login: @json(route('login')),
         terminal: @json(route('pos.terminal')),
         sw: @json(asset('pos-sw.js')),
+        cardTerminal: @json(url('/terminal-payments')),
     };
 </script>
 <script src="{{ asset('js/pos-terminal.js') }}?v={{ @filemtime(public_path('js/pos-terminal.js')) }}"></script>

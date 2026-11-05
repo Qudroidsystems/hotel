@@ -614,6 +614,9 @@
                                     @can('View folios')
                                         <li class="nav-item"><a href="{{ route('billing.outstanding') }}" class="nav-link">Outstanding Bills</a></li>
                                     @endcan
+                                    @canany(['Manage card terminals', 'View finance reports'])
+                                        <li class="nav-item"><a href="{{ route('terminals.index') }}" class="nav-link">Card Terminals</a></li>
+                                    @endcanany
                                     @can('View finance reports')
                                         <li class="nav-item"><a href="{{ route('billing.payments') }}" class="nav-link">Collections</a></li>
                                     @elsecan('Receive payments')
@@ -1526,6 +1529,7 @@
         {title:'Guests',                                url:'{{ route("guests.index") }}',                                   icon:'mdi-account-star',            category:'Front Desk',          keywords:['guest','customer','profile','vip']},
         @endcan
         @can('View folios')
+        @canany(['Manage card terminals', 'View finance reports']){title:'Card Terminals',                        url:'{{ route("terminals.index") }}',                                icon:'mdi-credit-card-wireless',    category:'Billing',             keywords:['pos','paystack','moniepoint','opay','card','terminal','swipe']},@endcanany
         {title:'Outstanding Bills',                     url:'{{ route("billing.outstanding") }}',                            icon:'mdi-cash-clock',              category:'Billing',             keywords:['bill','folio','owing','balance','debt','credit','refund','invoice']},
         @endcan
         @canany(['View finance reports', 'Receive payments'])
@@ -2062,6 +2066,11 @@
 })();
 </script>
 
+{{-- Work that carries on with no connection: safe forms are kept and sent later (once), pages opened before can be read. --}}
+@auth
+<script>window.HOTEL_OFFLINE = { user: {{ (int) auth()->id() }}, patterns: @json(\App\Support\OfflineForms::patterns()), sw: @json(asset('hotel-sw.js')), scope: @json(rtrim(parse_url(url('/'), PHP_URL_PATH) ?: '', '/') . '/') };</script>
+<script src="{{ asset('js/offline-queue.js') }}?v=1" defer></script>
+@endauth
 {{-- Weak or dropped network: say so, and don't let a form be sent into the void or twice. --}}
 <div id="netBanner" role="status" aria-live="polite" hidden
      style="position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2000;max-width:min(640px,94vw);background:#b91c1c;color:#fff;border-radius:12px;padding:10px 16px;font-weight:600;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:10px;align-items:center">
@@ -2078,8 +2087,8 @@
     function hide() { banner.hidden = true; banner.style.display = 'none'; }
     function set(on) {
         var was = online; online = on;
-        if (!on) show("You're offline. Nothing can be saved until the connection is back — what you've typed stays on the page.");
-        else { hide(); if (!was && window.Swal) Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Back online', timer: 1800, showConfirmButton: false }); }
+        if (!on) show("You're offline. Room, repair and task updates are kept on this computer and sent when the connection is back; payments and check-ins wait.");
+        else { hide(); if (!was && window.Swal) Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Back online', timer: 1800, showConfirmButton: false }); if (!was && window.HotelOffline) HotelOffline.flush(); }
     }
     function check() {
         clearTimeout(timer);
@@ -2102,6 +2111,8 @@
         if (method === 'get') return;
         if (!online || navigator.onLine === false) {
             e.preventDefault();
+            // Everyday work (rooms cleaned, repairs, tasks …) is kept on this computer and sent later.
+            if (window.HotelOffline && HotelOffline.canQueue(f)) { HotelOffline.queue(f, e.submitter); return; }
             show("You're offline — this wasn't sent. Nothing is lost: press the button again once the connection is back.");
             check();
             return;

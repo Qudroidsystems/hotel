@@ -140,6 +140,26 @@ Artisan::command('maintenance:plans', $eachHotel(function (\App\Services\Operati
     $this->info($plans->openDue() . ' servicing job(s) opened.');
 }))->purpose('Open work orders for preventive maintenance coming due');
 
+// Card terminals: check payments still waiting on a terminal (in case the provider's notice never arrives).
+Artisan::command('terminals:check', $eachHotel(function (\App\Services\Billing\TerminalService $terminals) {
+    $this->info($terminals->checkOpen() . ' terminal payment(s) completed.');
+}))->purpose('Check card terminal payments still waiting for the card');
+
+// Car service: booked cars still without a driver close to pick-up, drivers who haven't set off; papers and services.
+Artisan::command('transport:remind', $eachHotel(function (\App\Services\Transport\RideService $rides) {
+    $this->info($rides->reminders() . ' ride reminder(s) sent.');
+}))->purpose('Remind the car desk and drivers about rides coming up');
+Artisan::command('transport:fleet', $eachHotel(function (\App\Services\Transport\RideService $rides) {
+    foreach ($rides->fleetWarnings() as $line) {
+        $this->line($line);
+    }
+}))->purpose('Flag car papers, services and driving licences running out');
+
+// Answers kept so actions sent again after a lost connection happen once; a month is plenty.
+Artisan::command('offline:prune', function () {
+    $this->info(\App\Http\Middleware\OfflineReplay::prune() . ' old offline answer(s) removed.');
+})->purpose('Forget answers to old offline actions');
+
 // The management report by e-mail: last week (Mondays) or last month (the 1st).
 Artisan::command('reports:email {period=week : week or month}', $eachHotel(function (\App\Services\Reports\ReportEmails $emails) {
     $period = $this->argument('period') === 'month' ? 'month' : 'week';
@@ -249,6 +269,10 @@ Schedule::command('loyalty:sync')->dailyAt('04:00')->withoutOverlapping();
 Schedule::command('luggage:checkout-reminders')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('feedback:invite')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('maintenance:plans')->hourly()->withoutOverlapping();
+Schedule::command('terminals:check')->everyMinute()->withoutOverlapping();
+Schedule::command('transport:remind')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('transport:fleet')->dailyAt('07:30');
+Schedule::command('offline:prune')->dailyAt('03:40');
 Schedule::command('reports:email week')->weeklyOn(1, (string) config('hotel.reports.send_at', '07:00'));
 Schedule::command('reports:email month')->monthlyOn(1, (string) config('hotel.reports.send_at', '07:00'));
 Schedule::command('messages:arrival-reminders')->dailyAt((string) config('hotel.messaging.reminder_time', '10:00'))->withoutOverlapping();

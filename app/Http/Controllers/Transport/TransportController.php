@@ -53,6 +53,7 @@ class TransportController extends Controller
             'requested' => $open->where('status', Ride::REQUESTED)->values(),
             'active'    => $open->where('status', '!=', Ride::REQUESTED)->values(),
             'done'      => Ride::whereIn('status', [Ride::COMPLETED, Ride::CANCELLED])->where('updated_at', '>=', today())->with('driver')->latest('updated_at')->limit(30)->get(),
+            'cash'      => Ride::where('cash_collected', '>', 0)->whereNull('cash_handed_at')->with('driver')->orderBy('completed_at')->get(),
             'candidates' => $open->where('status', Ride::REQUESTED)->mapWithKeys(fn (Ride $r) => [$r->id => $this->rides->candidates($r)->take(5)]),
             'map' => [
                 'hotel'   => app(\App\Services\Booking\ArrivalService::class)->hotelPoint(),
@@ -110,12 +111,34 @@ class TransportController extends Controller
         return $this->attempt(fn () => tap("{$ride->number} cancelled.", fn () => $this->rides->cancel($ride, $d['reason'], $request->user())));
     }
 
-    /** Move a ride on for a driver without the app (start, arrived, picked_up, complete). */
+    /** Move a ride on for a driver without the app (start, arrived, picked_up, complete, no_show). */
     public function status(Request $request, Ride $ride, string $action)
     {
-        abort_unless(in_array($action, ['start', 'arrived', 'picked_up', 'complete'], true), 404);
+        abort_unless(in_array($action, ['start', 'arrived', 'picked_up', 'complete', 'no_show'], true), 404);
+        $d = $request->validate(['km' => 'nullable|integer|min:0|max:2000000', 'cash' => 'nullable|numeric|min:0|max:10000000']);
 
-        return $this->attempt(fn () => $ride->number . ': ' . $this->rides->driverAction($ride, $request->user(), $action));
+        return $this->attempt(fn () => $ride->number . ': ' . $this->rides->driverAction($ride, $request->user(), $action, null, $d));
+    }
+
+    /** A driver hands in the cash a guest paid them: it goes on the guest's bill as paid, in this person's till. */
+    public function cashIn(Request $request, Ride $ride)
+    {
+        abort_unless($request->user()->canAny(['Manage transport', 'Receive payments']), 403);
+
+        return $this->attempt(fn () => $this->rides->cashHandedIn($ride, $request->user()));
+    }
+
+    /** Fuel, a service or a problem for one of the cars. */
+    public function logVehicle(Request $request, Vehicle $vehicle)
+    {
+        $d = $request->validate([
+            'kind' => 'required|in:fuel,service,issue', 'litres' => 'nullable|required_if:kind,fuel|numeric|min:0.1|max:500', 'cost' => 'nullable|numeric|min:0|max:10000000',
+            'km' => 'nullable|integer|min:0|max:2000000', 'notes' => 'nullable|required_unless:kind,fuel|string|max:500', 'next_service_on' => 'nullable|date',
+            'back_in_service' => 'nullable|boolean', 'photo' => 'nullable|image|max:5120',
+        ]);
+        $this->rides->logVehicle($vehicle, $d['kind'], $d, $request->user(), null, $request->file('photo'));
+
+        return redirect()->route('transport.index', ['tab' => 'cars', 'edit' => $vehicle->id])->with('success', \App\Models\Transport\VehicleLog::KINDS[$d['kind']] . ' logged.');
     }
 
     // ── Fleet ─────────────────────────────────────────────────────────
@@ -126,6 +149,8 @@ class TransportController extends Controller
             'name' => 'required|string|max:80', 'plate' => ['required', 'string', 'max:20', Rule::unique('vehicles', 'plate')->ignore($vehicle?->id)],
             'color' => 'nullable|string|max:30', 'kind' => ['required', Rule::in(array_keys(Vehicle::KINDS))], 'seats' => 'required|integer|min:1|max:60',
             'status' => 'required|in:available,out_of_service', 'notes' => 'nullable|string|max:255',
+            'odometer_km' => 'nullable|integer|min:0|max:2000000', 'insurance_expires' => 'nullable|date', 'roadworthy_expires' => 'nullable|date',
+            'service_every_km' => 'nullable|integer|min:0|max:100000', 'last_service_km' => 'nullable|integer|min:0|max:2000000', 'service_due_on' => 'nullable|date',
         ]);
         $d['plate'] = strtoupper(trim($d['plate']));
         $d['is_active'] = $request->boolean('is_active', true);

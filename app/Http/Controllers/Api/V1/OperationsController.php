@@ -171,15 +171,80 @@ class OperationsController extends ApiController
         return $this->ok($this->driverJson($d, $rides));
     }
 
-    /** POST /driver/duty {on} */
+    /** POST /driver/duty {on} — going on duty needs today's car check (POST /driver/check) first. */
     public function driverDuty(Request $request, \App\Services\Transport\RideService $rides)
     {
         $d = $rides->driverFor($request->user());
         abort_unless($d, 403);
         $on = $request->boolean('on');
+        if ($on && config('hotel.transport.check_before_duty', true) && $d->vehicle && ! $rides->checkedRecently($d, $d->vehicle)) {
+            return response()->json(['success' => false, 'code' => 'vehicle_check', 'message' => "Check {$d->vehicle->label} before you start.",
+                'data' => $this->checkForm($d)], 422);
+        }
+        if ($on && $d->licenceExpired()) {
+            return $this->fail('Your driving licence on file has run out. Give the front desk the new one first.', 422, 'licence');
+        }
         $d->forceFill(['on_duty' => $on] + ($on ? [] : ['latitude' => null, 'longitude' => null]))->save();
 
         return $this->ok($this->driverJson($d->fresh(), $rides), $on ? 'You’re on duty: new rides can come to you.' : 'Off duty. Your location is no longer shared.');
+    }
+
+    private function checkForm(\App\Models\Transport\Driver $d): array
+    {
+        return [
+            'vehicle' => $d->vehicle ? ['id' => $d->vehicle->id, 'label' => $d->vehicle->label, 'odometer_km' => $d->vehicle->odometer_km] : null,
+            'items' => collect(\App\Models\Transport\VehicleLog::CHECKS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+        ];
+    }
+
+    /** POST /driver/check {checks: {tyres: true …}, km?, safe, notes?, photo?, on?} — the car check before a shift. */
+    public function driverCheck(Request $request, \App\Services\Transport\RideService $rides)
+    {
+        $d = $rides->driverFor($request->user());
+        abort_unless($d, 403);
+        abort_unless($d->vehicle, 422, 'You have no car of your own on file. Ask the front desk to set one.');
+        $data = $request->validate([
+            'checks' => 'required|array', 'checks.*' => 'boolean', 'km' => 'nullable|integer|min:0|max:2000000',
+            'safe' => 'required|boolean', 'notes' => 'nullable|string|max:500', 'photo' => 'nullable|image|max:5120',
+        ]);
+        $log = $rides->vehicleCheck($d, $d->vehicle, $data['checks'], $data['km'] ?? null, (bool) $data['safe'], $data['notes'] ?? null, $request->file('photo'), $request->header('X-Offline-Id'));
+        $msg = $log->ok ? 'Car checked. All good.' : ($data['safe'] ? 'Saved. The car desk knows about: ' . implode(', ', $log->failed) . '.' : 'The car is off the road; the car desk has been told.');
+        if ($request->boolean('on') && $data['safe'] && ! $d->licenceExpired()) {
+            $d->forceFill(['on_duty' => true])->save();
+            $msg .= ' You’re on duty.';
+        }
+
+        return $this->ok($this->driverJson($d->fresh(), $rides), $msg);
+    }
+
+    /** POST /driver/log {kind: fuel|issue, litres?, cost?, km?, notes?, photo?} */
+    public function driverLog(Request $request, \App\Services\Transport\RideService $rides)
+    {
+        $d = $rides->driverFor($request->user());
+        abort_unless($d && $d->vehicle, 403);
+        $data = $request->validate([
+            'kind' => 'required|in:fuel,issue', 'litres' => 'nullable|required_if:kind,fuel|numeric|min:0.1|max:500', 'cost' => 'nullable|numeric|min:0|max:10000000',
+            'km' => 'nullable|integer|min:0|max:2000000', 'notes' => 'nullable|required_if:kind,issue|string|max:500', 'photo' => 'nullable|image|max:5120',
+        ]);
+        $rides->logVehicle($d->vehicle, $data['kind'], $data + ['offline_id' => $request->header('X-Offline-Id')], $request->user(), $d, $request->file('photo'));
+
+        return $this->ok($this->driverJson($d->fresh(), $rides), $data['kind'] === 'fuel' ? 'Fuel logged.' : 'Problem reported to the car desk.');
+    }
+
+    /** POST /driver/rides/{ride}/{action} {note?, km?, cash?} — start, arrived, picked_up, complete, decline, no_show. */
+    public function driverRide(Request $request, int $ride, string $action, \App\Services\Transport\RideService $rides)
+    {
+        $r = \App\Models\Transport\Ride::findOrFail($ride);
+        $data = $request->validate(['note' => 'nullable|string|max:300', 'km' => 'nullable|integer|min:0|max:2000000', 'cash' => 'nullable|numeric|min:0|max:10000000']);
+        if ($action === 'decline' && blank($data['note'] ?? null)) {
+            return $this->fail('Say why you can’t do this ride.', 422, 'reason_needed');
+        }
+        $msg = $rides->driverAction($r, $request->user(), $action, $data['note'] ?? null, [
+            'km' => $data['km'] ?? null, 'cash' => $data['cash'] ?? null, 'at' => $request->attributes->get('offline_at'),
+        ]);
+        $d = $rides->driverFor($request->user());
+
+        return $this->ok($d ? $this->driverJson($d->fresh(), $rides) : null, $msg);
     }
 
     /** POST /driver/location {lat, lng} — every 30–60 s while on duty. */
@@ -199,12 +264,27 @@ class OperationsController extends ApiController
     private function driverJson(\App\Models\Transport\Driver $d, \App\Services\Transport\RideService $rides): array
     {
         $active = $d->activeRide();
-        $row = fn (\App\Models\Transport\Ride $r) => $rides->rideJson($r) + ['nav' => $rides->navUrl($r), 'guest' => $r->guest_name, 'guest_phone' => $r->guest_phone, 'room' => $r->reservation?->rooms()->with('room')->get()->pluck('room.number')->filter()->implode(', ')];
+        $row = fn (\App\Models\Transport\Ride $r) => $rides->rideJson($r) + [
+            'nav' => $rides->navUrl($r), 'guest' => $r->guest_name, 'guest_phone' => $r->guest_phone,
+            'room' => $r->reservation?->rooms()->with('room')->get()->pluck('room.number')->filter()->implode(', '),
+            'fare' => $r->fare !== null ? (float) $r->fare : null, 'start_km' => $r->start_km,
+            'arrived_at' => $r->arrived_at?->toIso8601String(), 'no_show_after' => (int) config('hotel.transport.no_show_wait_minutes', 15),
+        ];
+        $v = $d->vehicle;
+        $cash = $d->rides()->where('cash_collected', '>', 0)->whereNull('cash_handed_at')->get(['id', 'number', 'cash_collected']);
 
         return [
             'id' => $d->id, 'name' => $d->name, 'on_duty' => (bool) $d->on_duty,
-            'car' => $d->vehicle ? ['name' => $d->vehicle->name, 'plate' => $d->vehicle->plate, 'label' => $d->vehicle->label] : null,
+            'car' => $v ? ['id' => $v->id, 'name' => $v->name, 'plate' => $v->plate, 'label' => $v->label, 'odometer_km' => $v->odometer_km,
+                'checked' => $rides->checkedRecently($d, $v), 'warnings' => array_values(array_filter([
+                    $v->status !== 'available' ? 'This car is off the road.' : null,
+                    ...array_map(fn ($p) => "{$p} has run out.", $v->expiredPapers()),
+                    ...$v->papersEnding(), $v->serviceDue(),
+                ]))] : null,
             'licence_warning' => $d->licenceExpired() ? 'Your licence on file has expired. Tell the front desk.' : null,
+            'check' => $this->checkForm($d),
+            'cash_held' => round((float) $cash->sum('cash_collected'), 2),
+            'cash_held_label' => $cash->isNotEmpty() ? $rides->money((float) $cash->sum('cash_collected')) . ' from ' . $cash->pluck('number')->implode(', ') : null,
             'ride' => $active ? $row($active) : null,
             'upcoming' => $d->rides()->where('status', \App\Models\Transport\Ride::ASSIGNED)->when($active, fn ($q) => $q->whereKeyNot($active->id))->orderBy('pickup_at')->limit(10)->get()->map($row)->values(),
             'ping_seconds' => 45,

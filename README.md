@@ -109,6 +109,17 @@ water heater and door lock). Hardware can report states itself: create a hub key
 at least every 15 minutes; `GET /api/v1/facility/devices` lists the codes. Demo: `php artisan db:seed
 --class=CallConsoleDemoSeeder`, then `php artisan facility:simulate --loop`.
 
+## Card terminals (Billing → Card Terminals)
+
+Send an amount from a guest's bill, the bar till or the staff app to a **Paystack Terminal**, **Moniepoint POS** or **OPay POS**. The guest pays on the terminal and the payment records itself (on the bill, with the approval code; at the bar the till finishes the sale).
+
+1. Hotel Settings → Card Terminals: Moniepoint client ID/secret and webhook secret; OPay merchant IDs, client auth key, OPay's public key and your private key. Paystack uses the secret key from Online Payments.
+2. Billing → Card Terminals: add each terminal (Paystack terminal ID, Moniepoint serial, OPay SN) and press **Test**.
+3. Webhooks (optional, they only make it quicker): Paystack → the existing `/paystack/webhook`; Moniepoint → `/terminals/webhook/moniepoint`; OPay → `/terminals/webhook/opay`. A webhook never records a payment by itself: the system always asks the provider first. `terminals:check` (every minute) catches anything missed.
+4. Try it without an account: `php artisan db:seed --class=TerminalDemoSeeder` adds demo terminals that pay after 8 seconds (an amount ending in .13 is declined).
+
+When the internet is down the terminals can't be reached: key the amount on the terminal and record **Card** with the approval code as before.
+
 ## Adding a module
 
 1. Permissions: add a group to `PermissionTableSeeder::PERMISSIONS`, grant them in

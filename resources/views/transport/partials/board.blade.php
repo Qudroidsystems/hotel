@@ -56,6 +56,7 @@
                     <div class="d-flex gap-2 flex-wrap mt-2">
                         @php $next = ['assigned' => ['start', 'Driving to pick-up'], 'on_the_way' => ['arrived', 'At pick-up'], 'arrived' => ['picked_up', 'Picked up'], 'on_trip' => ['complete', 'Dropped off']][$r->status] ?? null; @endphp
                         @if ($next)<form method="POST" action="{{ route('transport.rides.status', [$r, $next[0]]) }}" data-once>@csrf<button class="action-btn btn-more">{{ $next[1] }}</button></form>@endif
+                        @if ($r->status === 'arrived')<form method="POST" action="{{ route('transport.rides.status', [$r, 'no_show']) }}" data-once onsubmit="return confirm('The guest never came? The ride is cancelled as a no-show.')">@csrf<button class="action-btn btn-more">Guest didn't come</button></form>@endif
                         @if ($r->status === 'assigned')
                             <form method="POST" action="{{ route('transport.rides.cancel', $r) }}" class="d-flex gap-1" data-once>@csrf<input name="reason" class="form-control form-control-sm" required maxlength="255" placeholder="Reason, to cancel"><button class="action-btn btn-more"><i class="ri-close-line"></i></button></form>
                         @endif
@@ -66,6 +67,18 @@
             @endforelse
         </div>
     </div>
+    @if (($cash ?? collect())->isNotEmpty())
+        <h6 class="tr-h mt-3">Cash with drivers <span class="cb-count">{{ $sym }}{{ number_format((float) $cash->sum('cash_collected'), 0) }}</span></h6>
+        <x-cb.card :flush="true"><div class="table-responsive"><table class="cb-table stack">
+            <thead><tr><th>Ride</th><th>Driver</th><th class="num">Cash</th><th></th></tr></thead>
+            <tbody>@foreach ($cash as $r)<tr>
+                <td data-label="Ride"><span class="rs-ref">{{ $r->number }}</span> <span class="small text-muted">{{ $r->guest_name }} · {{ $r->completed_at?->format('D H:i') }}</span></td>
+                <td data-label="Driver">{{ $r->driver?->name ?? '—' }}</td>
+                <td data-label="Cash" class="num fw-semibold">{{ $sym }}{{ number_format((float) $r->cash_collected, 0) }}</td>
+                <td class="text-end"><form method="POST" action="{{ route('transport.rides.cash', $r) }}" data-once onsubmit="return confirm('Counted {{ $sym }}{{ number_format((float) $r->cash_collected, 0) }} from {{ e($r->driver?->name ?? 'the driver') }}? It goes into your till.')">@csrf<button class="action-btn btn-go"><i class="ri-hand-coin-line"></i> Received</button></form></td>
+            </tr>@endforeach</tbody>
+        </table></div></x-cb.card>
+    @endif
     @if ($done->isNotEmpty())
         <h6 class="tr-h mt-3">Earlier today</h6>
         <div class="table-responsive"><table class="cb-table stack">

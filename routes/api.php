@@ -127,7 +127,7 @@ Route::middleware('throttle:mobile-public')->group(function () {
     Route::post('/auth/forgot-password', [AuthController::class, 'forgot'])->middleware('throttle:mobile-login');
 });
 
-Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->group(function () {
+Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api', \App\Http\Middleware\OfflineReplay::class])->group(function () {
     // Account
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -201,6 +201,31 @@ Route::middleware(['auth:sanctum', MobileStaff::class, 'throttle:mobile-api'])->
         Route::post('/driver/duty', 'driverDuty');
         Route::post('/driver/location', 'driverLocation');
         Route::post('/folios/{folio}/to-company', 'billToCompany')->whereNumber('folio')->middleware('throttle:30,1');
+    });
+
+    // Everything else on the app's "More" page: tasks, visitors, incidents, check-in, card payments, keys, cars …
+    Route::controller(\App\Http\Controllers\Api\V1\ModuleController::class)->prefix('modules')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/{key}', 'show')->where('key', '[a-z_]+');
+        Route::post('/{key}', 'create')->where('key', '[a-z_]+')->middleware('throttle:60,1');
+        Route::post('/{key}/scan', 'scan')->where('key', '[a-z_]+')->middleware('throttle:240,1');
+        Route::get('/{key}/items/{id}', 'item')->where('key', '[a-z_]+')->whereNumber('id');
+        Route::post('/{key}/items/{id}/actions/{action}', 'act')->where(['key' => '[a-z_]+', 'action' => '[a-z0-9_]+'])->whereNumber('id')->middleware('throttle:120,1');
+    });
+
+    // Driver mode extras: the car check before a shift, fuel and problems, a ride step with kilometres / cash
+    Route::controller(\App\Http\Controllers\Api\V1\OperationsController::class)->group(function () {
+        Route::post('/driver/check', 'driverCheck');
+        Route::post('/driver/log', 'driverLog');
+        Route::post('/driver/rides/{ride}/{action}', 'driverRide')->whereNumber('ride')->where('action', '[a-z_]+');
+    });
+
+    // Card terminals: send a bill's amount to a Paystack / Moniepoint / OPay terminal and watch it
+    Route::prefix('terminal-payments')->controller(\App\Http\Controllers\Billing\TerminalController::class)->group(function () {
+        Route::get('/terminals', 'choices');
+        Route::post('/', 'send')->middleware('throttle:30,1');
+        Route::get('/{payment}', 'show')->whereNumber('payment');
+        Route::post('/{payment}/cancel', 'cancel')->whereNumber('payment');
     });
 
     // Alerts

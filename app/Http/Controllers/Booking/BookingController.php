@@ -188,6 +188,13 @@ class BookingController extends Controller
 
             return response()->json(['ok' => true]);
         }
+        // Card terminals: a payment request paid on a Paystack Terminal (checked with Paystack before it is recorded).
+        if (in_array($event, ['paymentrequest.success', 'charge.success', 'invoice.payment_failed'], true)) {
+            app(\App\Services\Billing\TerminalService::class)->poke('paystack', [
+                (string) $request->json('data.request_code'), (string) $request->json('data.id'), (string) $request->json('data.offline_reference'),
+                (string) $request->json('data.metadata.reference'), (string) $request->json('data.invoice.request_code'),
+            ]);
+        }
         $known = OnlinePayment::withoutGlobalScope('hotel')->where('reference', $reference)->first();
         \App\Support\Tenancy\CurrentHotel::get()->adopt($known);
         if ($event === 'charge.success' && $known) {

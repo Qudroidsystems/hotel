@@ -136,6 +136,12 @@ class HotelSettings
                     'transport.round_to'           => ['type' => 'int', 'label' => 'Round fares to the nearest', 'min' => 1, 'max' => 100000],
                     'transport.min_notice_minutes' => ['type' => 'int', 'label' => 'Minutes\' notice for a booked time', 'min' => 0, 'max' => 1440, 'help' => 'A time sooner than this is treated as "as soon as possible".'],
                     'transport.max_km'             => ['type' => 'int', 'label' => 'Furthest the cars go (km)', 'min' => 1, 'max' => 2000],
+                    'transport.clash_minutes'        => ['type' => 'int', 'label' => 'Minutes kept free between two rides of one car or driver', 'min' => 0, 'max' => 600],
+                    'transport.no_show_wait_minutes' => ['type' => 'int', 'label' => 'Minutes a driver waits before "guest didn\'t come"', 'min' => 0, 'max' => 180],
+                    'transport.no_show_fee'          => ['type' => 'money', 'label' => 'Charge on the guest\'s bill for a no-show', 'help' => '0 = no charge.'],
+                    'transport.dispatch_lead_minutes' => ['type' => 'int', 'label' => 'Remind the desk this many minutes before a pick-up with no driver', 'min' => 5, 'max' => 1440],
+                    'transport.auto_dispatch'        => ['type' => 'bool', 'label' => 'Give new rides to a free driver by themselves'],
+                    'transport.check_before_duty'    => ['type' => 'bool', 'label' => 'Drivers check their car before going on duty each day'],
                 ],
             ],
             'revenue' => [
@@ -442,6 +448,25 @@ class HotelSettings
                     'accounts.paystack.secret_key' => ['type' => 'secret', 'config' => 'services.paystack.secret_key', 'label' => 'Paystack secret key', 'prefix' => '/^sk_(test|live)_/', 'help' => 'sk_live_… or sk_test_…, from Paystack → Settings → API keys & webhooks. Set the webhook URL there to ' . (app()->bound('url') ? url('/paystack/webhook') : '/paystack/webhook') . '.'],
                 ],
             ],
+            'terminals' => [
+                'title' => 'Card Terminals', 'icon' => 'ri-bank-card-2-line',
+                'intro' => 'The accounts of the card terminals staff send amounts to from the bill, the bar till and the staff app. Add the terminals themselves under Billing → Card Terminals. Paystack Terminal uses the Paystack key under Online Payments. Keys are stored encrypted.',
+                'fields' => [
+                    'terminals.enabled'                => ['type' => 'bool', 'label' => 'Send amounts to card terminals'],
+                    'terminals.expire_minutes'         => ['type' => 'int', 'label' => 'Wait for the card for (minutes)', 'min' => 2, 'max' => 60],
+                    'terminals.paystack_customer_email' => ['type' => 'text', 'label' => 'Paystack: e-mail for walk-in customers', 'rules' => ['required', 'email', 'max:120'], 'help' => 'Paystack needs a customer on each payment. The guest\'s own e-mail is used when they have one.'],
+                    'accounts.moniepoint.client_id'      => ['type' => 'text', 'config' => 'services.moniepoint.client_id', 'label' => 'Moniepoint API client ID', 'rules' => ['nullable', 'string', 'max:120'], 'help' => 'Moniepoint dashboard → Settings → API credentials. Switch on "ERP integration" for each terminal (terminal app 1.7.2 or newer).'],
+                    'accounts.moniepoint.client_secret'  => ['type' => 'secret', 'config' => 'services.moniepoint.client_secret', 'label' => 'Moniepoint API client secret'],
+                    'accounts.moniepoint.webhook_secret' => ['type' => 'secret', 'config' => 'services.moniepoint.webhook_secret', 'label' => 'Moniepoint webhook secret', 'help' => 'Optional: makes payments show sooner. Subscribe ' . (app()->bound('url') ? url('/terminals/webhook/moniepoint') : '/terminals/webhook/moniepoint') . ' to POS purchase events and paste its secret.'],
+                    'accounts.moniepoint.amount_in_kobo' => ['type' => 'bool', 'config' => 'services.moniepoint.amount_in_kobo', 'label' => 'Moniepoint amounts are in kobo', 'help' => 'Send ₦100 first and check the terminal shows ₦100. If it shows ₦1, switch this off.'],
+                    'accounts.opay.head_merchant_id'     => ['type' => 'text', 'config' => 'services.opay_pos.head_merchant_id', 'label' => 'OPay business ID', 'rules' => ['nullable', 'string', 'max:60']],
+                    'accounts.opay.merchant_id'          => ['type' => 'text', 'config' => 'services.opay_pos.merchant_id', 'label' => 'OPay branch ID', 'rules' => ['nullable', 'string', 'max:60']],
+                    'accounts.opay.sub_scene'            => ['type' => 'text', 'config' => 'services.opay_pos.sub_scene', 'label' => 'OPay sub-scene', 'rules' => ['nullable', 'string', 'max:60'], 'help' => 'Given by OPay when the POS API is switched on.'],
+                    'accounts.opay.client_auth_key'      => ['type' => 'secret', 'config' => 'services.opay_pos.client_auth_key', 'label' => 'OPay client auth key', 'help' => 'OPay Business → Developer Tools. Set the "POS & Others" webhook there to ' . (app()->bound('url') ? url('/terminals/webhook/opay') : '/terminals/webhook/opay') . '.'],
+                    'accounts.opay.opay_public_key'      => ['type' => 'secret_text', 'pem' => true, 'config' => 'services.opay_pos.opay_public_key', 'label' => 'OPay public key'],
+                    'accounts.opay.merchant_private_key' => ['type' => 'secret_text', 'pem' => true, 'config' => 'services.opay_pos.merchant_private_key', 'label' => 'Your private key (the pair of the public key you gave OPay)'],
+                ],
+            ],
             'email' => [
                 'title' => 'Email', 'icon' => 'ri-mail-settings-line',
                 'intro' => 'How the system sends email: booking confirmations, password resets and IT alerts.',
@@ -509,7 +534,11 @@ class HotelSettings
                 'image'    => ['nullable', 'file', 'mimes:' . ($f['mimes'] ?? 'png,jpg,jpeg,webp'), 'max:1024'],
                 'select'   => ['required', 'in:' . implode(',', array_keys($f['options']))],
                 'secret'   => ['nullable', 'string', 'max:500', ...(isset($f['prefix']) ? ['regex:' . $f['prefix']] : [])],
-                'secret_text' => ['nullable', 'string', 'max:20000', function ($attribute, $value, $fail) {
+                'secret_text' => ['nullable', 'string', 'max:20000', ! empty($f['pem']) ? function ($attribute, $value, $fail) {
+                    if (filled($value) && ! str_contains((string) $value, '-----BEGIN') && ! preg_match('/^[A-Za-z0-9+\/=\s]{100,}$/', (string) $value)) {
+                        $fail('Paste the whole key, from -----BEGIN to -----END.');
+                    }
+                } : function ($attribute, $value, $fail) {
                     $json = json_decode((string) $value, true);
                     if (filled($value) && (! is_array($json) || empty($json['client_email']) || empty($json['private_key']))) {
                         $fail('That is not a Firebase service-account key: paste the whole JSON file.');

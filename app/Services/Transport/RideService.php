@@ -10,6 +10,7 @@ use App\Models\Transport\Driver;
 use App\Models\Transport\Ride;
 use App\Models\Transport\RidePlace;
 use App\Models\Transport\Vehicle;
+use App\Models\Transport\VehicleLog;
 use App\Models\User;
 use App\Services\Billing\FolioService;
 use App\Services\Booking\ArrivalService;
@@ -204,6 +205,9 @@ class RideService
         if (! $vehicle) {
             throw new BookingException("Choose a car for {$driver->name}.");
         }
+        if ($why = $this->clash($ride, $driver, $vehicle)) {
+            throw new BookingException($why);
+        }
         $previous = $ride->driver;
         $ride->forceFill([
             'driver_id' => $driver->id, 'vehicle_id' => $vehicle->id, 'status' => Ride::ASSIGNED, 'assigned_by' => $by->id, 'assigned_at' => now(),
@@ -226,7 +230,7 @@ class RideService
     /** Give it to the best free driver who has a car. Answers the driver, or null when nobody is free. */
     public function autoAssign(Ride $ride, User $by): ?Driver
     {
-        $d = $this->candidates($ride)->first(fn (Driver $d) => $d->on_duty && $d->free && $d->vehicle && $d->vehicle->status === 'available' && $d->vehicle->is_active);
+        $d = $this->candidates($ride)->first(fn (Driver $d) => $d->on_duty && $d->free && $d->vehicle && $this->clash($ride, $d, $d->vehicle) === null);
         if ($d) {
             $this->assign($ride, $d, $d->vehicle, $by);
         }
@@ -241,13 +245,21 @@ class RideService
         return Driver::where('user_id', $user->id)->where('is_active', true)->first();
     }
 
-    /** start (on my way), arrived, picked_up, complete, decline (give it back). */
-    public function driverAction(Ride $ride, User $user, string $action, ?string $note = null): string
+    /**
+     * start (on my way), arrived, picked_up, complete, decline (give it back), no_show (waited, the guest never came).
+     * $extra: km (the car's odometer: at the start, or at the end), cash (what a cash ride's guest paid),
+     * at (when it really happened, for a press made with no connection and sent later).
+     */
+    public function driverAction(Ride $ride, User $user, string $action, ?string $note = null, array $extra = []): string
     {
         $driver = $this->driverFor($user);
         $dispatcher = $user->can('Manage transport');
         if (! $dispatcher && (! $driver || $ride->driver_id !== $driver->id)) {
             throw new AuthorizationException('This ride isn’t yours.');
+        }
+        $at = $this->happenedAt($extra['at'] ?? null);
+        if ($action === 'no_show') {
+            return $this->noShow($ride, $user, $note, $at);
         }
         [$from, $to, $stamp, $msg] = match ($action) {
             'start'     => [[Ride::ASSIGNED], Ride::ON_THE_WAY, 'started_at', 'On your way — the guest can see you coming.'],
@@ -257,18 +269,39 @@ class RideService
             'decline'   => [[Ride::ASSIGNED], Ride::REQUESTED, null, 'Given back to the front desk.'],
             default     => throw new BookingException('Unknown action.'),
         };
-        DB::transaction(function () use ($ride, $from, $to, $stamp, $action, $note, $user) {
+        $km = isset($extra['km']) && $extra['km'] !== '' && $extra['km'] !== null ? (int) $extra['km'] : null;
+        $cash = isset($extra['cash']) && $extra['cash'] !== '' && $extra['cash'] !== null ? round((float) $extra['cash'], 2) : null;
+        if ($action === 'complete' && $ride->payment === 'cash' && $cash === null && $ride->fare === null) {
+            throw new BookingException('How much cash did the guest pay?');
+        }
+        DB::transaction(function () use ($ride, $from, $to, $stamp, $action, $note, $user, $at, $km, $cash) {
             $locked = Ride::whereKey($ride->id)->lockForUpdate()->first();
             if (! in_array($locked->status, $from, true)) {
                 throw new BookingException("{$ride->number} has moved on. Pull down to refresh.");
             }
-            $locked->forceFill(['status' => $to] + ($stamp ? [$stamp => now()] : []) + ($action === 'decline' ? ['driver_id' => null, 'vehicle_id' => null, 'assigned_at' => null] : []))->save();
+            $fill = ['status' => $to] + ($stamp ? [$stamp => $at] : []) + ($action === 'decline' ? ['driver_id' => null, 'vehicle_id' => null, 'assigned_at' => null] : []);
+            if ($km !== null && $action === 'start') {
+                $fill['start_km'] = $km;
+            }
+            if ($km !== null && $action === 'complete') {
+                if ($locked->start_km !== null && $km < $locked->start_km) {
+                    throw new BookingException("The kilometres at the end ({$km}) can’t be less than at the start ({$locked->start_km}).");
+                }
+                $fill['end_km'] = $km;
+            }
+            if ($action === 'complete' && $locked->payment === 'cash') {
+                $fill['cash_collected'] = $cash ?? (float) $locked->fare;
+            }
+            $locked->forceFill($fill)->save();
             if ($action === 'complete') {
                 $this->charge($locked);
             }
             $locked->reservation?->log('ride', "Car {$locked->number}: " . (Ride::STATUSES[$to][1] ?? $to) . ($note ? " — {$note}" : '') . " ({$user->name})");
             $ride->setRawAttributes($locked->getAttributes());
         });
+        if ($km !== null && $ride->vehicle) {
+            $this->odometer($ride->vehicle, $km);
+        }
         if ($action === 'decline') {
             $this->tellDispatch($ride->fresh(), "Driver gave back {$ride->number}" . ($note ? ": {$note}" : ''), 'urgent');
         }
@@ -276,8 +309,256 @@ class RideService
             // Leaving the hotel: the front desk can tell the guest their car is at the door.
             $this->tellDispatch($ride->fresh(), "Car for {$ride->guest_name} is at the entrance", 'normal');
         }
+        if ($action === 'complete' && $ride->payment === 'cash' && (float) $ride->cash_collected > 0) {
+            $msg .= ' Hand the ' . $this->money((float) $ride->cash_collected) . ' cash in at the front desk.';
+        }
 
         return $msg;
+    }
+
+    /** A time the phone says something happened: used when it is believable (the last 12 hours), else now. */
+    public function happenedAt(mixed $at): Carbon
+    {
+        if (! $at) {
+            return now();
+        }
+        try {
+            $t = Carbon::parse($at)->setTimezone(config('app.timezone'));
+        } catch (Throwable) {
+            return now();
+        }
+
+        return $t->gt(now()) || $t->lt(now()->subHours(12)) ? now() : $t;
+    }
+
+    /** The driver waited at the pick-up and the guest never came. */
+    private function noShow(Ride $ride, User $user, ?string $note, Carbon $at): string
+    {
+        $wait = (int) config('hotel.transport.no_show_wait_minutes', 15);
+        DB::transaction(function () use ($ride, $user, $note, $at, $wait) {
+            $locked = Ride::whereKey($ride->id)->lockForUpdate()->first();
+            if ($locked->status !== Ride::ARRIVED) {
+                throw new BookingException('Mark yourself as arrived at the pick-up first.');
+            }
+            $waited = (int) floor($locked->arrived_at ? abs($locked->arrived_at->diffInSeconds($at)) / 60 : 0);
+            if ($waited < $wait && ! $user->can('Manage transport')) {
+                throw new BookingException("Wait at least {$wait} minutes and call the guest first ({$waited} so far).");
+            }
+            $locked->forceFill(['status' => Ride::CANCELLED, 'cancelled_at' => $at, 'no_show' => true,
+                'cancel_reason' => mb_substr('The guest didn’t come (driver waited ' . $waited . ' min)' . ($note ? ": {$note}" : ''), 0, 255)])->save();
+            $fee = (float) config('hotel.transport.no_show_fee', 0);
+            if ($fee > 0 && $locked->reservation && $locked->payment === 'room') {
+                $this->folios->postCharge($this->folios->forReservation($locked->reservation), ChargeType::Service, mb_substr("No-show: car {$locked->number}", 0, 255), 1, $fee, today(),
+                    ['source_type' => Ride::class, 'source_id' => $locked->id, 'idempotency_key' => "ride-noshow:{$locked->id}"]);
+            }
+            $locked->reservation?->log('ride', "Car {$locked->number}: guest didn’t come — {$locked->cancel_reason} ({$user->name})");
+            Audit::record('transport.ride_no_show', "{$locked->number}: no-show after {$waited} min", $locked, by: $user);
+            $ride->setRawAttributes($locked->getAttributes());
+        });
+        $this->tellDispatch($ride->fresh(), 'Guest didn’t come', 'normal');
+
+        return 'Marked as a no-show. You’re free for the next ride.';
+    }
+
+    /**
+     * Why this driver and car can't take this ride, or null when they can: papers run out, out of service,
+     * not enough seats, or already on another ride around that time.
+     */
+    public function clash(Ride $ride, Driver $driver, Vehicle $vehicle): ?string
+    {
+        if ($driver->is_active === false) {
+            return "{$driver->name} is no longer an active driver.";
+        }
+        if ($driver->licenceExpired()) {
+            return "{$driver->name}’s driving licence ran out on " . $driver->licence_expires->format('j M Y') . '.';
+        }
+        if ($vehicle->is_active === false || ($vehicle->status ?? 'available') !== 'available') {
+            return "{$vehicle->label} is out of service.";
+        }
+        if ($papers = $vehicle->expiredPapers()) {
+            return "{$vehicle->label}: " . implode(' and ', $papers) . ' ran out. Renew it before the car carries guests.';
+        }
+        if ($vehicle->seats && $ride->passengers > $vehicle->seats) {
+            return "{$vehicle->label} has {$vehicle->seats} seats; this ride is for {$ride->passengers}.";
+        }
+        $gap = (int) config('hotel.transport.clash_minutes', 90);
+        $at = $ride->pickup_at ?? now();
+        $busy = Ride::whereKeyNot($ride->id)->whereIn('status', Ride::ACTIVE)
+            ->where(fn ($q) => $q->where('vehicle_id', $vehicle->id)->orWhere('driver_id', $driver->id))
+            ->get()
+            ->first(fn (Ride $o) => in_array($o->status, [Ride::ON_THE_WAY, Ride::ARRIVED, Ride::ON_TRIP], true)
+                ? $at->lt(now()->addMinutes($gap))
+                : abs(($o->pickup_at ?? $o->assigned_at ?? now())->diffInMinutes($at)) < $gap);
+        if ($busy) {
+            return ($busy->vehicle_id === $vehicle->id ? $vehicle->label : $driver->name) . " is on {$busy->number} ({$busy->when_label}) around then.";
+        }
+
+        return null;
+    }
+
+    /** Keep the car's kilometres (they only go up) and say when it is due a service. */
+    public function odometer(Vehicle $vehicle, int $km): void
+    {
+        if ($km <= 0 || ($vehicle->odometer_km !== null && $km <= $vehicle->odometer_km) || $km > 2000000) {
+            return;
+        }
+        $wasDue = $vehicle->serviceDue();
+        $vehicle->forceFill(['odometer_km' => $km])->save();
+        if (! $wasDue && ($due = $vehicle->serviceDue())) {
+            app(StaffAlerts::class)->notify('Manage transport', [
+                'title' => "{$vehicle->label}: {$due}", 'body' => 'Now at ' . number_format($km) . ' km. Book the service.',
+                'group' => 'work', 'level' => 'normal', 'url' => 'transport', 'thread' => "vehicle:{$vehicle->id}",
+            ]);
+        }
+    }
+
+    /** Cash a driver took from a guest, handed in at the desk: it goes on the guest's bill as paid, in this person's till. */
+    public function cashHandedIn(Ride $ride, User $by): string
+    {
+        if ((float) $ride->cash_collected <= 0 || $ride->cash_handed_at) {
+            throw new BookingException("No cash is waiting to be handed in for {$ride->number}.");
+        }
+        DB::transaction(function () use ($ride, $by) {
+            $locked = Ride::whereKey($ride->id)->lockForUpdate()->first();
+            if ($locked->cash_handed_at) {
+                throw new BookingException("{$ride->number}’s cash was already handed in.");
+            }
+            $amount = (float) $locked->cash_collected;
+            if ($locked->reservation && ! $locked->folio_charge_id) {
+                $folio = $this->folios->forReservation($locked->reservation);
+                $charge = $this->folios->postCharge($folio, ChargeType::Service, mb_substr("Car {$locked->number}: {$locked->route_label}", 0, 255), 1, $amount, today(),
+                    ['source_type' => Ride::class, 'source_id' => $locked->id, 'idempotency_key' => "ride:{$locked->id}"]);
+                $this->folios->receivePayment($folio, \App\Enums\PaymentKind::Payment, \App\Enums\PaymentMethod::Cash, $amount, $locked->number,
+                    'Paid in cash to driver ' . ($locked->driver?->name ?? ''), ['idempotency_key' => "ride-cash:{$locked->id}"]);
+                $locked->folio_charge_id = $charge->id;
+            }
+            $locked->forceFill(['cash_handed_at' => now(), 'cash_received_by' => $by->id])->save();
+            Audit::record('transport.cash_handed_in', "Cash {$this->money($amount)} for {$locked->number} handed in by " . ($locked->driver?->name ?? 'the driver'), $locked, by: $by);
+            $ride->setRawAttributes($locked->getAttributes());
+        });
+
+        return $this->money((float) $ride->cash_collected) . ' received for ' . $ride->number . '.';
+    }
+
+    /**
+     * A driver's check of their car before a shift. $checks: [item => passed]. A car marked not safe is
+     * taken out of service until a manager puts it back.
+     */
+    public function vehicleCheck(Driver $driver, Vehicle $vehicle, array $checks, ?int $km, bool $safe, ?string $notes, ?\Illuminate\Http\UploadedFile $photo = null, ?string $offlineId = null): VehicleLog
+    {
+        if ($offlineId && ($done = VehicleLog::where('offline_id', $offlineId)->first())) {
+            return $done;
+        }
+        $list = collect(VehicleLog::CHECKS)->mapWithKeys(fn ($label, $key) => [$key => (bool) ($checks[$key] ?? false)])->all();
+        $ok = $safe && ! in_array(false, $list, true);
+        $log = VehicleLog::create([
+            'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id, 'user_id' => $driver->user_id, 'kind' => 'check',
+            'odometer_km' => $km, 'checklist' => $list, 'ok' => $ok, 'notes' => $notes ? mb_substr($notes, 0, 500) : null,
+            'photo_path' => $photo && $photo->isValid() ? $photo->store('transport', 'public') : null, 'offline_id' => $offlineId,
+        ]);
+        $vehicle->forceFill(['checked_at' => now()] + (! $safe ? ['status' => 'out_of_service'] : []))->save();
+        if ($km) {
+            $this->odometer($vehicle, $km);
+        }
+        if (! $ok) {
+            app(StaffAlerts::class)->notify('Manage transport', [
+                'title' => ($safe ? "{$vehicle->label}: check found problems" : "{$vehicle->label} taken off the road"),
+                'body' => "{$driver->name}: " . (implode(', ', $log->failed) ?: 'not safe to drive') . ($notes ? " — {$notes}" : ''),
+                'group' => 'work', 'level' => $safe ? 'normal' : 'urgent', 'url' => 'transport', 'thread' => "vehicle:{$vehicle->id}",
+            ]);
+        }
+        Audit::record('transport.vehicle_check', "{$driver->name} checked {$vehicle->label}" . ($ok ? ': all good' : ': ' . (implode(', ', $log->failed) ?: 'not safe')), $vehicle);
+
+        return $log;
+    }
+
+    /** Has this driver checked this car within the last 12 hours? */
+    public function checkedRecently(Driver $driver, Vehicle $vehicle): bool
+    {
+        return VehicleLog::where('vehicle_id', $vehicle->id)->where('driver_id', $driver->id)->where('kind', 'check')->where('created_at', '>=', now()->subHours(12))->exists();
+    }
+
+    /** A fill-up, a service or a problem, from the driver's phone or the fleet page. */
+    public function logVehicle(Vehicle $vehicle, string $kind, array $d, ?User $by, ?Driver $driver = null, ?\Illuminate\Http\UploadedFile $photo = null): VehicleLog
+    {
+        if (! empty($d['offline_id']) && ($done = VehicleLog::where('offline_id', $d['offline_id'])->first())) {
+            return $done;
+        }
+        abort_unless(array_key_exists($kind, VehicleLog::KINDS) && $kind !== 'check', 422);
+        $log = VehicleLog::create([
+            'vehicle_id' => $vehicle->id, 'driver_id' => $driver?->id, 'user_id' => $by?->id, 'kind' => $kind,
+            'odometer_km' => isset($d['km']) ? (int) $d['km'] : null, 'litres' => $d['litres'] ?? null, 'cost' => $d['cost'] ?? null,
+            'ok' => $kind !== 'issue', 'notes' => isset($d['notes']) ? mb_substr((string) $d['notes'], 0, 500) : null,
+            'photo_path' => $photo && $photo->isValid() ? $photo->store('transport', 'public') : null, 'offline_id' => $d['offline_id'] ?? null,
+        ]);
+        if ($kind === 'service') {
+            $km = isset($d['km']) ? (int) $d['km'] : $vehicle->odometer_km;
+            $vehicle->forceFill(['last_service_km' => $km, 'service_due_on' => ! empty($d['next_service_on']) ? Carbon::parse($d['next_service_on'])->toDateString() : null]
+                + (! empty($d['back_in_service']) ? ['status' => 'available'] : []))->save();
+        }
+        if (! empty($d['km'])) {
+            $this->odometer($vehicle->fresh(), (int) $d['km']);
+        }
+        if ($kind === 'issue') {
+            app(StaffAlerts::class)->notify('Manage transport', [
+                'title' => "{$vehicle->label}: problem reported", 'body' => ($driver?->name ?? $by?->name ?? 'Someone') . ': ' . ($d['notes'] ?? ''),
+                'group' => 'work', 'level' => 'urgent', 'url' => 'transport', 'thread' => "vehicle:{$vehicle->id}",
+            ]);
+        }
+
+        return $log;
+    }
+
+    /**
+     * Every few minutes: a booked car nobody has been given to soon before the pick-up tells the
+     * desk (and is given to a free driver when the hotel lets the system do that); a driver who
+     * hasn't set off close to the time is reminded. Daily: papers about to run out.
+     */
+    public function reminders(?User $system = null): int
+    {
+        $n = 0;
+        $lead = (int) config('hotel.transport.dispatch_lead_minutes', 60);
+        Ride::where('status', Ride::REQUESTED)->whereNull('reminded_at')->whereNotNull('pickup_at')->where('pickup_at', '<=', now()->addMinutes($lead))
+            ->get()->each(function (Ride $r) use (&$n, $system) {
+                $who = $system ?? User::permission('Manage transport')->where('is_disabled', false)->first();
+                $given = config('hotel.transport.auto_dispatch', false) && $who ? $this->autoAssign($r, $who) : null;
+                $r->forceFill(['reminded_at' => now()])->save();
+                $this->tellDispatch($r->fresh(), $given ? "Given to {$given->name} automatically" : 'No driver yet, pick-up ' . $r->pickup_at->format('g:i A'), $given ? 'normal' : 'urgent');
+                $n++;
+            });
+        Ride::where('status', Ride::ASSIGNED)->whereNull('driver_reminded_at')->whereNotNull('pickup_at')->where('pickup_at', '<=', now()->addMinutes(30))
+            ->with('driver')->get()->each(function (Ride $r) use (&$n) {
+                $r->forceFill(['driver_reminded_at' => now()])->save();
+                if ($r->driver?->user_id) {
+                    $this->send(User::whereKey($r->driver->user_id)->get(), ['title' => "Time to go: {$r->number}", 'body' => $r->route_label . ' · pick-up ' . $r->pickup_at->format('g:i A'), 'level' => 'urgent'], $r);
+                }
+                $n++;
+            });
+
+        return $n;
+    }
+
+    /** Papers and services coming up (daily). Answers what was flagged. */
+    public function fleetWarnings(): array
+    {
+        $out = [];
+        foreach (Vehicle::where('is_active', true)->get() as $v) {
+            $w = array_merge(array_map(fn ($p) => "{$p} ran out", $v->expiredPapers()), $v->papersEnding(), array_filter([$v->serviceDue()]));
+            if ($w) {
+                $out[] = $v->label . ': ' . implode(', ', $w);
+            }
+        }
+        foreach (Driver::where('is_active', true)->whereNotNull('licence_expires')->where('licence_expires', '<=', today()->addDays(14))->get() as $d) {
+            $out[] = "{$d->name}: licence " . ($d->licenceExpired() ? 'ran out ' : 'ends ') . $d->licence_expires->format('j M');
+        }
+        if ($out) {
+            app(StaffAlerts::class)->notify('Manage transport', [
+                'title' => 'Cars and drivers: ' . count($out) . ' thing(s) to sort', 'body' => implode(' · ', array_slice($out, 0, 6)),
+                'group' => 'work', 'level' => 'normal', 'url' => 'transport', 'thread' => 'fleet:' . today()->toDateString(),
+            ]);
+        }
+
+        return $out;
     }
 
     /** Where the driver is (sent by the staff app while on duty). */
@@ -307,7 +588,8 @@ class RideService
     private function charge(Ride $ride): void
     {
         $r = $ride->reservation;
-        if ($ride->payment !== 'room' || ! $r || (float) $ride->fare <= 0 || $ride->folio_charge_id) {
+        // Cash is put on the bill (as paid) when the driver hands it in; room and card rides go on the bill now.
+        if (! in_array($ride->payment, ['room', 'card'], true) || ! $r || (float) $ride->fare <= 0 || $ride->folio_charge_id) {
             return;
         }
         $charge = $this->folios->postCharge($this->folios->forReservation($r), ChargeType::Service, mb_substr("Car {$ride->number}: {$ride->route_label}", 0, 255), 1, (float) $ride->fare, today(),

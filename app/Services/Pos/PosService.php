@@ -117,6 +117,9 @@ class PosService
             'bank_accounts' => HotelBankAccount::forTransfers()->map(fn ($a) => ['id' => $a->id, 'label' => $a->bank_name . ' · ' . $a->account_number])->values(),
             'methods' => collect([PaymentMethod::Cash, PaymentMethod::Card, PaymentMethod::Transfer])
                 ->map(fn ($m) => ['value' => $m->value, 'label' => $m->label()])->values(),
+            // Card terminals the till can send the amount to (needs the internet; the approval code box stays for when it's down).
+            'card_terminals' => app(\App\Services\Billing\TerminalService::class)->available()
+                ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'provider' => $t->provider_label, 'outlet_id' => $t->pos_outlet_id])->values(),
         ];
     }
 
@@ -183,6 +186,7 @@ class PosService
             'cashier_id'        => 'nullable|integer',
             'device_id'         => 'nullable|string|max:20',
             'was_offline'       => 'nullable|boolean',
+            'terminal_payment_id' => 'nullable|integer',
             'items'             => 'required|array|min:1|max:200',
             'items.*.item_id'   => 'nullable|integer',
             'items.*.name'      => 'required|string|max:120',
@@ -208,6 +212,10 @@ class PosService
                 return $this->result($existing, 'duplicate');
             }
             throw $e;
+        }
+
+        if (! empty($p['terminal_payment_id'])) {
+            app(\App\Services\Billing\TerminalService::class)->linkSale((int) $p['terminal_payment_id'], $order->uuid);
         }
 
         return $this->result($order, 'ok');
