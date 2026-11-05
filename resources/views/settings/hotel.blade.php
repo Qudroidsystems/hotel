@@ -157,6 +157,26 @@
                 <p class="small mb-2"><strong>Use default</strong> removes your value and goes back to the installed one.</p>
                 <p class="small mb-0">Every change is recorded on the audit trail with the old and new value and who made it.</p>
             </x-cb.card>
+            @if ($tab === 'email')
+                <x-cb.card title="Send a test e-mail" icon="ri-mail-check-line">
+                    @if (in_array(config('mail.default'), ['log', 'array'], true))
+                        <p class="small text-warning mb-2"><i class="ri-error-warning-line"></i> E-mails are only written to <code>storage/logs/laravel.log</code> at the moment. Guests won't get sign-in codes or booking e-mails until you choose an SMTP server.</p>
+                    @endif
+                    <form method="POST" action="{{ route('settings.hotel.test-email') }}" class="d-flex gap-2">
+                        @csrf
+                        <input type="email" name="to" class="form-control form-control-sm" placeholder="you@example.com" value="{{ auth()->user()->email }}" required>
+                        <button class="btn btn-sm btn-primary text-nowrap">Send test</button>
+                    </form>
+                    <p class="small text-muted mt-2 mb-0">Gmail: smtp.gmail.com, port 587, STARTTLS, your Gmail address, and an app password from myaccount.google.com/apppasswords (two-step verification must be on).</p>
+                </x-cb.card>
+            @endif
+            @if ($tab === 'guest_sign_in')
+                <x-cb.card title="Setting up the buttons" icon="ri-key-2-line">
+                    <p class="small mb-2"><strong>Google:</strong> make a "Web application" OAuth client and add <code>{{ url('/') }}</code> as an authorised JavaScript origin. For the apps, also make an iOS client (bundle ID) and an Android client (package name + SHA-1 of the signing key).</p>
+                    <p class="small mb-2"><strong>Apple:</strong> needs a paid Apple Developer account. Turn on Sign in with Apple for the app's App ID, make a Services ID for the website, and add the return URL <code>{{ url('/account/apple/callback') }}</code>. Apple only accepts real https domains, not localhost.</p>
+                    <p class="small mb-0">Guests sign in on the website at <a href="{{ route('account.show') }}" target="_blank">{{ url('/account') }}</a>.</p>
+                </x-cb.card>
+            @endif
             @if ($tab === 'money')
                 <x-cb.card title="Taxes on new bills" icon="ri-receipt-line">
                     @forelse (config('hotel.taxes') as $t)

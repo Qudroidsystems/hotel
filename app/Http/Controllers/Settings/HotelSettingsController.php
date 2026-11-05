@@ -9,7 +9,9 @@ use App\Support\HotelSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Settings → Hotel Settings: branding, tax, approval limits and the other
@@ -104,6 +106,24 @@ class HotelSettingsController extends Controller
 
         return redirect()->route('settings.hotel.index', ['tab' => $group])
             ->with('success', count($labels) === 1 ? $labels[0] . ' saved.' : count($labels) . ' settings saved.');
+    }
+
+    /** Settings → Email: send a test message with the saved settings, so the administrator sees it works. */
+    public function testEmail(Request $request)
+    {
+        $data = $request->validate(['to' => 'required|email|max:150']);
+        $back = redirect()->route('settings.hotel.index', ['tab' => 'email']);
+        if (in_array(config('mail.default'), ['log', 'array'], true)) {
+            return $back->with('error', 'E-mail is set to "write to the log", so nothing is sent. Choose an SMTP server above and save first.');
+        }
+        try {
+            Mail::raw('This is a test e-mail from ' . config('hotel.name') . '. If you can read it, guests will get their sign-in codes and booking e-mails.',
+                fn ($m) => $m->to($data['to'])->subject('Test e-mail from ' . config('hotel.name')));
+        } catch (Throwable $e) {
+            return $back->with('error', 'The e-mail could not be sent: ' . Str::limit($e->getMessage(), 300));
+        }
+
+        return $back->with('success', 'Test e-mail sent to ' . $data['to'] . '. Check the inbox (and the spam folder).');
     }
 
     /** "Use default": drop the saved value so config/.env applies again. */

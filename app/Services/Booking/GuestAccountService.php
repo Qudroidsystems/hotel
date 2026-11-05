@@ -6,6 +6,7 @@ use App\Enums\ReservationStatus as S;
 use App\Exceptions\BookingException;
 use App\Models\Booking\GuestLoginCode;
 use App\Models\Booking\GuestSession;
+use App\Models\Booking\GuestSocialLogin;
 use App\Models\Guest;
 use App\Models\Hotel;
 use App\Models\Reservation;
@@ -32,8 +33,20 @@ class GuestAccountService
     public const CODES_PER_HOUR = 5;
     public const SESSION_DAYS = 90;
 
+    /** The last code sent, kept only while e-mails go to the log on a local install (see devCodes). */
+    public ?string $devCode = null;
+
     public function __construct(private GuestMessenger $messenger)
     {
+    }
+
+    /**
+     * On a local install whose e-mail is set to "write to the log", nobody can
+     * receive the code, so the sign-in screen shows it instead. Never on a live site.
+     */
+    public static function devCodes(): bool
+    {
+        return app()->environment('local') && config('app.debug') && in_array(config('mail.default'), ['log', 'array'], true);
     }
 
     /** ['email', 'ada@x.com'] or ['phone', '+2348031234567'], or null when it's neither. */
@@ -68,6 +81,7 @@ class GuestAccountService
      */
     public function sendCode(string $raw, ?string $ip = null): string
     {
+        $this->devCode = null;
         [$type, $contact] = $this->contact($raw) ?? throw new BookingException('Enter the e-mail address or mobile number you booked with.');
         if (GuestLoginCode::where('contact', $contact)->where('created_at', '>=', now()->subHour())->count() >= self::CODES_PER_HOUR) {
             throw new BookingException('Too many codes asked for. Please wait a while and try again.');
@@ -93,6 +107,9 @@ class GuestAccountService
         if ($type === 'email') {
             try {
                 Mail::raw($text, fn ($m) => $m->to($contact, $guest?->full_name)->subject("{$code} — your {$hotel} sign-in code"));
+                if (self::devCodes()) {
+                    $this->devCode = $code;
+                }
             } catch (Throwable $e) {
                 Log::warning('Guest sign-in code e-mail failed: ' . $e->getMessage());
                 throw new BookingException('We couldn’t send the e-mail just now. Please try again in a minute.');
@@ -123,12 +140,44 @@ class GuestAccountService
         }
         $row->forceFill(['used_at' => now()])->save();
 
+        return $this->startSession($contact, $device, str_contains($contact, '@') ? 'e-mail' : 'phone');
+    }
+
+    /**
+     * Sign in (or join) with Google or Apple. The e-mail the provider confirmed
+     * is the account, so it brings the same bookings as a code to that e-mail.
+     * Apple sends the name only the first time, from the app or page, not in the token.
+     */
+    public function socialSignIn(string $provider, string $idToken, ?string $device = null, array $name = [], ?string $nonce = null): array
+    {
+        $id = app(SocialSignIn::class)->verify($provider, $idToken, $nonce);
+        $link = $id['sub'] !== '' ? GuestSocialLogin::where('provider', $provider)->where('subject', $id['sub'])->first() : null;
+        $email = $id['email'] && $id['email_verified'] ? $id['email'] : $link?->email;
+        if (! $email || $id['sub'] === '') {
+            throw new BookingException('Your ' . ucfirst($provider) . ' account didn’t share a confirmed e-mail address. Sign in with your e-mail instead.');
+        }
+        if ($this->guests($email)->isEmpty() && ! $link && ! config('hotel.guest_app.open_sign_up', true)) {
+            throw new BookingException('We couldn’t find a booking made with ' . $email . '. Use the e-mail or phone you booked with.');
+        }
+
+        $first = $name['first_name'] ?? null ?: $id['first_name'];
+        $last = $name['last_name'] ?? null ?: $id['last_name'];
+        $link ??= new GuestSocialLogin(['provider' => $provider, 'subject' => $id['sub']]);
+        $link->fill(array_filter([
+            'email' => $email, 'first_name' => $first ? mb_substr(trim($first), 0, 100) : null, 'last_name' => $last ? mb_substr(trim($last), 0, 100) : null,
+        ]))->forceFill(['last_used_at' => now()])->save();
+
+        return $this->startSession($email, $device, ucfirst($provider));
+    }
+
+    private function startSession(string $contact, ?string $device, string $via): array
+    {
         $token = 'gs_' . Str::random(60);
         $session = GuestSession::create([
             'token_hash' => hash('sha256', $token), 'contact' => $contact, 'device' => $device ? mb_substr($device, 0, 120) : null,
             'last_used_at' => now(), 'expires_at' => now()->addDays(self::SESSION_DAYS),
         ]);
-        Audit::record('guest.signed_in', 'A guest signed in to the guest app (' . (str_contains($contact, '@') ? 'e-mail' : 'phone') . ')', new: ['session' => $session->id]);
+        Audit::record('guest.signed_in', "A guest signed in to their account ({$via})", new: ['session' => $session->id]);
 
         return ['token' => $token, 'session' => $session];
     }
@@ -183,13 +232,15 @@ class GuestAccountService
             });
         }
         $stays = $stays->sortByDesc('check_in')->values();
+        // A guest who joined with Google / Apple and hasn't booked yet: the name from that account.
+        $social = $latest ? null : GuestSocialLogin::where('email', $s->contact)->whereNotNull('first_name')->latest('last_used_at')->first();
 
         return [
             'contact'     => $s->contact,
-            'first_name'  => $latest?->first_name,
-            'last_name'   => $latest?->last_name,
-            'name'        => $latest?->full_name,
-            'email'       => $latest?->email,
+            'first_name'  => $latest?->first_name ?? $social?->first_name,
+            'last_name'   => $latest?->last_name ?? $social?->last_name,
+            'name'        => $latest?->full_name ?? ($social ? trim($social->first_name . ' ' . $social->last_name) : null),
+            'email'       => $latest?->email ?? (str_contains($s->contact, '@') ? $s->contact : null),
             'phone'       => $latest?->phone,
             'nationality' => $latest?->nationality,
             'marketing_opt_in' => (bool) $latest?->marketing_opt_in,
@@ -210,6 +261,10 @@ class GuestAccountService
         $fields = array_intersect_key($data, array_flip(['first_name', 'last_name', 'nationality', 'marketing_opt_in']));
         foreach ($this->guests($s->contact) as $g) {
             $g->forceFill($fields)->saveQuietly();
+        }
+        $names = array_filter(array_intersect_key($fields, array_flip(['first_name', 'last_name'])));
+        if ($names) {
+            GuestSocialLogin::where('email', $s->contact)->update($names);
         }
     }
 

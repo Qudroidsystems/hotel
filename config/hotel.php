@@ -150,6 +150,15 @@ return [
     // The guest app: new guests may make an account with their e-mail before their first booking.
     'guest_app' => [
         'open_sign_up' => env('HOTEL_GUEST_OPEN_SIGN_UP', true),
+        // Sign in with Google / Apple (Settings → Guest Sign-in). Client IDs are public values.
+        'google_sign_in'           => (bool) env('HOTEL_GOOGLE_SIGN_IN', false),
+        'google_web_client_id'     => env('GOOGLE_SIGN_IN_WEB_CLIENT_ID'),
+        'google_ios_client_id'     => env('GOOGLE_SIGN_IN_IOS_CLIENT_ID'),
+        'google_android_client_id' => env('GOOGLE_SIGN_IN_ANDROID_CLIENT_ID'),
+        'apple_sign_in'            => (bool) env('HOTEL_APPLE_SIGN_IN', false),
+        'apple_service_id'         => env('APPLE_SIGN_IN_SERVICE_ID'),
+        'apple_bundle_id'          => env('APPLE_SIGN_IN_BUNDLE_ID'),
+        'android_package'          => env('GUEST_APP_ANDROID_PACKAGE'),
     ],
 
     'booking' => [

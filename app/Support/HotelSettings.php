@@ -317,7 +317,6 @@ class HotelSettings
                 'fields' => [
                     'booking.guest_chat'            => ['type' => 'bool', 'label' => 'Guests can chat with the hotel (guest app and booking page)'],
                     'booking.guest_calls'           => ['type' => 'bool', 'label' => 'Guests can call sections in the app'],
-                    'guest_app.open_sign_up'        => ['type' => 'bool', 'label' => 'New guests can join in the guest app with their e-mail', 'help' => 'Off: only guests who have booked before can sign in.'],
                     'accounts.realtime.enabled'     => ['type' => 'bool', 'config' => 'services.realtime.enabled', 'label' => 'Use the real-time server'],
                     'accounts.realtime.app_id'      => ['type' => 'text', 'config' => 'services.realtime.app_id', 'label' => 'Real-time app ID', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_ID (or your Pusher-compatible service\'s app id).'],
                     'accounts.realtime.key'         => ['type' => 'text', 'config' => 'services.realtime.key', 'label' => 'Real-time app key', 'rules' => ['nullable', 'string', 'max:64'], 'help' => 'REVERB_APP_KEY — public: browsers and apps use it to connect.'],
@@ -408,6 +407,21 @@ class HotelSettings
                     'laundry.express_hours'    => ['type' => 'int', 'label' => 'Express laundry comes back after (hours)', 'min' => 1, 'max' => 48],
                     'laundry.express_percent'  => ['type' => 'percent', 'label' => 'Express costs more by', 'max' => 300],
                     'laundry.guest_note'       => ['type' => 'textarea', 'label' => 'Note guests see', 'rules' => ['nullable', 'string', 'max:300'], 'help' => 'Where to leave the bag, pockets, what you don\'t wash.'],
+                ],
+            ],
+            'guest_sign_in' => [
+                'title' => 'Guest Sign-in', 'icon' => 'ri-user-shared-line',
+                'intro' => 'How guests sign in to their account on the website (/account) and in the guest app. A code by e-mail always works; Google and Apple add one-tap buttons. The e-mail Google or Apple confirms is the guest\'s account, so it shows every booking made with it. Client IDs are public values, not secrets.',
+                'fields' => [
+                    'guest_app.open_sign_up'             => ['type' => 'bool', 'label' => 'New guests can make an account (e-mail, Google or Apple)', 'help' => 'Off: only guests who have booked before can sign in.'],
+                    'guest_app.google_sign_in'           => ['type' => 'bool', 'label' => 'Sign in with Google'],
+                    'guest_app.google_web_client_id'     => ['type' => 'text', 'label' => 'Google web client ID', 'rules' => ['nullable', 'string', 'max:200', 'regex:/\.apps\.googleusercontent\.com$/'], 'help' => 'Google Cloud → APIs & Services → Credentials → OAuth client ID, type "Web application". Add this site\'s address (' . (app()->bound('url') ? url('/') : '') . ') under Authorised JavaScript origins. The Android app uses this ID too.'],
+                    'guest_app.google_ios_client_id'     => ['type' => 'text', 'label' => 'Google iOS client ID', 'rules' => ['nullable', 'string', 'max:200', 'regex:/\.apps\.googleusercontent\.com$/'], 'help' => 'An OAuth client ID of type "iOS" with the guest app\'s bundle ID.'],
+                    'guest_app.google_android_client_id' => ['type' => 'text', 'label' => 'Google Android client ID', 'rules' => ['nullable', 'string', 'max:200', 'regex:/\.apps\.googleusercontent\.com$/'], 'help' => 'An OAuth client ID of type "Android" with the app\'s package name and SHA-1. Only needs to exist in Google Cloud; filling it here is optional.'],
+                    'guest_app.apple_sign_in'            => ['type' => 'bool', 'label' => 'Sign in with Apple'],
+                    'guest_app.apple_service_id'         => ['type' => 'text', 'label' => 'Apple Services ID (website and Android)', 'rules' => ['nullable', 'string', 'max:150'], 'help' => 'Apple Developer → Identifiers → Services IDs, e.g. com.yourhotel.signin. Turn on Sign in with Apple, add this site\'s domain and the return URL ' . (app()->bound('url') ? url('/account/apple/callback') : '/account/apple/callback') . '.'],
+                    'guest_app.apple_bundle_id'          => ['type' => 'text', 'label' => 'iOS guest app bundle ID', 'rules' => ['nullable', 'string', 'max:150'], 'help' => 'The App ID with the Sign in with Apple capability, e.g. com.yourhotel.guest.'],
+                    'guest_app.android_package'          => ['type' => 'text', 'label' => 'Android guest app package name', 'rules' => ['nullable', 'string', 'max:150', 'regex:/^[A-Za-z0-9_.]+$/'], 'help' => 'Apple sign-in on Android comes back to the app through this, e.g. com.yourhotel.guest.'],
                 ],
             ],
             'maps' => [

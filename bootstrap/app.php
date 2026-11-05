@@ -21,8 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
-        // Paystack, Twilio and Termii post without a CSRF token; they are checked by signature instead.
-        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound', 'termii/events']);
+        // Paystack, Twilio and Termii post without a CSRF token; they are checked by signature instead (Apple sign-in: by the ID token's signature).
+        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'twilio/status', 'twilio/inbound', 'termii/events', 'account/apple/callback']);
 
         // Multi-hotel: pick the hotel before route models are loaded (so they come from that hotel only).
         // Then: roles that must use two-step sign-in are sent to set it up first.

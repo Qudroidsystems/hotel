@@ -44,6 +44,8 @@ Route::prefix('guest')->group(function () {
     // Guest accounts: sign in with a code sent to the e-mail / phone they booked with.
     Route::post('/auth/code', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'code'])->middleware('throttle:booking-lookup');
     Route::post('/auth/verify', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'verify'])->middleware('throttle:booking-lookup');
+    Route::post('/auth/social', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'social'])->middleware('throttle:booking-lookup');
+    Route::get('/auth/providers', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'providers'])->middleware('throttle:mobile-public');
     Route::middleware('throttle:mobile-public')->group(function () {
         Route::get('/me', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'me']);
         Route::patch('/me', [\App\Http\Controllers\Api\V1\GuestAccountController::class, 'update']);

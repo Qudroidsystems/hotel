@@ -128,6 +128,15 @@ Route::middleware('throttle:booking-pages')->group(function () {
     Route::get('/book/pay/{token}', [BookingController::class, 'pay'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:stay-actions')->name('book.pay');
     Route::get('/book/paystack/callback', [BookingController::class, 'callback'])->name('book.paystack.callback');
 
+    // The guest's account (same as the guest app): sign in with an e-mail code, Google or Apple
+    Route::prefix('account')->name('account.')->controller(\App\Http\Controllers\Booking\GuestAccountWebController::class)->group(function () {
+        Route::get('/', 'show')->name('show');
+        Route::post('/code', 'code')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('code');
+        Route::post('/verify', 'verify')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('verify');
+        Route::post('/social', 'social')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('social');
+        Route::post('/apple/callback', 'appleCallback')->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('apple.callback');
+        Route::post('/logout', 'logout')->name('logout');
+    });
     Route::get('/stay', [GuestPortalController::class, 'find'])->name('stay.find');
     Route::post('/stay', [GuestPortalController::class, 'lookup'])->withoutMiddleware('throttle:booking-pages')->middleware('throttle:booking-lookup')->name('stay.lookup');
     Route::get('/stay/{token}', [GuestPortalController::class, 'show'])->name('stay.show');
@@ -920,6 +929,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/hotel', [HotelSettingsController::class, 'index'])->name('hotel.index');
         Route::put('/hotel/{group}', [HotelSettingsController::class, 'update'])->where('group', '[a-z_]+')->name('hotel.update');
         Route::post('/hotel/reset', [HotelSettingsController::class, 'reset'])->name('hotel.reset');
+        Route::post('/hotel/test-email', [HotelSettingsController::class, 'testEmail'])->middleware('throttle:6,1')->name('hotel.test-email');
         // Hotels: one or several, and who works where
         Route::get('/hotels', [\App\Http\Controllers\Settings\HotelController::class, 'index'])->name('hotels.index');
         Route::post('/hotels/mode', [\App\Http\Controllers\Settings\HotelController::class, 'mode'])->name('hotels.mode');

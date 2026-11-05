@@ -76,6 +76,7 @@
             <div class="head-tools">
                 @if ($contact['phone'])<a class="tool hide-sm" href="tel:{{ preg_replace('/[^0-9+]/', '', $contact['phone']) }}"><i class="ri-phone-line"></i><span>{{ $contact['phone'] }}</span></a>@endif
                 <a class="tool hide-sm" href="{{ route('stay.find') }}" title="My booking"><i class="ri-key-2-line"></i><span>My booking</span></a>
+                <a class="tool hide-sm" href="{{ route('account.show') }}" title="Sign in to your account"><i class="ri-user-line"></i><span>Sign in</span></a>
                 @if (config('hotel.booking.enabled', true))<a href="{{ route('book.index') }}" class="btn sm" data-book>Book now</a>@endif
                 <button class="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
             </div>
@@ -92,6 +93,7 @@
         <div class="foot">
             @if (config('hotel.booking.enabled', true))<a href="{{ route('book.index') }}" data-book><i class="ri-calendar-check-line"></i> Book a stay</a>@endif
             <a href="{{ route('stay.find') }}"><i class="ri-key-2-line"></i> My booking</a>
+            <a href="{{ route('account.show') }}"><i class="ri-user-line"></i> My account</a>
             @if ($contact['phone'])<a href="tel:{{ preg_replace('/[^0-9+]/', '', $contact['phone']) }}"><i class="ri-phone-line"></i> {{ $contact['phone'] }}</a>@endif
             @if ($multi)<a href="{{ route('hotels.public') }}"><i class="ri-hotel-line"></i> All our hotels</a>@endif
         </div>
